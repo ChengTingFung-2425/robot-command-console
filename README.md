@@ -16,3 +16,22 @@ If you are not under GitHub Classroom.
 3. Create CodeSpace for each lab branch.
 4. Follow the video and work on the lab.
 5. If you need to get the solution, you can compare LabXX branch to LabXX-Completed branch, then you will know the difference.
+
+
+# How to create translation
+Run following commands
+```
+cd app/
+mkdir translations
+pybabel extract -F babel.cfg -k lazy_gettext -o translations/messages.pot .
+pybabel init -i translations/messages.pot -d translations -l en
+pybabel init -i translations/messages.pot -d translations -l es
+pybabel init -i translations/messages.pot -d translations -l zh
+pybabel compile -d translations
+```
+
+# How to update translation
+```
+cd app/
+pybabel update -i translations/messages.pot -d translations
+```

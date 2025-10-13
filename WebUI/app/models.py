@@ -1,7 +1,7 @@
 
 from datetime import datetime, timedelta, timezone
 from hashlib import md5
-from app import app, db, login
+from WebUI.app import app, db, login
 import jwt
 
 from flask_login import UserMixin

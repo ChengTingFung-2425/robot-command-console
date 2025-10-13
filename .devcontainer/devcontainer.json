@@ -8,7 +8,7 @@
   "waitFor": "onCreateCommand",
   "postCreateCommand": "",
   "postAttachCommand": {
-    "server": "flask -app WebUI/run.py --debug run --host=0.0.0.0"
+    "server": "flask --debug run --host=0.0.0.0"
   },
   "portsAttributes": {
     "5000": {

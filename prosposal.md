@@ -1,72 +1,74 @@
+# **提案：將 WebUI 轉型為機器人指令中介層（MCP 伺服器）**
+
+## **目標**
+
+**將現有的 WebUI 專案轉型為一個中介平台（模型上下文協議，MCP 伺服器），能夠持續接收、處理並轉發來自人類與 AI 客戶端的指令至各種機器人（伺服器），並可靠地將回應與狀態回傳給客戶端。系統必須確保隨時具備強大的人工監督與介入能力。**
+
+### **模組化架構理念**
+**本系統將採用模組化架構設計，將各項功能（如指令處理、機器人介接、通訊協議、認證授權、日誌監控等）分為獨立模組。每個模組可獨立開發、測試與維護，並可根據需求彈性擴充或替換。此設計有助於系統的可維護性、可擴展性與穩定性，並能快速因應未來新功能或新型機器人的整合。**
+
+**為達成此目標，WebUI 必須提供一個完整、即時的日誌與監控介面。這個日誌儀表板將允許人類操作員檢視所有指令活動、回應與錯誤，實現即時介入、監督與所有行為的可追溯性。這對於安全性、責任歸屬與有效的人機協作控制至關重要。**
 
 
-# Proposal: Transforming WebUI into a Robot Command Middleware (MCP Server)
+## **主要功能**
+1. **一致的多客戶端支援（人類與 AI）**
+   - **接受並處理來自人類用戶（透過 WebUI）與 AI 代理（透過 API/MCP 協議）的指令。**
+   - **為所有客戶端提供即時回饋與狀態更新。**
+   - **WebUI（人機介面）必須始終作為備援，確保人類可在 AI 出錯或需要協助時介入、覆寫或監督指令。**
 
-## Objective
-Transform the current WebUI project into a middleware platform (Model Context Protocol, MCP server) that consistently receives, processes, and forwards commands from both human and AI clients to various robots (servers), and reliably relays responses and statuses back to the clients. The system will ensure robust human oversight and intervention capabilities at all times.
+2. **機器人抽象層**
+   - **為不同類型的機器人定義一致且可擴充的介面。**
+   - **支援新機器人類型的無縫整合，僅需最小化修改。**
 
+3. **指令路由與處理**
+   - **中介層邏輯負責驗證、排隊並分派指令至適當的機器人（伺服器）。**
+   - **處理指令回執、錯誤回報與狀態追蹤。**
 
-## Key Features
+4. **模型上下文協議（MCP）伺服器**
+   - **實作 MCP 伺服器功能，標準化並簡化所有客戶端（人類/AI）與機器人之間的通訊。**
+   - **支援具備上下文感知的指令處理，並可擴充以因應未來 AI 整合。**
 
-1. **Consistent Multi-Client Support (Humans & AI)**
-   - Accept and process commands from both human users (via WebUI) and AI agents (via API/MCP protocol).
-   - Provide real-time feedback and status updates to all clients.
-   - The WebUI (human interface) must always be available as a fallback, ensuring humans can intervene, override, or supervise commands if the AI makes mistakes or requires assistance.
+5. **彈性的通訊協議**
+   - **支援多種通訊協議（HTTP、MQTT、WebSocket 等）以與不同機器人互動。**
 
-2. **Robot Abstraction Layer**
-   - Define a consistent, extensible interface for different robot types.
-   - Support seamless integration of new robot types with minimal changes.
+6. **認證與授權**
+   - **確保只有授權的客戶端（人類或 AI）能夠發送指令。**
+   - **提供基於角色的權限控管。**
 
-3. **Command Routing & Processing**
-   - Middleware logic to validate, queue, and dispatch commands to the appropriate robot (server).
-   - Handle command acknowledgments, error reporting, and status tracking.
+7. **完整的日誌與監控**
+   - **記錄所有指令、回應與錯誤，確保可追溯性。**
+   - **提供儀表板以監控機器人狀態、指令結果與系統健康狀況。**
 
-4. **Model Context Protocol (MCP) Server**
-   - Implement MCP server capabilities to standardize and streamline communication between all clients (humans/AI) and robots.
-   - Support context-aware command processing and extensibility for future AI integrations.
+## **實作步驟**
 
-5. **Flexible Communication Protocols**
-   - Support multiple communication protocols (HTTP, MQTT, WebSocket, etc.) to interact with different robots.
+1. **重構現有程式碼**
+   - **移除或調整以部落格/用戶為主的功能。**
+   - **建立新的、統一的資料模型，涵蓋機器人、指令與客戶端（人類/AI）。**
 
-6. **Authentication & Authorization**
-   - Ensure only authorized clients (humans or AI) can send commands.
-   - Provide role-based access control for different command privileges.
+2. **設計機器人介面**
+   - **建立健全的基礎類別/介面以進行機器人通訊。**
+   - **為每種機器人類型實作轉接器，確保一致性。**
 
-7. **Comprehensive Logging & Monitoring**
-   - Log all commands, responses, and errors for traceability.
-   - Provide a dashboard for monitoring robot statuses, command outcomes, and system health.
+3. **實作 MCP 伺服器層**
+   - **為 AI 與人類客戶端加入 MCP 協議支援。**
+   - **標準化客戶端與機器人之間的指令與上下文交換。**
 
-## Implementation Steps
+4. **更新 WebUI 與 API**
+   - **將部落格表單替換為指令輸入表單。**
+   - **新增機器人選擇、狀態顯示，以及 AI 客戶端的 API 端點。**
+   - **確保 WebUI 隨時可供人類介入與監督。**
 
-1. **Refactor Existing Codebase**
-   - Remove or adapt blog/user-centric features.
-   - Set up a new, consistent data model for robots, commands, and clients (humans/AI).
+5. **中介層邏輯**
+   - **實作指令驗證、排隊與分派邏輯。**
+   - **確保健全的錯誤處理與狀態回報。**
 
-2. **Design Robot Interface**
-   - Create a robust base class/interface for robot communication.
-   - Implement adapters for each robot type to ensure consistency.
+6. **整合通訊協議**
+   - **新增所需協議以與機器人通訊。**
 
-3. **Implement MCP Server Layer**
-   - Add MCP protocol support for both AI and human clients.
-   - Standardize command and context exchange between clients and robots.
+7. **安全性強化**
+   - **為人類與 AI 客戶端實作認證與授權。**
+   - **強制執行基於角色的權限控管。**
 
-4. **Update WebUI & API**
-   - Replace blog forms with command input forms.
-   - Add robot selection, status display, and API endpoints for AI clients.
-   - Ensure the WebUI is always available for human intervention and oversight.
-
-5. **Middleware Logic**
-   - Implement command validation, queuing, and dispatching logic.
-   - Ensure robust error handling and status reporting.
-
-6. **Integrate Communication Protocols**
-   - Add support for required protocols to communicate with robots.
-
-7. **Security Enhancements**
-   - Implement authentication and authorization for both human and AI clients.
-   - Enforce role-based access control.
-
-8. **Testing & Documentation**
-   - Write comprehensive tests for all new features.
-   - Update documentation to reflect the new architecture, usage, and fallback procedures.
-
+8. **測試與文件**
+   - **為所有新功能撰寫完整測試。**
+   - **更新文件，反映新架構、使用方式與備援流程。**

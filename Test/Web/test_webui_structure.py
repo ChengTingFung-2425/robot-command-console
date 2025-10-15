@@ -21,10 +21,14 @@ class TestWebUIFolderStructure(unittest.TestCase):
             'errors.py',
             'email.py',
             'forms.py',
-            'config.py',
         ]
         for m in modules:
             self.assertTrue(os.path.isfile(os.path.join(app_dir, m)), f"缺少 app 模組檔案: {m}")
 
+    def test_config_py_at_root(self):
+        # Check that config.py exists at the project root
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
+        config_path = os.path.join(project_root, 'config.py')
+        self.assertTrue(os.path.isfile(config_path), "缺少 config.py 檔案於專案根目錄")
 if __name__ == '__main__':
     unittest.main()

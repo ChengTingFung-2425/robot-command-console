@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://robot-command-console/schemas/command_request.schema.json",
+  "title": "CommandRequest",
+  "type": "object",
+  "required": ["trace_id", "timestamp", "actor", "source", "command"],
+  "properties": {
+    "trace_id": { "type": "string", "format": "uuid" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "actor": {
+      "type": "object",
+      "required": ["type", "id"],
+      "properties": {
+        "type": { "type": "string", "enum": ["human", "ai", "system"] },
+        "id": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "source": { "type": "string", "enum": ["webui", "api", "cli", "scheduler"] },
+    "command": {
+      "type": "object",
+      "required": ["id", "type", "target"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]+$" },
+        "target": {
+          "type": "object",
+          "properties": {
+            "robot_id": { "type": "string", "minLength": 1 }
+          },
+          "required": ["robot_id"],
+          "additionalProperties": false
+        },
+        "params": { "type": "object", "additionalProperties": true },
+        "timeout_ms": { "type": "integer", "minimum": 100, "maximum": 600000 },
+        "priority": { "type": "string", "enum": ["low", "normal", "high"] }
+      },
+      "additionalProperties": false
+    },
+    "auth": {
+      "type": "object",
+      "properties": {
+        "token": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "labels": { "type": "object", "additionalProperties": { "type": ["string", "number", "boolean"] } }
+  },
+  "additionalProperties": false
+}

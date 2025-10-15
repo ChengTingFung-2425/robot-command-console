@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://robot-command-console/schemas/error.schema.json",
+  "title": "Error",
+  "type": "object",
+  "required": ["code", "message"],
+  "properties": {
+    "code": { "type": "string", "enum": [
+      "ERR_TIMEOUT", "ERR_UNAUTHORIZED", "ERR_VALIDATION", "ERR_ROUTING", "ERR_PROTOCOL", "ERR_INTERNAL"
+    ] },
+    "message": { "type": "string" },
+    "details": { "type": ["object", "array", "string", "number", "boolean", "null"] }
+  },
+  "additionalProperties": true
+}

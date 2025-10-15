@@ -26,3 +26,6 @@ PyJWT==2.6.0
 
 # Development tools (template linting)
 djlint==1.19.7
+
+# JSON Schema validation for contract tests
+jsonschema==4.21.1

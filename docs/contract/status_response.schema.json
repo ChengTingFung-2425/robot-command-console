@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://robot-command-console/schemas/status_response.schema.json",
+  "title": "StatusResponse",
+  "type": "object",
+  "required": ["trace_id", "timestamp", "command"],
+  "properties": {
+    "trace_id": { "type": "string", "format": "uuid" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "command": {
+      "type": "object",
+      "required": ["id", "status"],
+      "properties": {
+        "id": { "type": "string" },
+        "status": { "type": "string", "enum": ["accepted", "running", "succeeded", "failed", "cancelled"] }
+      },
+      "additionalProperties": false
+    },
+    "progress": {
+      "type": "object",
+      "properties": {
+        "percent": { "type": "number", "minimum": 0, "maximum": 100 },
+        "stage": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "error": {
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "details": { "type": ["object", "array", "string", "number", "boolean", "null"] }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

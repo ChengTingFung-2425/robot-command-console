@@ -1,14 +1,17 @@
-# Python 檔案格式化範本
+---
+applyTo: '**/*.py'
+---
+## Python 檔案格式化與開發指引
 
-請遵循以下順序與格式撰寫 Python 檔案：
+> **撰寫程式時優先重用現有 function 並善用 requirements.txt 依賴。**
 
+格式順序：
 1. imports（標準庫、第三方、專案內，分段）
-2. class 
-3. function 定義（依功能分組，加註 docstring）
-4. main 區塊（如有，使用 if __name__ == '__main__':）
+2. class
+3. function（加 docstring，依功能分組）
+4. main 區塊（如有）
 
 範例：
-
 ```python
 # imports
 import os
@@ -32,8 +35,8 @@ def send_email(subject, sender, recipients, text_body, html_body=None):
 
 # main（如有）
 if __name__ == '__main__':
-    # 測試或 CLI 入口
-    pass
+    main()
 ```
+（如無 main 區塊可省略）
 
-如無 main 區塊可省略。所有檔案請統一此結構，便於維護與自動化工具解析。
+---

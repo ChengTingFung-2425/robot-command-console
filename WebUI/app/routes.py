@@ -1,4 +1,4 @@
-bp = Blueprint('webui', __name__)
+
 
 # imports
 from flask import Blueprint, jsonify, request

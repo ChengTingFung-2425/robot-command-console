@@ -1,44 +1,64 @@
 # WebUI 模組設計說明
 
-本文件依據專案提案（prosposal.md）規劃 WebUI 目錄，作為「機器人指令中介層（MCP 伺服器）」的人機互動介面，強調模組化、可擴充、可監督與安全。
+本文件定義 WebUI 模組在本專案中的職責、互動流程、事件與即時性要求、介入操作、安全與可觀測性，對齊 `Project.prompt.md` 與 `MCP/Module.md`。
 
-## 目標
-WebUI 提供人類操作員與 AI 客戶端的互動入口，支援：
-- 指令發送與回應
-- 狀態監控與日誌查詢
-- 即時介入與監督
-確保人機協作安全、可追溯與高可用。
+## 1. 職責與邊界
+- WebUI 僅與 MCP 交互，永不直接連線機器人或協定適配器。
+- 提供人機互動能力：登入/審批中心/指令下達/狀態面板/日誌查詢/告警訂閱。
+- 提供人類介入控制：pause/resume/cancel/override，並完整產生日誌與審計事件。
 
-## 模組化架構理念
-本 WebUI 採用模組化設計，將各項功能分為獨立模組，包含：
-- **指令路由與處理（routes.py）**：負責接收、驗證、分派來自 WebUI/AI 的指令。
-- **資料模型（models.py）**：定義機器人、指令、用戶等資料結構。
-- **錯誤處理（errors.py）**：統一管理例外與錯誤回報。
-- **郵件通知（email.py）**：異常、狀態變更等事件通知。
-- **表單驗證（forms.py）**：用戶輸入驗證。
-- **設定管理（config.py）**：集中管理系統設定。
-- **日誌與監控（建議擴充 logging_monitor.py）**：記錄所有操作、錯誤與事件，支援即時監控。
+## 2. 互動流程（對齊 MCP 契約）
+1) 使用者登入（AuthN），獲取 Token；授權（AuthZ）決定可用功能。
+2) 下達指令：組裝 CommandRequest（含 trace_id/actor/source/labels），POST 到 MCP `/api/command`。
+3) 監控執行：
+	 - 查詢：輪詢 `/api/status?command_id=...` 或
+	 - 訂閱：透過 WebSocket/SSE `/api/events` 接收事件（accepted/running/...）。
+4) 人類介入：於執行中狀態觸發 pause/resume/cancel/override；所有操作與審批紀錄寫入 Event（category=audit）。
+5) 結果歸檔：將最終狀態、摘要與關鍵上下文關聯 trace_id 以供追溯與報表。
 
-各模組可獨立開發、測試與維護，便於未來整合新功能或新型機器人。
+## 3. 即時性與事件
+- 渲染來源：事件優先（WS/SSE），失連時回退輪詢。
+- UI 狀態機：顯示 accepted → running → succeeded/failed/cancelled 流轉與進度。
+- 告警：對錯誤與高風險事件彈出提醒與指引（排查建議/回滾操作）。
 
-## 主要功能
-- 一致的多客戶端支援（人類 WebUI、AI API）
-- 指令驗證、排隊、分派與回應
-- 機器人狀態與指令結果監控
-- 完整日誌查詢與即時監督介面
-- 認證授權與角色權限控管
+事件格式（參考 MCP）：
+{
+	"trace_id": "...",
+	"timestamp": "...",
+	"severity": "INFO|WARN|ERROR",
+	"category": "command|auth|protocol|robot|audit",
+	"message": "...",
+	"context": { "command_id": "cmd-...", "user_id": "..." }
+}
 
-## 目錄結構簡介
-- app/：WebUI 主程式與模組
-- templates/：Jinja2 前端模板
-- translations/：多語系翻譯檔
-- migrations/：資料庫遷移管理
+## 4. 介入操作與審批
+- 高風險指令需先審批；審批結論、審批人與依據須記錄於審計事件。
+- 支援操作：pause/resume/cancel/override；若覆寫需提供原因與風險提示。
+- UI 應提供保護：二次確認、角色限制、節流與速率限制。
 
-## 實作建議
-1. 移除或調整部落格/用戶為主的功能，聚焦指令與機器人管理。
-2. 建立統一的資料模型，涵蓋機器人、指令、用戶。
-3. 強化日誌、監控與安全性，確保人類可隨時介入。
-4. 撰寫完整測試，確保各模組獨立可驗證。
+## 5. 安全與權限
+- 身份驗證：JWT/OAuth2/Session 皆可，建議短期 Token + 刷新。
+- 授權：RBAC（viewer/operator/admin/auditor）；頁面與操作基於權限控制顯示。
+- 敏感資訊：前端不儲存明文秘鑰；錯誤訊息脫敏；避免在 URL 曝露敏感參數。
 
----
-如需詳細設計理念與開發步驟，請參閱專案根目錄下的 prosposal.md。
+## 6. 可觀測性
+- 使用者行為與關鍵操作產生 Event（category=audit）。
+- UI 健康指標：事件延遲、斷線率、重連成功率。
+- 與 MCP 之 trace_id 對齊，確保端到端追蹤。
+
+## 7. 目錄結構對照
+- `WebUI/app/*.py`：後端路由、錯誤處理、資料模型、郵件、表單。
+- `WebUI/app/templates/*.j2`：頁面模板（狀態面板、日誌、審批、登入）。
+- `WebUI/migrations/*`：資料庫遷移。
+- `Test/Web/*`：對應測試檔，驗證路由、權限、日誌與 UI 結構。
+
+## 8. 完成定義（DoD）
+- 頁面與 API 對齊 MCP 契約；指令/事件流在本地可驗證。
+- 測試涵蓋：登入/授權、下達指令、事件訂閱、介入操作、日誌產生。
+- 安全檢查：權限控制、敏感資訊處理、錯誤脫敏。
+- 可觀測性：事件與 trace_id 貫通，關鍵指標可查。
+
+## 9. 下一步
+- 定義介入操作的 API 與前端交互細節（確認對話、風險提示）。
+- 建立告警訂閱與通知機制（Email/Webhook）。
+- 強化 E2E 測試：模擬連線中斷、超時與重試。

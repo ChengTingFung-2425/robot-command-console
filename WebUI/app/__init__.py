@@ -10,7 +10,7 @@ from flask_mail import Mail
 from flask_bootstrap import Bootstrap
 from flask_moment import Moment
 from flask_babel import Babel
-from WebUI.config import Config
+from config import Config
 
 # app 實例與初始化
 app = Flask(__name__)

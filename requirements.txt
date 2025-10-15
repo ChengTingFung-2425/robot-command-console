@@ -1,6 +1,6 @@
 # Core Flask framework
 Flask==2.2.5
-Werkzeug<3.0
+Werkzeug>3.0.3
 
 # Flask extensions
 Flask-Babel==2.0.0

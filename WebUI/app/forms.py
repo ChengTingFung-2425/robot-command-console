@@ -39,6 +39,11 @@ class ResetPasswordRequestForm(FlaskForm):
     email = StringField('電子郵件', validators=[DataRequired(), Email()])
     submit = SubmitField('發送重設密碼郵件')
 
+class ResetPasswordForm(FlaskForm):
+    password = PasswordField('新密碼', validators=[DataRequired()])
+    password2 = PasswordField('重複新密碼', validators=[DataRequired(), EqualTo('password')])
+    submit = SubmitField('重設密碼')
+
 class AdvancedCommandForm(FlaskForm):
     name = StringField('指令名稱', validators=[DataRequired()])
     description = TextAreaField('指令描述', validators=[DataRequired()])

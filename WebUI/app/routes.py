@@ -1,17 +1,32 @@
 
 # imports
-from flask import Blueprint, jsonify, request, render_template, redirect, url_for, flash
+from flask import Blueprint, jsonify, request, render_template, redirect, url_for, flash, session
 from flask_login import current_user, login_user, logout_user, login_required
 from WebUI.app import db
 from WebUI.app.models import Robot, Command, User, AdvancedCommand
-from WebUI.app.forms import LoginForm, RegisterForm, RegisterRobotForm, ResetPasswordRequestForm, AdvancedCommandForm
+from WebUI.app.forms import LoginForm, RegisterForm, RegisterRobotForm, ResetPasswordRequestForm, ResetPasswordForm, AdvancedCommandForm
+from WebUI.app.email import send_email
 
 # blueprint
 bp = Blueprint('webui', __name__)
 
+# functions
+def send_password_reset_email(user, token):
+    """發送密碼重設郵件"""
+    send_email(
+        subject='[Robot Console] 重設您的密碼',
+        sender='noreply@robot-console.com',
+        recipients=[user.email],
+        text_body=render_template('email/reset_password.txt.j2', user=user, token=token),
+        html_body=render_template('email/reset_password.html.j2', user=user, token=token)
+    )
+
 # 首頁
-@bp.route('/', methods=['GET'])
+@bp.route('/', methods=['GET', 'POST'])
 def home():
+    if request.method == 'POST':
+        # 處理 POST 請求
+        pass
     return render_template('home.html.j2')
 
 # 用戶註冊
@@ -120,21 +135,80 @@ def reset_password_request():
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
         if user:
-            # TODO: 發送密碼重設郵件
+            token = user.get_reset_password_token()
+            send_password_reset_email(user, token)
             flash('密碼重設郵件已發送至您的信箱，請查收。')
         else:
             flash('該電子郵件尚未註冊。')
         return redirect(url_for('webui.login'))
     return render_template('reset_password_request.html.j2', form=form)
 
+# 密碼重設
+@bp.route('/reset_password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    if current_user.is_authenticated:
+        return redirect(url_for('webui.home'))
+    user = User.verify_reset_password_token(token)
+    if not user:
+        flash('無效或過期的重設連結。')
+        return redirect(url_for('webui.login'))
+    form = ResetPasswordForm()
+    if form.validate_on_submit():
+        user.set_password(form.password.data)
+        db.session.commit()
+        flash('您的密碼已重設成功，請登入。')
+        return redirect(url_for('webui.login'))
+    return render_template('reset_password.html.j2', form=form)
+
 # 進階指令分享區
 @bp.route('/advanced_commands', methods=['GET'])
 def advanced_commands():
+    # 獲取篩選參數（從 URL 查詢字串或 session）
+    filter_status = request.args.get('status', session.get('cmd_filter_status', 'all'))
+    sort_by = request.args.get('sort', session.get('cmd_sort_by', 'created_at'))
+    sort_order = request.args.get('order', session.get('cmd_sort_order', 'desc'))
+    
+    # 儲存篩選設定到 session
+    session['cmd_filter_status'] = filter_status
+    session['cmd_sort_by'] = sort_by
+    session['cmd_sort_order'] = sort_order
+    
+    # 基礎查詢
+    query = AdvancedCommand.query
+    
+    # 權限與狀態篩選
     if current_user.is_authenticated and current_user.is_admin():
-        commands = AdvancedCommand.query.order_by(AdvancedCommand.created_at.desc()).all()
+        # Admin/Auditor 可以看到所有指令並篩選
+        if filter_status != 'all':
+            query = query.filter_by(status=filter_status)
     else:
-        commands = AdvancedCommand.query.filter_by(status='approved').order_by(AdvancedCommand.created_at.desc()).all()
-    return render_template('advanced_commands.html.j2', commands=commands)
+        # 一般用戶僅可見已批准的指令
+        query = query.filter_by(status='approved')
+    
+    # 排序
+    if sort_by == 'name':
+        sort_column = AdvancedCommand.name
+    elif sort_by == 'category':
+        sort_column = AdvancedCommand.category
+    elif sort_by == 'author':
+        sort_column = AdvancedCommand.author_id
+    elif sort_by == 'updated_at':
+        sort_column = AdvancedCommand.updated_at
+    else:  # created_at (預設)
+        sort_column = AdvancedCommand.created_at
+    
+    if sort_order == 'asc':
+        query = query.order_by(sort_column.asc())
+    else:
+        query = query.order_by(sort_column.desc())
+    
+    commands = query.all()
+    
+    return render_template('advanced_commands.html.j2', 
+                         commands=commands,
+                         filter_status=filter_status,
+                         sort_by=sort_by,
+                         sort_order=sort_order)
 
 # 建立進階指令
 @bp.route('/advanced_commands/create', methods=['GET', 'POST'])
@@ -156,7 +230,7 @@ def create_advanced_command():
     return render_template('create_advanced_command.html.j2', form=form)
 
 # 審核進階指令（僅 admin/auditor）
-@bp.route('/advanced_commands/<int:cmd_id>/audit', methods=['POST'])
+@bp.route('/advanced_commands/audit/<int:cmd_id>', methods=['POST'])
 @login_required
 def audit_advanced_command(cmd_id):
     if not current_user.is_admin():

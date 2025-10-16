@@ -3,6 +3,9 @@
 
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
+from time import time
+import jwt
+from flask import current_app
 from WebUI.app import db, login
 
 # classes
@@ -16,6 +19,11 @@ class User(UserMixin, db.Model):
     role = db.Column(db.String(32), default='operator')  # viewer/operator/admin/auditor
     robots = db.relationship('Robot', backref='owner', lazy='dynamic')
 
+    def __init__(self, **kwargs):
+        super(User, self).__init__(**kwargs)
+        if 'role' not in kwargs:
+            self.role = 'operator'
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
@@ -24,6 +32,23 @@ class User(UserMixin, db.Model):
     
     def is_admin(self):
         return self.role in ['admin', 'auditor']
+    
+    def get_reset_password_token(self, expires_in=600):
+        """生成密碼重設 token (有效期 10 分鐘)"""
+        return jwt.encode(
+            {'reset_password': self.id, 'exp': time() + expires_in},
+            current_app.config['SECRET_KEY'], algorithm='HS256'
+        )
+    
+    @staticmethod
+    def verify_reset_password_token(token):
+        """驗證密碼重設 token"""
+        try:
+            id = jwt.decode(token, current_app.config['SECRET_KEY'],
+                          algorithms=['HS256'])['reset_password']
+        except:
+            return None
+        return User.query.get(id)
 
     def __repr__(self):
         return f'<User {self.username}>'

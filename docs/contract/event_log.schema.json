@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://robot-command-console/schemas/event_log.schema.json",
+  "title": "EventLog",
+  "type": "object",
+  "required": ["trace_id", "timestamp", "severity", "category", "message"],
+  "properties": {
+    "trace_id": { "type": "string", "format": "uuid" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "severity": { "type": "string", "enum": ["INFO", "WARN", "ERROR"] },
+    "category": { "type": "string", "enum": ["command", "auth", "protocol", "robot", "audit"] },
+    "message": { "type": "string" },
+    "context": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": false
+}

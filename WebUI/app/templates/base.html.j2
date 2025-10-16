@@ -20,28 +20,30 @@
                     <span class="icon-bar"></span>
                     <span class="icon-bar"></span>
                 </button>
-                <a class="navbar-brand" href="{{ url_for('index') }}">Microblog</a>
+                <a class="navbar-brand" href="{{ url_for('webui.home') }}">機器人指令中介層</a>
             </div>
             <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
                 <ul class="nav navbar-nav">
                     <li>
-                        <a href="{{ url_for('index') }}">{{ _('Home') }}</a>
+                        <a href="{{ url_for('webui.home') }}">{{ _('Home') }}</a>
+                    </li>
+                    {% if current_user.is_authenticated %}
+                    <li>
+                        <a href="{{ url_for('webui.robot_dashboard') }}">{{ _('Dashboard') }}</a>
                     </li>
                     <li>
-                        <a href="{{ url_for('explore') }}">{{ _('Explore') }}</a>
+                        <a href="{{ url_for('webui.advanced_commands') }}">{{ _('Advanced Commands') }}</a>
                     </li>
+                    {% endif %}
                 </ul>
                 <ul class="nav navbar-nav navbar-right">
                     {% if current_user.is_anonymous %}
                         <li>
-                            <a href="{{ url_for('login') }}">{{ _('Login') }}</a>
+                            <a href="{{ url_for('webui.login') }}">{{ _('Login') }}</a>
                         </li>
                     {% else %}
                         <li>
-                            <a href="{{ url_for('user', username=current_user.username) }}">{{ _('Profile') }}</a>
-                        </li>
-                        <li>
-                            <a href="{{ url_for('logout') }}">{{ _('Logout') }}</a>
+                            <a href="{{ url_for('webui.logout') }}">{{ _('Logout') }}</a>
                         </li>
                     {% endif %}
                 </ul>

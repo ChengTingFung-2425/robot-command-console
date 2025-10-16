@@ -1,92 +1,96 @@
 
-from datetime import datetime, timedelta, timezone
-from hashlib import md5
-from WebUI.app import app, db, login
-import jwt
-
-from flask_login import UserMixin
+# imports
 
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_login import UserMixin
+from time import time
+import jwt
+from flask import current_app
+from WebUI.app import db, login
 
-
-followers = db.Table(
-    'followers',
-    db.Column('follower_id', db.Integer, db.ForeignKey('user.id')),
-    db.Column('followed_id', db.Integer, db.ForeignKey('user.id'))
-)
-
+# classes
 
 class User(UserMixin, db.Model):
+    """用戶資料表"""
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(64), index=True, unique=True)
-    email = db.Column(db.String(120), index=True, unique=True)
+    username = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(128))
-    posts = db.relationship('Post', backref='author', lazy='dynamic')
-    about_me = db.Column(db.String(140))
-    last_seen = db.Column(db.DateTime, default=datetime.utcnow)
-    followed = db.relationship(
-        'User', secondary=followers,
-        primaryjoin=(followers.c.follower_id == id),
-        secondaryjoin=(followers.c.followed_id == id),
-        backref=db.backref('followers', lazy='dynamic'), lazy='dynamic')
+    role = db.Column(db.String(32), default='operator')  # viewer/operator/admin/auditor
+    robots = db.relationship('Robot', backref='owner', lazy='dynamic')
 
-    def __repr__(self) -> str:
-        return f'<User {self.username}>'
+    def __init__(self, **kwargs):
+        super(User, self).__init__(**kwargs)
+        if 'role' not in kwargs:
+            self.role = 'operator'
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
-
-    def avatar(self, size):
-        digest = md5(self.email.lower().encode("utf-8")).hexdigest()
-        return 'https://www.gravatar.com/avatar/{}?d=identicon&s={}'.format(
-            digest, size)
-
-    def follow(self, user):
-        if not self.is_following(user):
-            self.followed.append(user)
-
-    def unfollow(self, user):
-        if self.is_following(user):
-            self.followed.remove(user)
-
-    def is_following(self, user):
-        return self.followed.filter(followers.c.followed_id == user.id).count() > 0
-
-    def followed_posts(self):
-        followed = Post.query.join(
-            followers, followers.c.followed_id == Post.user_id
-        ).filter(followers.c.follower_id == self.id)
-        own = Post.query.filter_by(user_id=self.id)
-        return followed.union(own).order_by(Post.timestamp.desc())
-
+    
+    def is_admin(self):
+        return self.role in ['admin', 'auditor']
+    
     def get_reset_password_token(self, expires_in=600):
-        return jwt.encode({"reset_password": self.id,
-                           "exp": datetime.now(tz=timezone.utc) + timedelta(seconds=expires_in)},
-                          app.config["SECRET_KEY"], algorithm="HS256")
-
+        """生成密碼重設 token (有效期 10 分鐘)"""
+        return jwt.encode(
+            {'reset_password': self.id, 'exp': time() + expires_in},
+            current_app.config['SECRET_KEY'], algorithm='HS256'
+        )
+    
     @staticmethod
     def verify_reset_password_token(token):
+        """驗證密碼重設 token"""
         try:
-            id = jwt.decode(token, app.config["SECRET_KEY"], algorithms="HS256")[
-                "reset_password"]
-        except:           
+            id = jwt.decode(token, current_app.config['SECRET_KEY'],
+                          algorithms=['HS256'])['reset_password']
+        except:
             return None
         return User.query.get(id)
 
+    def __repr__(self):
+        return f'<User {self.username}>'
 
 @login.user_loader
 def load_user(id):
     return User.query.get(int(id))
 
-
-class Post(db.Model):
+class Robot(db.Model):
+    """機器人資料表"""
     id = db.Column(db.Integer, primary_key=True)
-    body = db.Column(db.String(140))
-    timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
+    name = db.Column(db.String(64), unique=True, nullable=False)
+    type = db.Column(db.String(64), nullable=False)
+    status = db.Column(db.String(64), default='idle')
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
 
-    def __repr__(self) -> str:
-        return f'<Post {self.body}>'
+    def __repr__(self):
+        return f'<Robot {self.name}>'
+
+class Command(db.Model):
+    """指令資料表"""
+    id = db.Column(db.Integer, primary_key=True)
+    robot_id = db.Column(db.Integer, db.ForeignKey('robot.id'))
+    command = db.Column(db.String(128), nullable=False)
+    status = db.Column(db.String(64), default='pending')
+    timestamp = db.Column(db.DateTime, index=True)
+
+    def __repr__(self):
+        return f'<Command {self.command} to robot {self.robot_id}>'
+
+class AdvancedCommand(db.Model):
+    """進階指令資料表"""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(128), nullable=False, unique=True)
+    description = db.Column(db.Text)
+    category = db.Column(db.String(64), index=True)
+    base_commands = db.Column(db.Text, nullable=False)  # JSON 格式的基礎指令序列
+    author_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    author = db.relationship('User', backref='advanced_commands')
+    status = db.Column(db.String(32), default='pending')  # pending/approved/rejected
+    created_at = db.Column(db.DateTime, index=True, default=db.func.now())
+    updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
+
+    def __repr__(self):
+        return f'<AdvancedCommand {self.name}>'

@@ -1,0 +1,18 @@
+{% extends "base.html.j2" %}
+{% import 'bootstrap/wtf.html' as wtf %}
+{% block app_content %}
+  <h2>建立進階指令</h2>
+  <p>基於基礎指令組合，建立可重複使用的進階指令範例。</p>
+  <div class="row">
+    <div class="col-md-6">{{ wtf.quick_form(form) }}</div>
+  </div>
+  <hr>
+  <h4>範例格式：</h4>
+  <pre>
+[
+  {"command": "go_forward", "duration_ms": 3000},
+  {"command": "turn_left", "duration_ms": 1000},
+  {"command": "go_forward", "duration_ms": 2000}
+]
+  </pre>
+{% endblock %}

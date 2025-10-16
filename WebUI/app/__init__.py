@@ -1,8 +1,8 @@
+# imports
 import logging
 from logging.handlers import RotatingFileHandler, SMTPHandler
 import os
 from flask import Flask, request
-from WebUI.app.config import Config
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager
@@ -10,8 +10,9 @@ from flask_mail import Mail
 from flask_bootstrap import Bootstrap
 from flask_moment import Moment
 from flask_babel import Babel
+from config import Config
 
-
+# app 實例與初始化
 app = Flask(__name__)
 app.config.from_object(Config)
 db = SQLAlchemy(app)
@@ -24,6 +25,7 @@ bootstrap = Bootstrap(app)
 moment = Moment(app)
 babel = Babel(app)
 
+# logging 設定（如需）
 if not app.debug:
     root = logging.getLogger()
     if app.config["MAIL_SERVER"]:

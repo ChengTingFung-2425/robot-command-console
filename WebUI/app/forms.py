@@ -1,69 +1,53 @@
+# imports
+
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, BooleanField, SubmitField, \
-    TextAreaField
-from wtforms.validators import ValidationError, DataRequired, Email, EqualTo, \
-    Length
-from flask_babel import _, lazy_gettext as _l
+from wtforms import StringField, PasswordField, BooleanField, SubmitField, TextAreaField
+from wtforms.validators import DataRequired, Email, EqualTo, ValidationError
 from WebUI.app.models import User
 
-
+# classes
 class LoginForm(FlaskForm):
-    username = StringField(_l('Username'), validators=[DataRequired()])
-    password = PasswordField(_l('Password'), validators=[DataRequired()])
-    remember_me = BooleanField(_l('Remember Me'))
-    submit = SubmitField(_l('Sign In'))
+    username = StringField('用戶名稱', validators=[DataRequired()])
+    password = PasswordField('密碼', validators=[DataRequired()])
+    remember_me = BooleanField('記住我')
+    submit = SubmitField('登入')
 
 
-class RegistrationForm(FlaskForm):
-    username = StringField(_l('Username'), validators=[DataRequired()])
-    email = StringField(_l('Email'), validators=[DataRequired(), Email()])
-    password = PasswordField(_l('Password'), validators=[DataRequired()])
-    password2 = PasswordField(
-        _l('Repeat Password'), validators=[DataRequired(),
-                                           EqualTo('password')])
-    submit = SubmitField(_l('Register'))
+class RegisterForm(FlaskForm):
+    username = StringField('用戶名稱', validators=[DataRequired()])
+    email = StringField('電子郵件', validators=[DataRequired(), Email()])
+    password = PasswordField('密碼', validators=[DataRequired()])
+    password2 = PasswordField('重複密碼', validators=[DataRequired(), EqualTo('password')])
+    submit = SubmitField('註冊')
 
     def validate_username(self, username):
         user = User.query.filter_by(username=username.data).first()
-        if user is not None:
-            raise ValidationError(_('Please use a different username.'))
+        if user:
+            raise ValidationError('用戶名稱已被使用。')
 
     def validate_email(self, email):
         user = User.query.filter_by(email=email.data).first()
-        if user is not None:
-            raise ValidationError(_('Please use a different email address.'))
+        if user:
+            raise ValidationError('電子郵件已被註冊。')
 
+class RegisterRobotForm(FlaskForm):
+    name = StringField('機器人名稱', validators=[DataRequired()])
+    type = StringField('機器人類型', validators=[DataRequired()])
+    submit = SubmitField('註冊機器人')
 
 class ResetPasswordRequestForm(FlaskForm):
-    email = StringField(_l('Email'), validators=[DataRequired(), Email()])
-    submit = SubmitField(_l('Request Password Reset'))
-
+    email = StringField('電子郵件', validators=[DataRequired(), Email()])
+    submit = SubmitField('發送重設密碼郵件')
 
 class ResetPasswordForm(FlaskForm):
-    password = PasswordField(_l('Password'), validators=[DataRequired()])
-    password2 = PasswordField(
-        _l('Repeat Password'), validators=[DataRequired(),
-                                           EqualTo('password')])
-    submit = SubmitField(_l('Request Password Reset'))
+    password = PasswordField('新密碼', validators=[DataRequired()])
+    password2 = PasswordField('重複新密碼', validators=[DataRequired(), EqualTo('password')])
+    submit = SubmitField('重設密碼')
 
+class AdvancedCommandForm(FlaskForm):
+    name = StringField('指令名稱', validators=[DataRequired()])
+    description = TextAreaField('指令描述', validators=[DataRequired()])
+    category = StringField('分類', validators=[DataRequired()])
+    base_commands = TextAreaField('基礎指令序列（JSON）', validators=[DataRequired()])
+    submit = SubmitField('提交進階指令')
 
-class EditProfileForm(FlaskForm):
-    username = StringField(_l('Username'), validators=[DataRequired()])
-    about_me = TextAreaField(_l('About me'),
-                             validators=[Length(min=0, max=140)])
-    submit = SubmitField(_l('Submit'))
-
-    def __init__(self, original_username, *args, **kwargs):
-        super(EditProfileForm, self).__init__(*args, **kwargs)
-        self.original_username = original_username
-
-    def validate_username(self, username):
-        if username.data != self.original_username:
-            user = User.query.filter_by(username=self.username.data).first()
-            if user is not None:
-                raise ValidationError(_('Please use a different username.'))
-
-
-class PostForm(FlaskForm):
-    post = TextAreaField(_l('Say something'), validators=[DataRequired()])
-    submit = SubmitField(_l('Submit'))

@@ -1,5 +1,3 @@
-def send_password_reset_email(user):
-
 # 用於機器人狀態/異常通知的郵件發送
 from threading import Thread
 from flask_mail import Message

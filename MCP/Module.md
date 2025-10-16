@@ -11,6 +11,7 @@
 - 指令處理（command）：接收、驗證、排隊、路由、重試、超時。
 - 上下文管理（context）：指令上下文與狀態歷史；冪等鍵管理。
 - 協定適配（protocols）：HTTP/WebSocket/MQTT/gRPC/ROS 等轉接與可靠傳輸。
+- 機器人路由（robot_routing）：根據 robot_id 與 robot_type 路由至對應的 Robot-Console 模組。
 - 認證授權（auth）：身份驗證、RBAC/ABAC、權限審計。
 - 日誌/監控（logging_monitor）：事件、審計、指標、追蹤。
 
@@ -82,8 +83,15 @@ Event：
 1) 接收與驗證（schema + 業務規則）
 2) 認證/授權（AuthN/AuthZ）
 3) 上下文豐富與冪等鍵處理
-4) 路由至協定適配與機器人抽象
-5) 執行與監控（超時/重試/併發控制）
+4) **機器人路由**：
+   - 解析 command.target.robot_id 與 robot_type
+   - 查詢機器人註冊表（可用性、能力、協定）
+   - 路由至對應的 Robot-Console 實例
+5) **執行與監控**（透過 Robot-Console）：
+   - Robot-Console 接收標準化指令
+   - 轉換為機器人特定格式
+   - 透過協定適配器發送（HTTP/MQTT/WS 等）
+   - 超時/重試/併發控制
 6) 事件上報（accepted/running/succeeded/failed/cancelled）
 7) 回應與最終狀態查詢/回調
 8) 人類介入（pause/resume/cancel/override）
@@ -97,6 +105,10 @@ Event：
 - ERR_VALIDATION：請求資料不符合 schema/業務規則。
 - ERR_UNAUTHORIZED：身份驗證或授權失敗。
 - ERR_ROUTING：無對應路由或目標不可達。
+- ERR_ROBOT_NOT_FOUND：指定的 robot_id 不存在或未註冊。
+- ERR_ROBOT_OFFLINE：機器人離線或無回應。
+- ERR_ROBOT_BUSY：機器人執行中，無法接受新指令。
+- ERR_ACTION_INVALID：動作類型不支援。
 - ERR_PROTOCOL：協定層錯誤（連線/封包/解碼）。
 - ERR_TIMEOUT：執行逾時。
 - ERR_INTERNAL：未預期錯誤。
@@ -118,7 +130,72 @@ Event：
 - 事件/指標可查詢；錯誤碼表同步文件。
 - 安全檢查完成（無硬編碼密鑰、權限/輸入檢查）。
 
-## 9. 下一步
+## 9. 機器人註冊與管理
+
+### 9.1 機器人註冊表
+MCP 維護一個機器人註冊表，包含：
+- `robot_id`：唯一識別碼（如 "robot_7"）
+- `robot_type`：機器人類型（humanoid/agv/arm/drone）
+- `capabilities`：支援的動作清單
+- `status`：online/offline/busy/maintenance
+- `endpoint`：Robot-Console 實例的連線資訊
+- `protocol`：優先通訊協定（HTTP/MQTT/WebSocket）
+- `last_heartbeat`：最後心跳時間
+
+### 9.2 機器人發現與健康檢查
+- **自動註冊**：Robot-Console 啟動時向 MCP 註冊
+- **心跳機制**：定期發送健康狀態（30秒間隔）
+- **自動摘除**：超過 2 分鐘無心跳則標記為 offline
+- **能力查詢**：WebUI 可查詢可用機器人清單與能力
+
+### 9.3 負載平衡與容錯
+- 相同類型的多個機器人可形成機群
+- 根據狀態（idle/busy）與負載分配指令
+- 單一機器人失敗時自動重試其他實例
+
+## 10. 進階指令插件機制
+
+### 10.1 設計理念
+- **基於組合**：進階指令由多個基礎指令按序列組合而成
+- **用戶貢獻**：登入用戶可建立、分享進階指令範例
+- **審核機制**：Admin/Auditor 角色審核後方可公開
+- **可重複使用**：審核通過的進階指令可被其他用戶直接引用
+
+### 10.2 進階指令格式
+進階指令以 JSON 陣列定義，包含：
+- `name`：進階指令名稱（唯一）
+- `description`：功能描述
+- `category`：分類（導航/操作/巡檢等）
+- `base_commands`：基礎指令序列，範例：
+```json
+[
+  {"command": "go_forward", "duration_ms": 3000, "speed": "normal"},
+  {"command": "turn_left", "duration_ms": 1000},
+  {"command": "go_forward", "duration_ms": 2000}
+]
+```
+
+### 10.3 執行流程
+1. 用戶選擇已審核的進階指令
+2. MCP 展開為基礎指令序列
+3. 逐一執行基礎指令，保留 trace_id 連貫性
+4. 任一步驟失敗可選擇中止或繼續
+5. 整體執行狀態與進度回報
+
+### 10.4 審核與管理
+- **提交**：登入用戶建立進階指令，初始狀態為 `pending`
+- **審核**：Admin/Auditor 可批准（`approved`）或拒絕（`rejected`）
+- **編輯**：作者可編輯自己的進階指令，重新送審
+- **分類與搜尋**：依類別、關鍵字過濾進階指令
+
+### 10.5 安全性
+- 基礎指令需通過標準驗證與授權流程
+- 進階指令不得包含惡意或越權操作
+- 審核時檢查指令合理性與安全性
+
+## 11. 下一步
+- 實作機器人註冊 API（POST /api/robots/register）
+- 實作進階指令 API（POST /api/advanced_commands、GET /api/advanced_commands）
 - 將協定適配器介面定義文件化（connect/send/receive/close、重試/超時約定）。
 - 與 WebUI 對齊審批/介入操作 API 與事件語意。
 - 擴充錯誤碼表與狀態機定義；補齊整合測試。

@@ -1,0 +1,46 @@
+{% extends "base.html.j2" %}
+{% block app_content %}
+<h2>進階指令分享區</h2>
+<p>這裡展示用戶基於基礎指令組合的進階指令範例，經審核後可供其他用戶參考與使用。</p>
+
+{% if current_user.is_authenticated %}
+<div class="text-right" style="margin-bottom: 15px;">
+  <a href="{{ url_for('webui.create_advanced_command') }}" class="btn btn-primary">建立進階指令</a>
+</div>
+{% endif %}
+
+<div class="panel-group" id="accordion">
+  {% for cmd in commands %}
+  <div class="panel panel-default">
+    <div class="panel-heading">
+      <h4 class="panel-title">
+        <a data-toggle="collapse" data-parent="#accordion" href="#collapse{{ cmd.id }}">
+          <strong>{{ cmd.name }}</strong> 
+          <span class="label label-{{ 'success' if cmd.status == 'approved' else 'warning' }}">{{ cmd.status }}</span>
+          <small class="text-muted">分類：{{ cmd.category }}</small>
+        </a>
+      </h4>
+    </div>
+    <div id="collapse{{ cmd.id }}" class="panel-collapse collapse">
+      <div class="panel-body">
+        <p><strong>描述：</strong>{{ cmd.description }}</p>
+        <p><strong>作者：</strong>{{ cmd.author.username }}</p>
+        <p><strong>基礎指令序列：</strong></p>
+        <pre>{{ cmd.base_commands }}</pre>
+        {% if current_user.is_admin() %}
+        <hr>
+        <form method="post" action="{{ url_for('webui.audit_advanced_command', cmd_id=cmd.id) }}" style="display:inline;">
+          <input type="hidden" name="action" value="approve">
+          <button type="submit" class="btn btn-success btn-sm">批准</button>
+        </form>
+        <form method="post" action="{{ url_for('webui.audit_advanced_command', cmd_id=cmd.id) }}" style="display:inline;">
+          <input type="hidden" name="action" value="reject">
+          <button type="submit" class="btn btn-danger btn-sm">拒絕</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

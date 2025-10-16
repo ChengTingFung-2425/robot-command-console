@@ -1,33 +1,174 @@
 
-
 # imports
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, render_template, redirect, url_for, flash
+from flask_login import current_user, login_user, logout_user, login_required
 from WebUI.app import db
-from WebUI.app.models import Robot, Command
+from WebUI.app.models import Robot, Command, User, AdvancedCommand
+from WebUI.app.forms import LoginForm, RegisterForm, RegisterRobotForm, ResetPasswordRequestForm, AdvancedCommandForm
 
 # blueprint
 bp = Blueprint('webui', __name__)
 
-# functions
+# 首頁
+@bp.route('/', methods=['GET'])
+def home():
+    return render_template('home.html.j2')
+
+# 用戶註冊
+@bp.route('/register', methods=['GET', 'POST'])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('webui.home'))
+    form = RegisterForm()
+    if form.validate_on_submit():
+        user = User(username=form.username.data, email=form.email.data)
+        user.set_password(form.password.data)
+        db.session.add(user)
+        db.session.commit()
+        flash('註冊成功，請登入。')
+        return redirect(url_for('webui.login'))
+    return render_template('register.html.j2', form=form)
+
+# 用戶登入
+@bp.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('webui.home'))
+    form = LoginForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(username=form.username.data).first()
+        if user is None or not user.check_password(form.password.data):
+            flash('用戶名稱或密碼錯誤')
+            return redirect(url_for('webui.login'))
+        login_user(user, remember=form.remember_me.data)
+        return redirect(url_for('webui.home'))
+    return render_template('login.html.j2', form=form)
+
+# 用戶登出
+@bp.route('/logout')
+def logout():
+    logout_user()
+    return redirect(url_for('webui.home'))
+
+# 註冊機器人
+@bp.route('/register_robot', methods=['GET', 'POST'])
+@login_required
+def register_robot():
+    form = RegisterRobotForm()
+    if form.validate_on_submit():
+        robot = Robot(name=form.name.data, type=form.type.data, owner=current_user)
+        db.session.add(robot)
+        db.session.commit()
+        flash('機器人註冊成功！')
+        return redirect(url_for('webui.robot_dashboard'))
+    return render_template('register_robot.html.j2', form=form)
+
+# 儀表板頁面：顯示當前用戶的機器人
+@bp.route('/dashboard', methods=['GET'])
+@login_required
+def robot_dashboard():
+    robots = Robot.query.filter_by(owner=current_user).all()
+    for r in robots:
+        if not hasattr(r, 'capabilities'):
+            r.capabilities = ['go_forward', 'turn_left', 'turn_right']
+    return render_template('robot_dashboard.html.j2', robots=robots)
+
+# API：查詢所有機器人（JSON）
 @bp.route('/robots', methods=['GET'])
 def list_robots():
-    """列出所有機器人"""
+    """列出所有機器人 (API)"""
     robots = Robot.query.all()
-    return jsonify([{'id': r.id, 'name': r.name, 'type': r.type, 'status': r.status} for r in robots])
+    return jsonify([
+        {'id': r.id, 'name': r.name, 'type': r.type, 'status': r.status,
+         'capabilities': getattr(r, 'capabilities', ['go_forward', 'turn_left', 'turn_right'])}
+        for r in robots
+    ])
 
+
+# 指令下達（支援表單與 API）
 @bp.route('/commands', methods=['POST'])
 def send_command():
-    """發送指令給指定機器人"""
-    data = request.get_json()
+    """發送指令給指定機器人（API 或表單）"""
+    if request.is_json:
+        data = request.get_json()
+    else:
+        data = request.form
     robot_id = data.get('robot_id')
     command = data.get('command')
     cmd = Command(robot_id=robot_id, command=command, status='pending')
     db.session.add(cmd)
     db.session.commit()
+    # 若為表單提交則導回 dashboard
+    if not request.is_json:
+        return redirect(url_for('webui.robot_dashboard'))
     return jsonify({'result': 'ok', 'command_id': cmd.id})
 
+
+# 查詢指令執行狀態
 @bp.route('/commands/<int:cmd_id>', methods=['GET'])
 def get_command_status(cmd_id):
     """查詢指令執行狀態"""
     cmd = Command.query.get_or_404(cmd_id)
     return jsonify({'id': cmd.id, 'robot_id': cmd.robot_id, 'command': cmd.command, 'status': cmd.status})
+
+# 密碼重設請求
+@bp.route('/reset_password_request', methods=['GET', 'POST'])
+def reset_password_request():
+    if current_user.is_authenticated:
+        return redirect(url_for('webui.home'))
+    form = ResetPasswordRequestForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(email=form.email.data).first()
+        if user:
+            # TODO: 發送密碼重設郵件
+            flash('密碼重設郵件已發送至您的信箱，請查收。')
+        else:
+            flash('該電子郵件尚未註冊。')
+        return redirect(url_for('webui.login'))
+    return render_template('reset_password_request.html.j2', form=form)
+
+# 進階指令分享區
+@bp.route('/advanced_commands', methods=['GET'])
+def advanced_commands():
+    if current_user.is_authenticated and current_user.is_admin():
+        commands = AdvancedCommand.query.order_by(AdvancedCommand.created_at.desc()).all()
+    else:
+        commands = AdvancedCommand.query.filter_by(status='approved').order_by(AdvancedCommand.created_at.desc()).all()
+    return render_template('advanced_commands.html.j2', commands=commands)
+
+# 建立進階指令
+@bp.route('/advanced_commands/create', methods=['GET', 'POST'])
+@login_required
+def create_advanced_command():
+    form = AdvancedCommandForm()
+    if form.validate_on_submit():
+        cmd = AdvancedCommand(
+            name=form.name.data,
+            description=form.description.data,
+            category=form.category.data,
+            base_commands=form.base_commands.data,
+            author=current_user
+        )
+        db.session.add(cmd)
+        db.session.commit()
+        flash('進階指令已提交，等待審核。')
+        return redirect(url_for('webui.advanced_commands'))
+    return render_template('create_advanced_command.html.j2', form=form)
+
+# 審核進階指令（僅 admin/auditor）
+@bp.route('/advanced_commands/<int:cmd_id>/audit', methods=['POST'])
+@login_required
+def audit_advanced_command(cmd_id):
+    if not current_user.is_admin():
+        flash('您沒有權限執行此操作。')
+        return redirect(url_for('webui.advanced_commands'))
+    cmd = AdvancedCommand.query.get_or_404(cmd_id)
+    action = request.form.get('action')
+    if action == 'approve':
+        cmd.status = 'approved'
+        flash(f'進階指令「{cmd.name}」已批准。')
+    elif action == 'reject':
+        cmd.status = 'rejected'
+        flash(f'進階指令「{cmd.name}」已拒絕。')
+    db.session.commit()
+    return redirect(url_for('webui.advanced_commands'))

@@ -3,7 +3,10 @@ mode: agent
 ---
 ## 專案總覽與作業規範
 
+
 本文件定義本專案「機器人指令中介層」的設計原則、模組邊界、資料契約、處理流程與完成定義，確保系統模組化、可擴充、可監督、可追溯與高可用。
+
+> **說明：如遇規格疑義，請以 prosposal.md 為最終依據。**
 
 ## 目標與核心原則
 - 模組化與鬆耦合：MCP、指令/路由、通訊協定、認證/授權、日誌/監控、機器人抽象、WebUI 皆為清楚邊界的獨立模組。
@@ -11,6 +14,7 @@ mode: agent
 - 可監督與人類可介入：任何指令可被審批、暫停、取消、覆寫，且具即時狀態與審計軌跡。
 - 安全與合規：強制身份驗證、授權與審計；敏感資訊不落地至原始碼。
 - 高可用與可維護：明確的超時/重試策略、錯誤分級、可觀測性指標。
+- **所有設計、資料契約、流程、完成定義等，若與 prosposal.md 有出入，請以 prosposal.md 為準。**
 
 ## 架構總覽（模組與職責）
 - MCP 服務模組：統一接入層，負責指令標準化、上下文管理、驗證、授權、路由、觀測事件產生。
@@ -24,6 +28,7 @@ mode: agent
 目錄參考：
 - MCP：`MCP/Module.md`
 - WebUI：`WebUI/Module.md`
+- Robot-Console：`Robot-Console/Module.md`
 - 測試：`Test/` 下各模組測試檔
 
 ## 標準資料契約（JSON）
@@ -35,49 +40,90 @@ mode: agent
 - source：入口來源（webui|api|cli|scheduler|…）。
 - labels：可選鍵值標籤（環境、租戶、任務編號等）。
 
-指令請求 CommandRequest：
+指令請求 CommandRequest（範例，詳見 prosposal.md）：
+```json
 {
-	"trace_id": "c1c5f2a0-6a0a-4f1e-9cc1-7b6f0a7a8d3e",
-	"timestamp": "2025-10-15T08:30:00Z",
-	"actor": { "type": "human", "id": "user_123" },
-	"source": "webui",
-	"command": {
-		"id": "cmd-0001",
-		"type": "robot.move",
-		"target": { "robot_id": "rbx-01" },
-		"params": { "x": 1.2, "y": -0.5, "theta": 0.0, "speed": 0.4 },
-		"timeout_ms": 10000,
-		"priority": "normal"
+	"trace_id": "uuid-v4",
+	"timestamp": "2025-10-16T10:30:00Z",
+	"actor": {
+		"type": "human|ai|system",
+		"id": "user-123",
+		"name": "張三"
 	},
-	"auth": { "token": "<redacted>" },
-	"labels": { "tenant": "acme", "env": "dev" }
+	"source": "webui|api|cli|scheduler",
+	"command": {
+		"id": "cmd-xxx",
+		"type": "robot.action",
+		"target": {
+			"robot_id": "robot_7",
+			"robot_type": "humanoid"
+		},
+		"params": {
+			"action_name": "go_forward",
+			"duration_ms": 3000,
+			"speed": "normal"
+		},
+		"timeout_ms": 10000,
+		"priority": "low|normal|high"
+	},
+	"auth": {
+		"token": "<jwt-token>"
+	},
+	"labels": {
+		"department": "研發部",
+		"project": "demo-001"
+	}
 }
+```
 
-指令回應 CommandResponse：
+指令回應 CommandResponse（範例，詳見 prosposal.md）：
+```json
 {
-	"trace_id": "c1c5f2a0-6a0a-4f1e-9cc1-7b6f0a7a8d3e",
-	"timestamp": "2025-10-15T08:30:01Z",
-	"command": { "id": "cmd-0001", "status": "accepted|running|succeeded|failed|cancelled" },
-	"result": { "data": { "distance": 1.7 }, "summary": "moved 1.7m" },
-	"error": { "code": "", "message": "", "details": {} }
+	"trace_id": "uuid-v4",
+	"timestamp": "2025-10-16T10:30:05Z",
+	"command": {
+		"id": "cmd-xxx",
+		"status": "accepted|running|succeeded|failed|cancelled"
+	},
+	"result": {
+		"data": {
+			"execution_time_ms": 2850,
+			"final_position": {"x": 1.2, "y": 0.5}
+		},
+		"summary": "動作執行完成"
+	},
+	"error": {
+		"code": "ERR_ROBOT_OFFLINE",
+		"message": "機器人連線中斷",
+		"details": {"last_ping": "2025-10-16T10:29:50Z"}
+	}
 }
+```
 
-事件/日誌 EventLog（監控/審計用）：
+事件/日誌 EventLog（監控/審計用，詳見 prosposal.md）：
+```json
 {
-	"trace_id": "c1c5f2a0-6a0a-4f1e-9cc1-7b6f0a7a8d3e",
-	"timestamp": "2025-10-15T08:30:00Z",
+	"trace_id": "uuid-v4",
+	"timestamp": "2025-10-16T10:30:03Z",
 	"severity": "INFO|WARN|ERROR",
 	"category": "command|auth|protocol|robot|audit",
-	"message": "Command routed to ROS adapter",
-	"context": { "command_id": "cmd-0001", "adapter": "ros" }
+	"message": "機器人開始執行動作 go_forward",
+	"context": {
+		"command_id": "cmd-xxx",
+		"robot_id": "robot_7",
+		"user_id": "user-123"
+	}
 }
+```
 
-錯誤格式（統一）：
+錯誤格式（統一，詳見 prosposal.md）：
+```json
 {
 	"code": "ERR_TIMEOUT|ERR_UNAUTHORIZED|ERR_VALIDATION|ERR_ROUTING|ERR_PROTOCOL|ERR_INTERNAL",
 	"message": "人類可讀訊息",
 	"details": { "hint": "排查建議或關鍵欄位" }
 }
+```
 
 ## 指令處理流程（高層級）
 1) 接收：入口（WebUI/API/CLI）提交 CommandRequest，生成/傳入 trace_id。
@@ -136,6 +182,7 @@ mode: agent
 - 事件與審計：產生必要的 EventLog，包含 trace_id 與關鍵上下文。
 - 安全檢查：敏感資訊不落地；權限與輸入檢查通過；沒有硬編碼密鑰。
 - 可觀測性：關鍵指標（成功率、延遲、錯誤碼分佈）可被查詢。
+- **如有疑慮，請參考 prosposal.md 的 DoD 條目與範例。**
 
 ## 下一步與落地任務
 - 補齊 MCP 契約與處理流程細節：見 `MCP/Module.md`。

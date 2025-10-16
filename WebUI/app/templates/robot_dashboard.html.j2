@@ -1,0 +1,29 @@
+{% extends "base.html.j2" %}
+{% block app_content %}
+<h2>機器人儀表板</h2>
+<div class="row">
+  {% for robot in robots %}
+  <div class="col-md-4">
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <strong>{{ robot.name }}</strong> ({{ robot.type }})
+      </div>
+      <div class="panel-body">
+        狀態：<span class="label label-{{ 'success' if robot.status == 'online' else 'danger' }}">{{ robot.status }}</span><br>
+        {% if robot.battery %}電量：{{ robot.battery }}%<br>{% endif %}
+        {% if robot.location %}位置：{{ robot.location }}<br>{% endif %}
+        <form action="{{ url_for('webui.send_command') }}" method="post">
+          <input type="hidden" name="robot_id" value="{{ robot.id }}">
+          <select name="command" class="form-control">
+            {% for action in robot.capabilities %}
+            <option value="{{ action }}">{{ action }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn btn-primary btn-block" style="margin-top:8px;">下達指令</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

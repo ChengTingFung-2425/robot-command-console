@@ -1,12 +1,48 @@
-
 # imports
+
 from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField
-from wtforms.validators import DataRequired
+from wtforms import StringField, PasswordField, BooleanField, SubmitField, TextAreaField
+from wtforms.validators import DataRequired, Email, EqualTo, ValidationError
+from WebUI.app.models import User
 
 # classes
-class CommandForm(FlaskForm):
-    """指令發送表單（如需 Web 表單介面）"""
-    robot_id = StringField('Robot ID', validators=[DataRequired()])
-    command = StringField('Command', validators=[DataRequired()])
-    submit = SubmitField('Send Command')
+class LoginForm(FlaskForm):
+    username = StringField('用戶名稱', validators=[DataRequired()])
+    password = PasswordField('密碼', validators=[DataRequired()])
+    remember_me = BooleanField('記住我')
+    submit = SubmitField('登入')
+
+
+class RegisterForm(FlaskForm):
+    username = StringField('用戶名稱', validators=[DataRequired()])
+    email = StringField('電子郵件', validators=[DataRequired(), Email()])
+    password = PasswordField('密碼', validators=[DataRequired()])
+    password2 = PasswordField('重複密碼', validators=[DataRequired(), EqualTo('password')])
+    submit = SubmitField('註冊')
+
+    def validate_username(self, username):
+        user = User.query.filter_by(username=username.data).first()
+        if user:
+            raise ValidationError('用戶名稱已被使用。')
+
+    def validate_email(self, email):
+        user = User.query.filter_by(email=email.data).first()
+        if user:
+            raise ValidationError('電子郵件已被註冊。')
+
+class RegisterRobotForm(FlaskForm):
+    name = StringField('機器人名稱', validators=[DataRequired()])
+    type = StringField('機器人類型', validators=[DataRequired()])
+    submit = SubmitField('註冊機器人')
+
+class ResetPasswordRequestForm(FlaskForm):
+    email = StringField('電子郵件', validators=[DataRequired(), Email()])
+    submit = SubmitField('發送重設密碼郵件')
+
+class AdvancedCommandForm(FlaskForm):
+    name = StringField('指令名稱', validators=[DataRequired()])
+    description = TextAreaField('指令描述', validators=[DataRequired()])
+    category = StringField('分類', validators=[DataRequired()])
+    base_commands = TextAreaField('基礎指令序列（JSON）', validators=[DataRequired()])
+    submit = SubmitField('提交進階指令')
+

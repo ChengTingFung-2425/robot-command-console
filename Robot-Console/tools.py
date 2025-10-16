@@ -182,7 +182,7 @@ TOOL_LIST = [
     },
     {
         "name": "stop",
-        "description": "Command the robot to perform stepping motions.",
+        "description": "Command the robot to stop all current actions or movements.",
     },
     {
         "name": "turn_left", 

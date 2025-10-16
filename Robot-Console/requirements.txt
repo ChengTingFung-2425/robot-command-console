@@ -1,0 +1,9 @@
+awsiotsdk
+pyyaml
+requests
+# pyaudio
+# rx
+# smithy-aws-core
+# pytz
+# aws_sdk_bedrock_runtime
+# boto3 

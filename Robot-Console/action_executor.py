@@ -247,7 +247,7 @@ class ActionExecutor:
     def stop(self) -> None:
         """Stop all actions immediately and clear the queue."""
         self.logger.info(
-            "Immediate stop requested: clearing queue and intserrupting current action."
+            "Immediate stop requested: clearing queue and interrupting current action."
         )
         self._immediate_stop_event.set()
         self.clear_action_queue()

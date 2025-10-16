@@ -18,7 +18,7 @@ app.config.from_object(Config)
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 login = LoginManager()
-login.login_view = "login"
+login.login_view = "webui.login"  # type: ignore[assignment]
 login.init_app(app)
 mail = Mail(app)
 bootstrap = Bootstrap(app)
@@ -58,5 +58,10 @@ if not app.debug:
 def get_locale():
     return request.accept_languages.best_match(app.config['LANGUAGES'])
 
-# You must keep the routes at the end.
-from WebUI.app import routes, errors
+# You must keep the routes registration at the end.
+# Register blueprint for WebUI routes
+from WebUI.app.routes import bp as webui_bp
+app.register_blueprint(webui_bp)
+
+# Register error handlers (import after app is set up)
+from WebUI.app import errors

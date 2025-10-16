@@ -7,8 +7,8 @@
     <a class="btn btn-primary btn-lg" href="{{ url_for('webui.robot_dashboard') }}">進入儀表板</a>
     <a class="btn btn-success btn-lg" href="{{ url_for('webui.register_robot') }}">註冊新機器人</a>
   {% else %}
-    <a class="btn btn-primary btn-lg" href="{{ url_for('login') }}">登入</a>
-    <a class="btn btn-default btn-lg" href="{{ url_for('register') }}">註冊帳號</a>
+    <a class="btn btn-primary btn-lg" href="{{ url_for('webui.login') }}">登入</a>
+    <a class="btn btn-default btn-lg" href="{{ url_for('webui.register') }}">註冊帳號</a>
   {% endif %}
 </div>
 {% endblock %}

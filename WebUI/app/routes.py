@@ -227,7 +227,75 @@ def create_advanced_command():
         db.session.commit()
         flash('進階指令已提交，等待審核。')
         return redirect(url_for('webui.advanced_commands'))
-    return render_template('create_advanced_command.html.j2', form=form)
+    # Server-side initial UI preferences and verified advanced commands list
+    duration_unit = session.get('duration_unit', 's')
+    verify_collapsed = session.get('verify_collapsed', False)
+    # Provide server-side list of approved advanced commands (names) for client-side validation
+    try:
+        verified_cmds = [ac.name for ac in AdvancedCommand.query.filter_by(status='approved').all()]
+    except Exception:
+        verified_cmds = []
+
+    return render_template(
+        'create_advanced_command.html.j2',
+        form=form,
+        duration_unit=duration_unit,
+        verify_collapsed=verify_collapsed,
+        verified_advanced_commands=verified_cmds
+    )
+
+
+# API: 更新使用者 UI 偏好（持久化到 session 與用戶資料）
+@bp.route('/settings/ui', methods=['POST'])
+@login_required
+def update_ui_settings():
+    data = request.get_json() or request.form
+    duration_unit = data.get('duration_unit')
+    verify_collapsed = data.get('verify_collapsed')
+    # 更新 session
+    if duration_unit in ('s', 'ms'):
+        session['duration_unit'] = duration_unit
+        try:
+            current_user.ui_duration_unit = duration_unit
+        except Exception:
+            pass
+    if verify_collapsed is not None:
+        # expect '1'/'0' or true/false
+        val = str(verify_collapsed) in ('1', 'true', 'True', 'yes')
+        session['verify_collapsed'] = val
+        try:
+            current_user.ui_verify_collapsed = val
+        except Exception:
+            pass
+    # try to persist user changes
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    return jsonify({'result': 'ok'})
+
+
+# 編輯進階指令：允許作者或管理員編輯自己的指令
+@bp.route('/advanced_commands/edit/<int:cmd_id>', methods=['GET', 'POST'])
+@login_required
+def edit_advanced_command(cmd_id):
+    cmd = AdvancedCommand.query.get_or_404(cmd_id)
+    # 權限檢查：作者本人或 admin/auditor
+    if not (current_user.is_admin() or cmd.author_id == current_user.id):
+        flash('您沒有權限編輯這個進階指令。')
+        return redirect(url_for('webui.advanced_commands'))
+    form = AdvancedCommandForm(obj=cmd)
+    if form.validate_on_submit():
+        cmd.name = form.name.data
+        cmd.description = form.description.data
+        cmd.category = form.category.data
+        cmd.base_commands = form.base_commands.data
+        # 編輯後狀態回到 pending 需重新審核
+        cmd.status = 'pending'
+        db.session.commit()
+        flash('進階指令已更新並重新送審。')
+        return redirect(url_for('webui.advanced_commands'))
+    return render_template('create_advanced_command.html.j2', form=form, duration_unit=session.get('duration_unit', current_user.ui_duration_unit if hasattr(current_user, 'ui_duration_unit') else 's'), verify_collapsed=session.get('verify_collapsed', current_user.ui_verify_collapsed if hasattr(current_user, 'ui_verify_collapsed') else False), verified_advanced_commands=[ac.name for ac in AdvancedCommand.query.filter_by(status='approved').all()])
 
 # 審核進階指令（僅 admin/auditor）
 @bp.route('/advanced_commands/audit/<int:cmd_id>', methods=['POST'])

@@ -83,6 +83,9 @@
           <button type="submit" class="btn btn-danger btn-sm">拒絕</button>
         </form>
         {% endif %}
+        {% if current_user.is_authenticated and (current_user.is_admin() or cmd.author_id == current_user.id) %}
+        <a href="{{ url_for('webui.edit_advanced_command', cmd_id=cmd.id) }}" class="btn btn-outline-primary btn-sm">編輯</a>
+        {% endif %}
       </div>
     </div>
   </div>

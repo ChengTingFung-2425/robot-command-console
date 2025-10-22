@@ -131,6 +131,35 @@
 }
 
 /* ============================================
+   可摺疊驗證面板樣式
+   ============================================ */
+#verifyCol {
+  transition: width 0.28s ease, opacity 0.28s ease; 
+}
+
+#verifyCol.collapsed {
+  width: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 當驗證欄位收合時，讓工作區平滑擴展（使用 flex-grid 會自動處理，但提供過渡效果） */
+#blocklyCol {
+  transition: width 0.28s ease;
+}
+
+@media (max-width: 992px) {
+  /* 中等及以下螢幕：將工作區佈局調整為單欄顯示 */
+  #verifyCol {
+    width: 100% !important;
+  }
+  #blocklyCol {
+    width: 100% !important;
+    margin-top: 16px;
+  }
+}
+
+/* ============================================
    Blockly 工具箱樣式（覆寫預設）
    ============================================ */
 .blocklyToolboxDiv {

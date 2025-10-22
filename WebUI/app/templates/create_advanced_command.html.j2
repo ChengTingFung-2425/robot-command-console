@@ -17,7 +17,9 @@
 var workspace;
 var isDirty = false;
 // 伺服器可注入的已驗證進階指令清單（例：['patrol_A', 'dance_show']）
-var VERIFIED_ADVANCED_COMMANDS = window.VERIFIED_ADVANCED_COMMANDS || [];
+var VERIFIED_ADVANCED_COMMANDS = window.VERIFIED_ADVANCED_COMMANDS || {{ verified_advanced_commands|tojson|safe }} || [];
+// Server-provided duration unit preference (s or ms)
+window.DURATION_UNIT = window.DURATION_UNIT || '{{ duration_unit }}';
 
 // 初始化 Blockly
 document.addEventListener('DOMContentLoaded', function() {
@@ -71,7 +73,37 @@ document.addEventListener('DOMContentLoaded', function() {
     oldJsonPreview.remove();
   }
   updateCodePreview();
+
+  // 恢復 verify 面板的摺疊狀態 （server-side 優先，client localStorage 為次）
+  try {
+    var serverVerifyCollapsed = {{ 'true' if verify_collapsed else 'false' }};
+    var localVerify = (localStorage.getItem && localStorage.getItem('verifyCollapsed') === '1');
+    var verifyCollapsed = serverVerifyCollapsed || localVerify;
+    if (verifyCollapsed) {
+      document.getElementById('verifyCol').classList.add('collapsed');
+      var btn = document.getElementById('verify-toggle');
+      if (btn) btn.textContent = '▸';
+      if (workspace && typeof workspace.resize === 'function') {
+        setTimeout(function(){ workspace.resize(); }, 50);
+      }
+    }
+  } catch (e) {}
 });
+
+// 切換驗證面板摺疊
+function toggleVerifyPanel() {
+  var col = document.getElementById('verifyCol');
+  var btn = document.getElementById('verify-toggle');
+  if (!col) return;
+  var collapsed = col.classList.toggle('collapsed');
+  if (btn) btn.textContent = collapsed ? '▸' : '▾';
+  try { localStorage.setItem('verifyCollapsed', collapsed ? '1' : '0'); } catch (e) {}
+  try { fetch('{{ url_for("webui.update_ui_settings") }}', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({verify_collapsed: collapsed ? '1' : '0'})}); } catch (e) {}
+  // 讓 Blockly 重新調整大小（重要）
+  if (workspace && typeof workspace.resize === 'function') {
+    setTimeout(function(){ workspace.resize(); }, 200);
+  }
+}
 
 // 更新程式碼預覽
 function updateCodePreview() {
@@ -218,7 +250,14 @@ function validateCommands() {
     });
     if (invalids.length > 0) {
       resultEl.textContent = '驗證結果：失敗\n' + invalids.join('\n');
+      return;
     } else {
+      // 進一步前端驗證 duration 欄位
+      var durationErrors = frontendVerifyDurations(parsed);
+      if (durationErrors.length > 0) {
+        resultEl.textContent = '驗證結果：失敗\n' + durationErrors.join('\n');
+        return;
+      }
       resultEl.textContent = '驗證結果：通過 \n指令數量：' + parsed.length;
     }
   } catch (e) {
@@ -238,6 +277,50 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 });
+
+// 初始化時間單位偏好（秒 / 毫秒）
+document.addEventListener('DOMContentLoaded', function() {
+  try {
+    var pref = localStorage.getItem('durationUnit') || 's';
+    window.DURATION_UNIT = pref;
+    if (pref === 'ms') {
+      document.getElementById('unit_ms').checked = true;
+    } else {
+      document.getElementById('unit_s').checked = true;
+    }
+  } catch (e) {}
+
+  // 綁定切換事件
+  var unitS = document.getElementById('unit_s');
+  var unitMs = document.getElementById('unit_ms');
+  if (unitS) unitS.addEventListener('change', function(){ if (this.checked) { try{ localStorage.setItem('durationUnit', 's'); window.DURATION_UNIT = 's'; }catch(e){} try{ fetch('{{ url_for("webui.update_ui_settings") }}', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({duration_unit: 's'})}); }catch(e){} }});
+  if (unitMs) unitMs.addEventListener('change', function(){ if (this.checked) { try{ localStorage.setItem('durationUnit', 'ms'); window.DURATION_UNIT = 'ms'; }catch(e){} try{ fetch('{{ url_for("webui.update_ui_settings") }}', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({duration_unit: 'ms'})}); }catch(e){} }});
+});
+
+// 前端驗證：檢查移動類積木的 duration 欄位
+// 若使用秒，允許 0.1 ~ 600；若毫秒，允許 100 ~ 600000
+function frontendVerifyDurations(parsedCommands) {
+  var errors = [];
+  parsedCommands.forEach(function(cmd, idx){
+    // 只檢查已知的移動動作
+    var moveActions = ['go_forward','back_fast','turn_left','turn_right','left_move_fast','right_move_fast'];
+    if (moveActions.indexOf(cmd.command) !== -1) {
+      if (cmd.duration_s === undefined && cmd.duration_ms === undefined) {
+        errors.push('第 ' + (idx+1) + ' 個動作 ('+cmd.command+') 缺少持續時間');
+        return;
+      }
+      var unit = (window.DURATION_UNIT) || (localStorage.getItem && localStorage.getItem('durationUnit')) || 's';
+      if (cmd.duration_s !== undefined) {
+        var v = parseFloat(cmd.duration_s);
+        if (isNaN(v) || v < 0.1 || v > 600) errors.push('第 ' + (idx+1) + ' 個動作 ('+cmd.command+') 的持續時間需介於 0.1~600 秒');
+      } else if (cmd.duration_ms !== undefined) {
+        var v = parseInt(cmd.duration_ms,10);
+        if (isNaN(v) || v < 100 || v > 600000) errors.push('第 ' + (idx+1) + ' 個動作 ('+cmd.command+') 的持續時間需介於 100~600000 毫秒');
+      }
+    }
+  });
+  return errors;
+}
 </script>
 {% endblock %}
 
@@ -255,7 +338,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     <div class="row mt-3">
       <!-- 左側：基本資訊 -->
-      <div class="col-md-3">
+      <div class="col-md-2">
         <div class="card">
           <div class="card-header bg-primary text-white">
             <h5 class="mb-0">📝 指令資訊</h5>
@@ -305,12 +388,44 @@ document.addEventListener('DOMContentLoaded', function() {
               <button type="button" class="btn btn-outline-primary" onclick="exportBlocks()">💾 匯出積木</button>
               <button type="button" class="btn btn-outline-primary" onclick="importBlocks()">📂 匯入積木</button>
             </div>
+            <div class="mt-3">
+              <label class="form-label">時間單位偏好</label>
+              <div class="btn-group" role="group" aria-label="Duration unit">
+                <input type="radio" class="btn-check" name="durationUnit" id="unit_s" autocomplete="off" {% if duration_unit == 's' %}checked{% endif %}>
+                <label class="btn btn-outline-secondary" for="unit_s">秒 (s)</label>
+
+                <input type="radio" class="btn-check" name="durationUnit" id="unit_ms" autocomplete="off" {% if duration_unit == 'ms' %}checked{% endif %}>
+                <label class="btn btn-outline-secondary" for="unit_ms">毫秒 (ms)</label>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- 中間：Blockly 工作區 -->
-      <div class="col-md-6">
+      <!-- 左側第二欄：待驗證 (To verify) -->
+  <div id="verifyCol" class="col-md-3 {% if verify_collapsed %}collapsed{% endif %}">
+        <div class="card">
+          <div class="card-header bg-info text-white">
+            <h5 class="mb-0">� 待驗證 (To verify)
+              <button id="verify-toggle" class="btn btn-sm btn-light ms-2 float-end" onclick="toggleVerifyPanel()" aria-expanded="true" title="摺疊/展開待驗證面板">▾</button>
+            </h5>
+          </div>
+          <div class="card-body">
+            <div id="verify-panel" class="bg-light p-3" style="height: 600px; overflow-y: auto; font-size: 0.95rem; border-radius: 4px;">
+              <h5>🔎 待驗證 (To verify)</h5>
+              <p id="verify-desc">按下「驗證指令」來檢查目前工作區組合是否符合後端契約與白名單。</p>
+              <div class="mt-3">
+                <button type="button" class="btn btn-primary" onclick="validateCommands()">✅ 驗證指令</button>
+              </div>
+              <hr>
+              <div id="verify-result" style="white-space: pre-wrap; font-size:0.9rem;">尚未驗證</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 中間：Blockly 工作區（擴大向右） -->
+  <div class="col-md-7" id="blocklyCol">
         <div class="card">
           <div class="card-header bg-success text-white">
             <h5 class="mb-0">🧩 積木工作區</h5>
@@ -331,25 +446,8 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
       </div>
 
-      <!-- 右側：待驗證 (To verify) -->
-      <div class="col-md-3">
-        <div class="card">
-          <div class="card-header bg-info text-white">
-            <h5 class="mb-0">� 待驗證 (To verify)</h5>
-          </div>
-          <div class="card-body">
-            <div id="verify-panel" class="bg-light p-3" style="height: 600px; overflow-y: auto; font-size: 0.95rem; border-radius: 4px;">
-              <h5>🔎 待驗證 (To verify)</h5>
-              <p id="verify-desc">按下「驗證指令」來檢查目前工作區組合是否符合後端契約與白名單。</p>
-              <div class="mt-3">
-                <button type="button" class="btn btn-primary" onclick="validateCommands()">✅ 驗證指令</button>
-              </div>
-              <hr>
-              <div id="verify-result" style="white-space: pre-wrap; font-size:0.9rem;">尚未驗證</div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <!-- 右側：空白占位（保留響應式間距） -->
+      <div class="col-md-0 d-none d-md-block"></div>
     </div>
 
     <!-- 隱藏欄位：儲存 JSON 與積木狀態 -->

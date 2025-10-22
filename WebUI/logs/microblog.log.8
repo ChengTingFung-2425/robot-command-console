@@ -1,4 +1,4 @@
-2025-10-22 02:25:16,084 ERROR: Error on request:
+2025-10-22 02:53:47,701 ERROR: Error on request:
 Traceback (most recent call last):
   File "/usr/local/lib/python3.11/site-packages/flask/app.py", line 1823, in full_dispatch_request
     rv = self.dispatch_request()
@@ -123,6 +123,4 @@ Traceback (most recent call last):
   File "/usr/local/lib/python3.11/site-packages/werkzeug/routing/map.py", line 950, in build
     raise BuildError(endpoint, values, method, self)
 werkzeug.routing.exceptions.BuildError: Could not build url for endpoint 'index'. Did you mean 'webui.send_command' instead? [in /usr/local/lib/python3.11/site-packages/werkzeug/_internal.py:187]
-2025-10-22 02:28:46,293 INFO: 172.18.0.1 - - [22/Oct/2025 02:28:46] "GET /advanced_commands/create HTTP/1.1" 200 - [in /usr/local/lib/python3.11/site-packages/werkzeug/_internal.py:187]
-2025-10-22 02:28:46,505 INFO: 172.18.0.1 - - [22/Oct/2025 02:28:46] "[36mGET /static/js/robot_blocks.js HTTP/1.1[0m" 304 - [in /usr/local/lib/python3.11/site-packages/werkzeug/_internal.py:187]
-2025-10-22 02:28:46,511 INFO: 172.18.0.1 - - [22/Oct/2025 02:28:46] "GET /static/css/blockly_workspace.css HTTP/1.1" 200 - [in /usr/local/lib/python3.11/site-packages/werkzeug/_internal.py:187]
+2025-10-22 03:09:43,615 INFO: 172.18.0.1 - - [22/Oct/2025 03:09:43] "GET / HTTP/1.1" 200 - [in /usr/local/lib/python3.11/site-packages/werkzeug/_internal.py:187]

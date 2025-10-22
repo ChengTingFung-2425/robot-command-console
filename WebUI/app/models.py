@@ -17,6 +17,9 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(128))
     role = db.Column(db.String(32), default='operator')  # viewer/operator/admin/auditor
+    # UI preferences
+    ui_duration_unit = db.Column(db.String(8), default='s')  # 's' or 'ms'
+    ui_verify_collapsed = db.Column(db.Boolean, default=False)
     robots = db.relationship('Robot', backref='owner', lazy='dynamic')
 
     def __init__(self, **kwargs):

@@ -21,7 +21,9 @@ const BLOCK_COLORS = {
 Blockly.Blocks['robot_go_forward'] = {
   init: function() {
     this.appendDummyInput()
-        .appendField("🤖 前進");
+        .appendField("🤖 前進")
+        .appendField(new Blockly.FieldNumber(3.5, 0.1, 600, 0.1), "DURATION")
+        .appendField("秒");
     this.setPreviousStatement(true, null);
     this.setNextStatement(true, null);
     this.setColour(BLOCK_COLORS.movement);
@@ -33,7 +35,9 @@ Blockly.Blocks['robot_go_forward'] = {
 Blockly.Blocks['robot_back_fast'] = {
   init: function() {
     this.appendDummyInput()
-        .appendField("🤖 快速後退");
+        .appendField("🤖 快速後退")
+        .appendField(new Blockly.FieldNumber(4.5, 0.1, 600, 0.1), "DURATION")
+        .appendField("秒");
     this.setPreviousStatement(true, null);
     this.setNextStatement(true, null);
     this.setColour(BLOCK_COLORS.movement);
@@ -44,7 +48,9 @@ Blockly.Blocks['robot_back_fast'] = {
 Blockly.Blocks['robot_turn_left'] = {
   init: function() {
     this.appendDummyInput()
-        .appendField("🤖 左轉");
+        .appendField("🤖 左轉")
+        .appendField(new Blockly.FieldNumber(4, 0.1, 600, 0.1), "DURATION")
+        .appendField("秒");
     this.setPreviousStatement(true, null);
     this.setNextStatement(true, null);
     this.setColour(BLOCK_COLORS.movement);
@@ -55,7 +61,9 @@ Blockly.Blocks['robot_turn_left'] = {
 Blockly.Blocks['robot_turn_right'] = {
   init: function() {
     this.appendDummyInput()
-        .appendField("🤖 右轉");
+        .appendField("🤖 右轉")
+        .appendField(new Blockly.FieldNumber(4, 0.1, 600, 0.1), "DURATION")
+        .appendField("秒");
     this.setPreviousStatement(true, null);
     this.setNextStatement(true, null);
     this.setColour(BLOCK_COLORS.movement);
@@ -66,7 +74,9 @@ Blockly.Blocks['robot_turn_right'] = {
 Blockly.Blocks['robot_left_move_fast'] = {
   init: function() {
     this.appendDummyInput()
-        .appendField("🤖 快速左移");
+        .appendField("🤖 快速左移")
+        .appendField(new Blockly.FieldNumber(3, 0.1, 600, 0.1), "DURATION")
+        .appendField("秒");
     this.setPreviousStatement(true, null);
     this.setNextStatement(true, null);
     this.setColour(BLOCK_COLORS.movement);
@@ -77,7 +87,9 @@ Blockly.Blocks['robot_left_move_fast'] = {
 Blockly.Blocks['robot_right_move_fast'] = {
   init: function() {
     this.appendDummyInput()
-        .appendField("🤖 快速右移");
+        .appendField("🤖 快速右移")
+        .appendField(new Blockly.FieldNumber(3, 0.1, 600, 0.1), "DURATION")
+        .appendField("秒");
     this.setPreviousStatement(true, null);
     this.setNextStatement(true, null);
     this.setColour(BLOCK_COLORS.movement);
@@ -443,13 +455,28 @@ const generateSimpleAction = (blockName, commandName) => {
   };
 };
 
-// 移動類
-generateSimpleAction('robot_go_forward', 'go_forward');
-generateSimpleAction('robot_back_fast', 'back_fast');
-generateSimpleAction('robot_turn_left', 'turn_left');
-generateSimpleAction('robot_turn_right', 'turn_right');
-generateSimpleAction('robot_left_move_fast', 'left_move_fast');
-generateSimpleAction('robot_right_move_fast', 'right_move_fast');
+// 帶有持續時間 (秒) 的動作產生器
+const generateActionWithDuration = (blockName, commandName, defaultSeconds) => {
+  Blockly.JavaScript[blockName] = function(block) {
+    var duration = parseFloat(block.getFieldValue('DURATION')) || defaultSeconds || 0;
+    // 決定輸出的時間單位：優先使用全域變數，其次檢查 localStorage，否則預設為秒(s)
+    var unit = (typeof window !== 'undefined' && window.DURATION_UNIT) || (typeof localStorage !== 'undefined' && localStorage.getItem('durationUnit')) || 's';
+    if (unit === 'ms') {
+      var ms = Math.round(duration * 1000);
+      return `{"command": "${commandName}", "duration_ms": ${ms}},\n`;
+    }
+    // default: seconds
+    return `{"command": "${commandName}", "duration_s": ${duration}},\n`;
+  };
+};
+
+// 移動類（包含可設定的持續時間）
+generateActionWithDuration('robot_go_forward', 'go_forward', 3.5);
+generateActionWithDuration('robot_back_fast', 'back_fast', 4.5);
+generateActionWithDuration('robot_turn_left', 'turn_left', 4);
+generateActionWithDuration('robot_turn_right', 'turn_right', 4);
+generateActionWithDuration('robot_left_move_fast', 'left_move_fast', 3);
+generateActionWithDuration('robot_right_move_fast', 'right_move_fast', 3);
 
 // 姿態類
 generateSimpleAction('robot_stand', 'stand');

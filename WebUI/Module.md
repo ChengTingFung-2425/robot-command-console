@@ -73,6 +73,27 @@
   - 參數輸入表單（JSON 編輯器或結構化表單）
   - 執行按鈕與確認對話框
   
+- **進階指令建立器（Advanced Command Builder）**：
+  - **程式積木介面（Blockly Integration）**：
+    - 視覺化拖放式積木編輯器，降低使用門檻
+    - 37 種機器人動作積木（movement, gesture, dance, combat, exercise）
+    - 控制流程積木（sequence, loop, conditional, wait）
+    - 即時 JSON 預覽與驗證
+    - 匯入/匯出積木工作區（儲存與分享）
+  - 積木類別：
+    - **移動積木**：go_forward, back_fast, turn_left, turn_right, left_move_fast, right_move_fast
+    - **姿態積木**：stand, bow, squat, stand_up_front, stand_up_back
+    - **戰鬥積木**：left_kick, right_kick, kung_fu, wing_chun, left_uppercut, right_uppercut, left_shot_fast, right_shot_fast
+    - **舞蹈積木**：dance_two ~ dance_ten（9 種舞蹈動作）
+    - **運動積木**：push_ups, sit_ups, chest, weightlifting, squat_up
+    - **控制積木**：loop（重複執行）, wait（延遲）, stop（停止）
+  - 積木編輯器特性：
+    - 自動計算總執行時間（基於 sleep_time）
+    - 語法錯誤即時提示（如未連接的積木）
+    - 工作區縮放與拖曳
+    - 垃圾桶拖放刪除
+    - 程式碼產生器：積木 → JSON 指令序列
+  
 - **執行監控面板（Execution Monitor）**：
   - 進行中指令列表（狀態、進度條）
   - 歷史指令查詢（篩選、排序、搜尋）

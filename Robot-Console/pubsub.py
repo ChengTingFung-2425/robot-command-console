@@ -11,6 +11,7 @@ from typing import Any, Dict, Optional
 
 import yaml
 from action_executor import ActionExecutor
+from advanced_decoder import AdvancedDecoder
 from awscrt import auth, mqtt5
 from awsiot import mqtt5_client_builder
 
@@ -47,6 +48,9 @@ class PubSubClient:
     def __init__(self, settings: Dict[str, Any], executor: ActionExecutor):
         self.settings = settings
         self.executor = executor
+        # Create decoder using MCP base URL if provided in settings
+        mcp_base = settings.get("mcp_base_url") or settings.get("MCP_BASE_URL")
+        self.decoder = AdvancedDecoder(mcp_base_url=mcp_base)
         self.client: Optional[mqtt5.Client] = None
         self.future_stopped = Future()
         self.future_connection_success = Future()
@@ -64,11 +68,24 @@ class PubSubClient:
             )
             try:
                 payload = json.loads(publish_packet.payload)
-                action_name = payload.get("toolName")
-                if action_name:
-                    self.executor.add_action_to_queue(action_name)
+                # First try to decode as advanced command sequence; falls back to
+                # single-tool semantics if decoder returns empty list.
+                decoded = []
+                try:
+                    decoded = self.decoder.decode(payload)
+                except Exception as e:
+                    logging.warning("Decoder error, falling back: %s", e)
+
+                if decoded:
+                    # enqueue decoded sequence preserving order
+                    self.executor.add_actions_to_queue(decoded)
                 else:
-                    logging.warning("No action specified in the payload")
+                    # fallback: legacy single toolName field
+                    action_name = payload.get("toolName")
+                    if action_name:
+                        self.executor.add_action_to_queue(action_name)
+                    else:
+                        logging.warning("No actionable command found in payload: %s", payload)
             except json.JSONDecodeError:
                 logging.error("Invalid JSON payload received")
         except Exception as e:

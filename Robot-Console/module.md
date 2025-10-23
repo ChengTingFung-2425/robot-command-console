@@ -18,7 +18,7 @@
 
 - `action_executor.py`：動作執行引擎（佇列、排程、超時、停止、並行下發本地/遠端）。
 - `pubsub.py`：AWS IoT MQTT 發佈/訂閱用戶端（mTLS 與 WebSocket 雙模式、自動切換、重連）。
-- `tools.py`：AI/LLM 整合工具定義（`TOOL_LIST`、`TOOLS` 與各動作的 JSON Schema）。
+- `tools.py`：本地執行器使用的工具映射（`TOOL_LIST`、`TOOLS` 與各動作的 JSON Schema）。注意：MCP 為工具清單的權威來源，請勿直接在此檔案中變更正式工具定義——變更應先在 MCP 更新，然後透過同步機制或 CI 下放到本模組。
 - `settings.yaml`：機器人與 AWS IoT 相關設定。
 - `requirements.txt`：此模組的依賴套件清單。
 - `create_virtual_env.sh`：建立虛擬環境與安裝依賴。
@@ -123,7 +123,7 @@ MCP（服務層）
 Robot-Console（本模組）
     ├─ pubsub.py（MQTT 訂閱/發布、mTLS/WS、自動切換）
     ├─ action_executor.py（佇列排程、超時、立即停止）
-    └─ tools.py（AI/LLM 工具與 Schema）
+  └─ tools.py（本地執行器映射與 Schema；MCP 為權威工具庫）
     │
     ├─ 向本地控制器（localhost:9030）下發
     └─ 向遠端模擬器（雲端）下發

@@ -15,6 +15,7 @@
    - 查看機器人狀態：即時顯示 online/offline/busy 與電量、位置等資訊
 3) **下達指令**：
    - 選擇機器人後，UI 動態載入該機器人的可用動作清單
+  - 注意：機器人可用動作的權威來源為 MCP（例如：GET /api/robots/{robot_id}/capabilities 或 GET /api/tools）。WebUI 應以 MCP 回傳為準，不直接讀取 Robot-Console 的本地映射檔。
    - 組裝 CommandRequest（含 trace_id/actor/source/target/params/labels）
    - POST 到 MCP `/api/command`
    - 顯示指令已接受並取得 command_id

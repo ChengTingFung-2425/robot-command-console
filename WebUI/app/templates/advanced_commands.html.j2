@@ -54,24 +54,26 @@
     <div class="panel-heading">
       <h4 class="panel-title">
         <a data-toggle="collapse" data-parent="#accordion" href="#collapse{{ cmd.id }}">
-          <strong>{{ cmd.name }}</strong> 
+          <strong>{{ cmd.name|e }}</strong> 
+          <small class="text-muted">v{{ cmd.version or 1 }}</small>
           <span class="label label-{{ 'success' if cmd.status == 'approved' else ('warning' if cmd.status == 'pending' else 'danger') }}">
             {{ '已批准' if cmd.status == 'approved' else ('待審核' if cmd.status == 'pending' else '已拒絕') }}
           </span>
-          <small class="text-muted">分類：{{ cmd.category }}</small>
+          <small class="text-muted">分類：{{ cmd.category|e }}</small>
         </a>
       </h4>
     </div>
     <div id="collapse{{ cmd.id }}" class="panel-collapse collapse">
       <div class="panel-body">
-        <p><strong>描述：</strong>{{ cmd.description }}</p>
-        <p><strong>作者：</strong>{{ cmd.author.username if cmd.author else '未知' }}</p>
-        <p><strong>建立時間：</strong>{{ cmd.created_at.strftime('%Y-%m-%d %H:%M') if cmd.created_at else '未知' }}</p>
+  <p><strong>描述：</strong>{{ cmd.description|e }}</p>
+  <p><strong>作者：</strong>{{ cmd.author.username|e if cmd.author else '未知' }}</p>
+  <p><strong>建立時間：</strong>{{ cmd.created_at.strftime('%Y-%m-%d %H:%M') if cmd.created_at else '未知' }}</p>
+  <p><strong>版本：</strong>v{{ cmd.version or 1 }} {% if cmd.updated_at and cmd.updated_at != cmd.created_at %}（最後更新版本於 {{ cmd.updated_at.strftime('%Y-%m-%d %H:%M') }}）{% endif %}</p>
         {% if cmd.updated_at and cmd.updated_at != cmd.created_at %}
         <p><strong>更新時間：</strong>{{ cmd.updated_at.strftime('%Y-%m-%d %H:%M') }}</p>
         {% endif %}
         <p><strong>基礎指令序列：</strong></p>
-        <pre>{{ cmd.base_commands }}</pre>
+  <pre>{{ cmd.base_commands|e }}</pre>
         {% if current_user.is_authenticated and current_user.is_admin() and cmd.status == 'pending' %}
         <hr>
         <form method="post" action="{{ url_for('webui.audit_advanced_command', cmd_id=cmd.id) }}" style="display:inline;">
@@ -83,6 +85,9 @@
           <button type="submit" class="btn btn-danger btn-sm">拒絕</button>
         </form>
         {% endif %}
+  {% if current_user.is_authenticated and (current_user.is_admin() or cmd.author_id == current_user.id) %}
+  <a href="{{ url_for('webui.edit_advanced_command', cmd_id=cmd.id) }}" class="btn btn-outline-primary btn-sm">編輯</a>
+  {% endif %}
       </div>
     </div>
   </div>

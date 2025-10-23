@@ -7,9 +7,6 @@
   },
   "waitFor": "onCreateCommand",
   "postCreateCommand": "",
-  "postAttachCommand": {
-    "server": "flask --debug run --host=0.0.0.0"
-  },
   "portsAttributes": {
     "5000": {
       "label": "Flask Apps",

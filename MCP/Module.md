@@ -144,6 +144,61 @@
 - 同類型可形成機群；依 idle／busy 與負載分配。
 - 單一失敗自動重試其他實例（受限於語義與安全）。
 
+## 11. 機器人工具清單（由 MCP 管理）
+
+為了集中管理機器人可執行動作（便於能力查詢、版本化與對上游 API 的一致性），本專案將機器人模組的工具清單（原始位置：`Robot-Console/tools.py`）移交至 MCP 作為權威來源。MCP 會暴露能力查詢 API（例如：GET /api/robots/{robot_id}/capabilities 或 GET /api/tools），並提供每項工具的描述與參數 schema，以供 WebUI、LLM 代理與外部整合使用。
+
+下列為已納入 MCP 的工具清單（從 `Robot-Console/tools.py` 同步過來，含名稱與簡短描述）：
+
+```
+back_fast: Command the robot to move backward quickly.
+bow: Command the robot to bow.
+chest: Command the robot to perform chest exercises.
+dance_eight: Command the robot to perform dance eight.
+dance_five: Command the robot to perform dance five.
+dance_four: Command the robot to perform dance four.
+dance_nine: Command the robot to perform dance nine.
+dance_seven: Command the robot to perform dance seven.
+dance_six: Command the robot to perform dance six.
+dance_ten: Command the robot to perform dance ten.
+dance_three: Command the robot to perform dance three.
+dance_two: Command the robot to perform dance two.
+go_forward: Command the robot to move forward in the direction it is currently facing.
+kung_fu: Command the robot to perform kung fu moves.
+left_kick: Command the robot to perform a left kick.
+left_move_fast: Command the robot to move left quickly.
+left_shot_fast: Command the robot to perform a fast left punch.
+left_uppercut: Command the robot to perform a left uppercut.
+push_ups: Command the robot to perform push-ups.
+right_kick: Command the robot to perform a right kick.
+right_move_fast: Command the robot to move right quickly.
+right_shot_fast: Command the robot to perform a fast right punch.
+right_uppercut: Command the robot to perform a right uppercut.
+sit_ups: Command the robot to perform sit-ups.
+squat: Command the robot to squat down.
+squat_up: Command the robot to stand up from a squat.
+stand: Command the robot to stand up and maintain a standing position.
+stand_up_back: Command the robot to stand up from the back.
+stand_up_front: Command the robot to stand up from the front.
+stepping: Command the robot to perform stepping motions.
+stop: Command the robot to stop all current actions or movements.
+turn_left: Command the robot to turn left.
+turn_right: Command the robot to turn right.
+twist: Command the robot to twist its body.
+wave: Command the robot to wave its hand.
+weightlifting: Command the robot to perform weightlifting.
+wing_chun: Command the robot to perform Wing Chun moves.
+```
+
+使用說明與約定：
+- API 資訊：MCP 應提供一個可以取得工具列表與每個工具 input schema 的端點（例如：GET /api/tools 或 GET /api/robots/{robot_id}/capabilities）。
+- 版本化：工具的 schema 與描述會以版本號管理（例如：tools.v1、tools.v2），避免破壞向後相容性。
+- 同步機制：Robot-Console 仍保留 `tools.py` 作為本地執行器映射與快速測試用，但任何權威變更需先在 MCP 的工具庫中更新，並透過 CI 或同步腳本下放到 Robot-Console（參見後述遷移說明）。
+
+遷移注意：
+- 在短期內，Robot-Console 的 `tools.py` 會繼續存在以維持相容，但開發者應以 MCP 作為編輯來源。
+- 建議建立一個同步腳本或 CI 檢查：當 MCP 的工具庫變動時，將變更自動檢出並產生 PR 到各 Robot-Console 的映射檔案。這可降低版本偏移與運行時差異。
+
 ## 10. 下一步（Roadmap）
 - 實作機器人註冊 API（POST /api/robots/register）。
 - 實作進階指令 API（POST／GET /api/advanced_commands）。

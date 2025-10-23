@@ -3,8 +3,10 @@ version: '3.8'
 services:
   web:
     build:
-      context: .
-      dockerfile: Dockerfile
+      # Build context should be the WebUI module directory (parent of this docker folder)
+      context: ..
+      # Dockerfile path relative to the build context
+      dockerfile: docker/Dockerfile
     image: robot-webui:latest
     environment:
       - FLASK_ENV=production
@@ -15,7 +17,15 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - ../:/opt/webui:rw
+      # Mount only important WebUI subfolders into the container for development.
+      # Adjust the list below if your code lives in other folders.
+      - ../app:/opt/webui/app:rw
+      - ../app/templates:/opt/webui/app/templates:rw
+      - ../app/static:/opt/webui/app/static:rw
+      - ../migrations:/opt/webui/migrations:rw
+      - ../logs:/opt/webui/logs:rw
+      # Optionally mount config if you keep local config there
+      - ../config.py:/opt/webui/config.py:ro
       # Optional: mount TLS certs for HTTPS if you want to run behind a proxy or enable TLS
       # - ./certs:/etc/ssl/certs:ro
     restart: unless-stopped

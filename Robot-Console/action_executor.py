@@ -128,7 +128,7 @@ class ActionExecutor:
         log_error_msg: str,
     ) -> Optional[Dict[str, Any]]:
         headers = {"deviceid": "1732853986186"}
-        data = {
+        data: Dict[str, Any] = {
             "id": "1732853986186",
             "jsonrpc": "2.0",
             "method": method,
@@ -224,6 +224,24 @@ class ActionExecutor:
 
         with self.queue_lock:
             self.action_queue.put({"id": action_id, "name": action_name})
+
+    def add_actions_to_queue(self, action_names: list) -> None:
+        """Add multiple actions to the queue in order.
+
+        This helper enqueues a list of action names atomically (i.e. holds the
+        queue lock while inserting) so sequences decoded from advanced commands
+        preserve order.
+        """
+        with self.queue_lock:
+            for name in action_names:
+                action_id = str(uuid4())
+                if name == "stop":
+                    # 'stop' is handled specially — call stop() immediately
+                    self.stop()
+                elif name in actions:
+                    self.action_queue.put({"id": action_id, "name": name})
+                else:
+                    self.logger.warning("Skipped unknown action when enqueueing sequence: %s", name)
 
     def remove_action_from_queue(self, action_id: str) -> None:
         """Remove an action from the queue by its ID."""

@@ -348,7 +348,27 @@ def edit_advanced_command(cmd_id):
         else:
             flash('進階指令已更新並重新送審。')
         return redirect(url_for('webui.advanced_commands'))
-    return render_template('create_advanced_command.html.j2', form=form, cmd=cmd, duration_unit=session.get('duration_unit', current_user.ui_duration_unit if hasattr(current_user, 'ui_duration_unit') else 's'), verify_collapsed=session.get('verify_collapsed', current_user.ui_verify_collapsed if hasattr(current_user, 'ui_verify_collapsed') else False), verified_advanced_commands=[ac.name for ac in AdvancedCommand.query.filter_by(status='approved').all()], editing=True)
+    # Extract complex logic into variables for readability
+    duration_unit = session.get(
+        'duration_unit',
+        getattr(current_user, 'ui_duration_unit', 's')
+    )
+    verify_collapsed = session.get(
+        'verify_collapsed',
+        getattr(current_user, 'ui_verify_collapsed', False)
+    )
+    verified_advanced_commands = [
+        ac.name for ac in AdvancedCommand.query.filter_by(status='approved').all()
+    ]
+    return render_template(
+        'create_advanced_command.html.j2',
+        form=form,
+        cmd=cmd,
+        duration_unit=duration_unit,
+        verify_collapsed=verify_collapsed,
+        verified_advanced_commands=verified_advanced_commands,
+        editing=True
+    )
 
 # 審核進階指令（僅 admin/auditor）
 @bp.route('/advanced_commands/audit/<int:cmd_id>', methods=['POST'])

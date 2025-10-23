@@ -3,13 +3,12 @@ MCP 認證授權管理器
 負責身份驗證、RBAC/ABAC 與權限審計
 """
 
-import hashlib
-import hmac
 import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
 import jwt
+from passlib.hash import bcrypt
 
 from .config import MCPConfig
 
@@ -175,9 +174,9 @@ class AuthManager:
         return None
     
     def _hash_password(self, password: str) -> str:
-        """雜湊密碼"""
-        return hashlib.sha256(password.encode()).hexdigest()
+        """雜湊密碼（使用 bcrypt，自動產生隨機鹽值）"""
+        return bcrypt.hash(password)
     
     def _verify_password(self, password: str, password_hash: str) -> bool:
-        """驗證密碼"""
-        return self._hash_password(password) == password_hash
+        """驗證密碼（使用 bcrypt）"""
+        return bcrypt.verify(password, password_hash)

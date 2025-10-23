@@ -293,8 +293,32 @@ document.addEventListener('DOMContentLoaded', function() {
   // 綁定切換事件
   var unitS = document.getElementById('unit_s');
   var unitMs = document.getElementById('unit_ms');
-  if (unitS) unitS.addEventListener('change', function(){ if (this.checked) { try{ localStorage.setItem('durationUnit', 's'); window.DURATION_UNIT = 's'; }catch(e){} try{ fetch('{{ url_for("webui.update_ui_settings") }}', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({duration_unit: 's'})}); }catch(e){} }});
-  if (unitMs) unitMs.addEventListener('change', function(){ if (this.checked) { try{ localStorage.setItem('durationUnit', 'ms'); window.DURATION_UNIT = 'ms'; }catch(e){} try{ fetch('{{ url_for("webui.update_ui_settings") }}', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({duration_unit: 'ms'})}); }catch(e){} }});
+  function updateDurationUnit(unit) {
+    try {
+      localStorage.setItem('durationUnit', unit);
+      window.DURATION_UNIT = unit;
+    } catch (e) {}
+    try {
+      postDurationUnitSetting(unit);
+    } catch (e) {}
+  }
+  function postDurationUnitSetting(unit) {
+    fetch('{{ url_for("webui.update_ui_settings") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ duration_unit: unit })
+    });
+  }
+  if (unitS) unitS.addEventListener('change', function() {
+    if (this.checked) {
+      updateDurationUnit('s');
+    }
+  });
+  if (unitMs) unitMs.addEventListener('change', function() {
+    if (this.checked) {
+      updateDurationUnit('ms');
+    }
+  });
 });
 
 // 前端驗證：檢查移動類積木的 duration 欄位

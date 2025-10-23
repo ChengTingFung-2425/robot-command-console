@@ -28,7 +28,7 @@ fi
 
 # If invoked with a flag, prepend the CMD
 if [[ "${1-}" == "-"* ]]; then
-  set -- ${@}
+  set -- "$@"
 fi
 
 exec "$@"

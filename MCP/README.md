@@ -140,6 +140,7 @@ uvicorn api:app --host 0.0.0.0 --port 8000 --reload
 | MCP_LOG_LEVEL | INFO | 日誌等級 |
 | MCP_DATABASE_URL | sqlite:///./mcp.db | 資料庫 URL |
 | MCP_REDIS_URL | redis://localhost:6379/0 | Redis URL |
+| MCP_SSL_VERIFY | true | HTTPS SSL 憑證驗證（生產環境應設為 true） |
 
 ## 📁 模組結構
 
@@ -166,6 +167,7 @@ MCP/
 - 密碼雜湊儲存
 - CORS 設定
 - 請求驗證與清理
+- **HTTPS SSL 憑證驗證** - 防止中間人攻擊（預設啟用）
 
 ## 📊 可觀測性
 

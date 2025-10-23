@@ -237,6 +237,7 @@ class RobotRouter:
     ) -> Dict[str, Any]:
         """透過 HTTP 下發指令"""
         import aiohttp
+        import ssl
         
         url = f"{endpoint}/api/command"
         payload = {
@@ -247,8 +248,19 @@ class RobotRouter:
         
         try:
             timeout = aiohttp.ClientTimeout(total=timeout_ms / 1000.0)
+            
+            # 設定 SSL 驗證
+            ssl_context = None
+            if url.startswith("https://"):
+                if MCPConfig.SSL_VERIFY:
+                    # 使用預設 SSL context，進行完整憑證驗證
+                    ssl_context = ssl.create_default_context()
+                else:
+                    # 明確設定為 False（僅用於開發環境）
+                    ssl_context = False
+            
             async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.post(url, json=payload) as response:
+                async with session.post(url, json=payload, ssl=ssl_context) as response:
                     if response.status == 200:
                         result = await response.json()
                         return {"data": result, "summary": "指令執行成功"}

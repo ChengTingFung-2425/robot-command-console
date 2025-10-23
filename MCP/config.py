@@ -41,6 +41,9 @@ class MCPConfig:
     # CORS 設定
     CORS_ORIGINS = os.getenv("MCP_CORS_ORIGINS", "*").split(",")
     
+    # SSL 設定
+    SSL_VERIFY = os.getenv("MCP_SSL_VERIFY", "true").lower() in ("true", "1", "yes")
+    
     @classmethod
     def get_config(cls) -> Dict[str, Any]:
         """取得所有設定"""

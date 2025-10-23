@@ -79,7 +79,7 @@ class AdvancedCommandForm(FlaskForm):
                 "dance_two", "dance_three", "dance_four", "dance_five",
                 "dance_six", "dance_seven", "dance_eight", "dance_nine", "dance_ten",
                 "push_ups", "sit_ups", "chest", "weightlifting",
-                "squat_up", "twist", "stepping", "stop", "wait"
+                "squat_up", "twist", "stepping", "stop", "wait", "advanced_command"
             }
             
             for idx, cmd in enumerate(commands):

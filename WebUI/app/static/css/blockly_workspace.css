@@ -1,0 +1,282 @@
+/**
+ * Blockly Workspace Styles
+ * 美化程式積木編輯器的樣式
+ */
+
+/* ============================================
+   Blockly 工作區容器
+   ============================================ */
+#blocklyDiv {
+  border: 2px solid #dee2e6;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================
+   驗證面板樣式 (verify panel)
+   ============================================ */
+#verify-panel {
+  background: #f8f9fa;
+  border: 2px solid #e9ecef;
+  color: #212529;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+#verify-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+#verify-panel::-webkit-scrollbar-track {
+  background: #e9ecef;
+  border-radius: 4px;
+}
+
+#verify-panel::-webkit-scrollbar-thumb {
+  background: #adb5bd;
+  border-radius: 4px;
+}
+
+#verify-panel::-webkit-scrollbar-thumb:hover {
+  background: #6c757d;
+}
+
+/* ============================================
+   統計資訊卡片
+   ============================================ */
+.alert-info {
+  border-left: 4px solid #0dcaf0;
+  background-color: #cff4fc;
+  border-color: #b6effb;
+}
+
+.alert-warning {
+  border-left: 4px solid #ffc107;
+}
+
+/* ============================================
+   按鈕樣式優化
+   ============================================ */
+.d-grid .btn {
+  border-radius: 6px;
+  font-weight: 500;
+  padding: 10px 16px;
+  transition: all 0.2s ease;
+}
+
+.d-grid .btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.d-grid .btn:active {
+  transform: translateY(0);
+}
+
+/* ============================================
+   卡片標題優化
+   ============================================ */
+.card-header h5 {
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.card {
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #dee2e6;
+}
+
+.card-header {
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+/* ============================================
+   表單輸入優化
+   ============================================ */
+.form-control, .form-select {
+  border-radius: 6px;
+  border: 1px solid #ced4da;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-control:focus, .form-select:focus {
+  border-color: #86b7fe;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+}
+
+.form-label {
+  font-weight: 500;
+  color: #495057;
+  margin-bottom: 0.5rem;
+}
+
+/* ============================================
+   響應式調整
+   ============================================ */
+@media (max-width: 768px) {
+  #blocklyDiv {
+    height: 400px !important;
+  }
+
+  .col-md-3, .col-md-6 {
+    margin-bottom: 20px;
+  }
+
+  #verify-panel {
+    height: 300px !important;
+  }
+}
+
+/* ============================================
+   可摺疊驗證面板樣式
+   ============================================ */
+#verifyCol {
+  transition: width 0.28s ease, opacity 0.28s ease; 
+}
+
+#verifyCol.collapsed {
+  width: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 當驗證欄位收合時，讓工作區平滑擴展（使用 flex-grid 會自動處理，但提供過渡效果） */
+#blocklyCol {
+  transition: width 0.28s ease;
+}
+
+@media (max-width: 992px) {
+  /* 中等及以下螢幕：將工作區佈局調整為單欄顯示 */
+  #verifyCol {
+    width: 100% !important;
+  }
+  #blocklyCol {
+    width: 100% !important;
+    margin-top: 16px;
+  }
+}
+
+/* ============================================
+   Blockly 工具箱樣式（覆寫預設）
+   ============================================ */
+.blocklyToolboxDiv {
+  background-color: #f8f9fa;
+  border-right: 2px solid #dee2e6;
+}
+
+.blocklyTreeRow {
+  padding: 8px 12px;
+  transition: background-color 0.2s ease;
+}
+
+.blocklyTreeRow:hover {
+  background-color: #e9ecef !important;
+}
+
+.blocklyTreeSelected {
+  background-color: #d0e7ff !important;
+}
+
+/* ============================================
+   積木類別標籤顏色優化
+   ============================================ */
+.blocklyTreeLabel {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+/* ============================================
+   動畫效果
+   ============================================ */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.card {
+  animation: fadeIn 0.3s ease;
+}
+
+/* ============================================
+   提示框樣式
+   ============================================ */
+.alert ul {
+  padding-left: 20px;
+  margin-top: 8px;
+}
+
+.alert li {
+  margin-bottom: 4px;
+}
+
+/* ============================================
+   統計數字強調
+   ============================================ */
+#block-count, #estimated-time {
+  font-weight: 700;
+  color: #0d6efd;
+  font-size: 1.1em;
+}
+
+/* ============================================
+   隱藏欄位確保不顯示
+   ============================================ */
+input[type="hidden"] {
+  display: none !important;
+}
+
+textarea#base_commands {
+  display: none !important;
+}
+
+/* ============================================
+   載入動畫（當 Blockly 初始化時）
+   ============================================ */
+#blocklyDiv:empty::before {
+  content: '⏳ 正在載入積木編輯器...';
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 1.2rem;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+/* ============================================
+   成功提交後的反饋樣式
+   ============================================ */
+.flash-messages {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  max-width: 400px;
+}
+
+.flash-messages .alert {
+  margin-bottom: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}

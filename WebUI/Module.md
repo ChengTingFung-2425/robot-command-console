@@ -120,3 +120,30 @@
 - 定義介入操作的 API 與前端交互細節（確認對話、風險提示）。
 - 建立告警訂閱與通知機制（Email/Webhook）。
 - 強化 E2E 測試：模擬連線中斷、超時與重試。
+
+## 10. 模組狀態更新 — Docker 啟動範例
+
+- 已在本模組下新增 `WebUI/docker/` 目錄，包含可用於開發與測試的容器化範例檔：
+  - `WebUI/docker/Dockerfile`：建立以 Python 3.11-slim 為基礎的映像，預設以 Gunicorn 啟動 `WebUI.app:app`。
+  - `WebUI/docker/docker-entrypoint.sh`：簡單 entrypoint，支援在有 `DATABASE_URL` 時等候資料庫啟動。
+  - `WebUI/docker/.dockerignore`：列出不應打包到映像中的檔案/資料夾。
+  - `WebUI/docker/docker-compose.yml`：示範性 Compose 檔案，可在本地啟動服務（映射 5000 埠、掛載程式碼以方便開發）。
+
+- 使用建議：
+  1. 若要在本機建構映像，請從專案根目錄執行：
+
+     ```bash
+     docker build -f WebUI/docker/Dockerfile -t robot-webui:latest .
+     ```
+
+  2. 或使用 compose（在 `WebUI/docker` 目錄）：
+
+     ```bash
+     cd WebUI/docker
+     docker-compose up --build
+     ```
+
+- 注意：
+  - 映像預設不在容器內終止 TLS，而是將 HTTP（5000）暴露出來；生產環境建議放置反向代理（nginx）處理 TLS 與靜態檔。 
+  - 若希望我把現有根目錄中的 Docker 文件（若仍存在複製）移除或同步到 `WebUI/docker/`，或加入 `nginx` + TLS 範例，請回覆我想要的選項，我將清理與補齊必要的 CI 與文件。
+

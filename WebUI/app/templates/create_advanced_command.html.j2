@@ -333,7 +333,7 @@ function frontendVerifyDurations(parsedCommands) {
     </div>
   </div>
 
-  <form method="POST" action="{{ url_for('webui.create_advanced_command') }}">
+  <form method="POST" action="{% if editing and cmd %}{{ url_for('webui.edit_advanced_command', cmd_id=cmd.id) }}{% else %}{{ url_for('webui.create_advanced_command') }}{% endif %}">
     {{ form.hidden_tag() }}
     
     <div class="row mt-3">
@@ -374,6 +374,16 @@ function frontendVerifyDurations(parsedCommands) {
               {% endif %}
             </div>
 
+            <div class="form-group mt-3">
+              {{ form.version.label(class="form-label") }}
+              {{ form.version(class="form-control", min=1) }}
+              {% if form.version.errors %}
+                <div class="invalid-feedback d-block">
+                  {% for error in form.version.errors %}<span>{{ error }}</span>{% endfor %}
+                </div>
+              {% endif %}
+            </div>
+
             <hr>
 
             <div class="alert alert-info">
@@ -406,7 +416,7 @@ function frontendVerifyDurations(parsedCommands) {
   <div id="verifyCol" class="col-md-3 {% if verify_collapsed %}collapsed{% endif %}">
         <div class="card">
           <div class="card-header bg-info text-white">
-            <h5 class="mb-0">� 待驗證 (To verify)
+            <h5 class="mb-0">待驗證 (To verify)
               <button id="verify-toggle" class="btn btn-sm btn-light ms-2 float-end" onclick="toggleVerifyPanel()" aria-expanded="true" title="摺疊/展開待驗證面板">▾</button>
             </h5>
           </div>

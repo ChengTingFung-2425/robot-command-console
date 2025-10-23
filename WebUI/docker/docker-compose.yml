@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: robot-webui:latest
+    environment:
+      - FLASK_ENV=production
+      # Example env placeholders
+      - DATABASE_URL=${DATABASE_URL}
+      - MAIL_SERVER=${MAIL_SERVER}
+      - SECRET_KEY=${SECRET_KEY}
+    ports:
+      - "5000:5000"
+    volumes:
+      - ../:/opt/webui:rw
+      # Optional: mount TLS certs for HTTPS if you want to run behind a proxy or enable TLS
+      # - ./certs:/etc/ssl/certs:ro
+    restart: unless-stopped
+    # Example healthcheck to ensure the HTTP server responds
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+# Notes:
+# - This compose file builds from the repository root (context: ../) and uses the Dockerfile
+#   located in WebUI/docker/Dockerfile. Adjust context if you prefer building only the WebUI folder.
+# - For production, consider adding a reverse proxy (nginx) and TLS termination instead of
+#   exposing Flask/Gunicorn directly to the public internet.

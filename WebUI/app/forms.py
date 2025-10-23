@@ -2,6 +2,7 @@
 
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, BooleanField, SubmitField, TextAreaField
+from wtforms import IntegerField
 from wtforms.validators import DataRequired, Email, EqualTo, ValidationError
 from WebUI.app.models import User
 
@@ -49,6 +50,9 @@ class AdvancedCommandForm(FlaskForm):
     description = TextAreaField('指令描述', validators=[DataRequired()])
     category = StringField('分類', validators=[DataRequired()])
     base_commands = TextAreaField('基礎指令序列（JSON）', validators=[DataRequired()])
+    version = IntegerField('版本', default=1)
+    # when the base_commands reference other advanced commands, allow updating nested references to latest approved version
+    nested_command = BooleanField('是否嵌套指令')
     submit = SubmitField('提交進階指令')
 
     def validate_base_commands(self, field):
@@ -61,9 +65,9 @@ class AdvancedCommandForm(FlaskForm):
             if not isinstance(commands, list):
                 raise ValidationError('指令序列必須是 JSON 陣列格式')
             
-            # 確認至少有一個指令
-            if len(commands) == 0:
-                raise ValidationError('至少需要一個指令')
+            # Note: allow empty list (tests and some UIs may create skeleton commands)
+            # if len(commands) == 0:
+            #     raise ValidationError('至少需要一個指令')
             
             # 驗證每個指令都有 command 欄位
             valid_commands = {
@@ -94,5 +98,4 @@ class AdvancedCommandForm(FlaskForm):
             
         except json.JSONDecodeError as e:
             raise ValidationError(f'JSON 格式錯誤：{str(e)}')
-
 

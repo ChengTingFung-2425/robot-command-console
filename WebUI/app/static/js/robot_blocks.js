@@ -460,7 +460,12 @@ const generateActionWithDuration = (blockName, commandName, defaultSeconds) => {
   Blockly.JavaScript[blockName] = function(block) {
     var duration = parseFloat(block.getFieldValue('DURATION')) || defaultSeconds || 0;
     // 決定輸出的時間單位：優先使用全域變數，其次檢查 localStorage，否則預設為秒(s)
-    var unit = (typeof window !== 'undefined' && window.DURATION_UNIT) || (typeof localStorage !== 'undefined' && localStorage.getItem('durationUnit')) || 's';
+    var unit = 's';
+    if (typeof window !== 'undefined' && window.DURATION_UNIT) {
+      unit = window.DURATION_UNIT;
+    } else if (typeof localStorage !== 'undefined' && localStorage.getItem('durationUnit')) {
+      unit = localStorage.getItem('durationUnit');
+    }
     if (unit === 'ms') {
       var ms = Math.round(duration * 1000);
       return `{"command": "${commandName}", "duration_ms": ${ms}},\n`;

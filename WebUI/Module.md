@@ -74,6 +74,27 @@
   - 參數輸入表單（JSON 編輯器或結構化表單）
   - 執行按鈕與確認對話框
   
+- **進階指令建立器（Advanced Command Builder）**：
+  - **程式積木介面（Blockly Integration）**：
+    - 視覺化拖放式積木編輯器，降低使用門檻
+    - 37 種機器人動作積木（movement, gesture, dance, combat, exercise）
+    - 控制流程積木（sequence, loop, conditional, wait）
+    - 即時 JSON 預覽與驗證
+    - 匯入/匯出積木工作區（儲存與分享）
+  - 積木類別：
+    - **移動積木**：go_forward, back_fast, turn_left, turn_right, left_move_fast, right_move_fast
+    - **姿態積木**：stand, bow, squat, stand_up_front, stand_up_back
+    - **戰鬥積木**：left_kick, right_kick, kung_fu, wing_chun, left_uppercut, right_uppercut, left_shot_fast, right_shot_fast
+    - **舞蹈積木**：dance_two ~ dance_ten（9 種舞蹈動作）
+    - **運動積木**：push_ups, sit_ups, chest, weightlifting, squat_up
+    - **控制積木**：loop（重複執行）, wait（延遲）, stop（停止）
+  - 積木編輯器特性：
+    - 自動計算總執行時間（基於 sleep_time）
+    - 語法錯誤即時提示（如未連接的積木）
+    - 工作區縮放與拖曳
+    - 垃圾桶拖放刪除
+    - 程式碼產生器：積木 → JSON 指令序列
+  
 - **執行監控面板（Execution Monitor）**：
   - 進行中指令列表（狀態、進度條）
   - 歷史指令查詢（篩選、排序、搜尋）
@@ -100,3 +121,30 @@
 - 定義介入操作的 API 與前端交互細節（確認對話、風險提示）。
 - 建立告警訂閱與通知機制（Email/Webhook）。
 - 強化 E2E 測試：模擬連線中斷、超時與重試。
+
+## 10. 模組狀態更新 — Docker 啟動範例
+
+- 已在本模組下新增 `WebUI/docker/` 目錄，包含可用於開發與測試的容器化範例檔：
+  - `WebUI/docker/Dockerfile`：建立以 Python 3.11-slim 為基礎的映像，預設以 Gunicorn 啟動 `WebUI.app:app`。
+  - `WebUI/docker/docker-entrypoint.sh`：簡單 entrypoint，支援在有 `DATABASE_URL` 時等候資料庫啟動。
+  - `WebUI/docker/.dockerignore`：列出不應打包到映像中的檔案/資料夾。
+  - `WebUI/docker/docker-compose.yml`：示範性 Compose 檔案，可在本地啟動服務（映射 5000 埠、掛載程式碼以方便開發）。
+
+- 使用建議：
+  1. 若要在本機建構映像，請從專案根目錄執行：
+
+     ```bash
+     docker build -f WebUI/docker/Dockerfile -t robot-webui:latest .
+     ```
+
+  2. 或使用 compose（在 `WebUI/docker` 目錄）：
+
+     ```bash
+     cd WebUI/docker
+     docker-compose up --build
+     ```
+
+- 注意：
+  - 映像預設不在容器內終止 TLS，而是將 HTTP（5000）暴露出來；生產環境建議放置反向代理（nginx）處理 TLS 與靜態檔。 
+  - 若希望我把現有根目錄中的 Docker 文件（若仍存在複製）移除或同步到 `WebUI/docker/`，或加入 `nginx` + TLS 範例，請回覆我想要的選項，我將清理與補齊必要的 CI 與文件。
+

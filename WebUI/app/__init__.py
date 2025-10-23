@@ -15,7 +15,11 @@ from config import Config
 # app 實例與初始化
 app = Flask(__name__)
 app.config.from_object(Config)
-db = SQLAlchemy(app)
+# Configure SQLAlchemy. Set session options so objects are not expired on commit
+# which makes testing patterns (creating objects then accessing them across
+# commits) more convenient.
+db = SQLAlchemy(session_options={"expire_on_commit": False})
+db.init_app(app)
 migrate = Migrate(app, db)
 login = LoginManager()
 login.login_view = "webui.login"  # type: ignore[assignment]

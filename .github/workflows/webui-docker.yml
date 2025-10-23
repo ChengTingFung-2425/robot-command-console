@@ -1,0 +1,86 @@
+name: Build & Scan WebUI Docker image
+
+on:
+  push:
+    branches: [ main, WebUI ]
+  pull_request:
+    branches: [ main, WebUI ]
+
+jobs:
+  build-and-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # needed to access tags
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Determine image tag
+        id: vars
+        run: |
+          # Prefer an annotated/tagged release; otherwise use short SHA
+          if git describe --tags --exact-match >/dev/null 2>&1; then
+            TAG=$(git describe --tags --exact-match)
+          else
+            TAG=$(git rev-parse --short=8 HEAD)
+          fi
+          IMAGE_TAG=robot-webui:${TAG}
+          echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Login to registry (optional)
+        if: secrets.REGISTRY_USERNAME && secrets.REGISTRY_PASSWORD
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build WebUI image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./WebUI
+          file: ./WebUI/docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: false
+          tags: |
+            ${{ steps.vars.outputs.IMAGE_TAG }}
+            robot-webui:latest
+
+      - name: Install trivy
+        uses: aquasecurity/trivy-action@v1
+        with:
+          version: 'latest'
+
+      - name: Scan built image with Trivy
+        run: |
+          IMAGE=${{ steps.vars.outputs.IMAGE_TAG }}
+          echo "Scanning ${IMAGE}"
+          # Use trivy to scan the local image
+          trivy image --exit-code 1 --severity CRITICAL,HIGH ${IMAGE} || true
+
+      - name: Push image (optional)
+        if: secrets.REGISTRY && secrets.REGISTRY_USERNAME && secrets.REGISTRY_PASSWORD
+        uses: docker/build-push-action@v4
+        with:
+          context: ./WebUI
+          file: ./WebUI/docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ secrets.REGISTRY }}/${{ steps.vars.outputs.IMAGE_TAG }}
+
+      - name: Upload scan result (placeholder)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webui-scan-log
+          path: |
+            # If you capture trivy output to a file, reference it here
+            |

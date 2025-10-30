@@ -19,11 +19,17 @@ from threading import Thread
 from flask_mail import Message
 from WebUI.app import app, mail
 
-# functions
-def send_async_email(app, msg):
-    """於 app context 下非同步發送郵件"""
-    with app.app_context():
-        mail.send(msg)
+# class
+class EmailSender:
+
+    def __init__(self, app, mail):
+        self.app = app
+        self.mail = mail
+
+    def send_async_email(self, msg):
+        """於 app context 下非同步發送郵件"""
+        with self.app.app_context():
+            self.mail.send(msg)
 
 def send_email(subject, sender, recipients, text_body, html_body=None):
     """發送郵件，可選擇純文字與 HTML 內容"""

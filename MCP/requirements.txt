@@ -14,7 +14,6 @@ pydantic>=2.5.0
 
 # 認證
 PyJWT>=2.8.0
-python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
 
 # 資料庫（選用）

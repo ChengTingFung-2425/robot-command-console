@@ -8,8 +8,8 @@
   "waitFor": "onCreateCommand",
   "postCreateCommand": [
     "cd WebUI",
-    "Flask db upgrade",
-    "flask --debug run --host=0.0.0.0 &"
+    "flask --debug run --host=0.0.0.0 --port=5000 &",
+    "sleep 5"
   ],
   "portsAttributes": {
     "5000": {

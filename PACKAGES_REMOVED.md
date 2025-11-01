@@ -1,6 +1,6 @@
 # Removed Python Packages
 
-This document lists the Python packages that were removed from `requirements.txt` as they were not being used by the application.
+This document lists the Python packages that were removed from `requirements.txt` and `MCP/requirements.txt` as they were not being used by the application or had security vulnerabilities.
 
 ## Summary
 - **Before**: 151 packages
@@ -150,3 +150,18 @@ Various supporting libraries for the above packages
 ## Verification
 
 No Python code in the repository imports or uses any of the removed packages. The application is a Flask web application that does not require Jupyter notebooks or data science libraries.
+
+## Security-Related Removals
+
+### python-jose[cryptography] (Removed from MCP/requirements.txt)
+
+**Reason**: Security vulnerability in transitive dependency `ecdsa`
+
+**Details**:
+- `python-jose[cryptography]==3.3.0` brings in `ecdsa` as a transitive dependency
+- `ecdsa` has a known vulnerability: Minerva timing attack on P-256 (CVE-TBD) with no patched version available
+- `python-jose` itself has vulnerability: algorithm confusion with OpenSSH ECDSA keys (fixed in 3.4.0, but upgrading doesn't fix the `ecdsa` issue)
+- The package was not being used in the codebase - MCP authentication module uses `PyJWT` directly
+- Removed to eliminate the vulnerable `ecdsa` transitive dependency
+
+**Alternative**: The application continues to use `PyJWT>=2.8.0` directly for JWT token handling, which is already present in MCP/requirements.txt and does not have the same security issues.

@@ -6,7 +6,11 @@
     "cpus": 2
   },
   "waitFor": "onCreateCommand",
-  "postCreateCommand": "",
+  "postCreateCommand": [
+    "cd WebUI",
+    "Flask db upgrade",
+    "flask --debug run --host=0.0.0.0 &"
+  ],
   "portsAttributes": {
     "5000": {
       "label": "Flask Apps",

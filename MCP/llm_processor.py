@@ -173,11 +173,24 @@ class LLMProcessor:
         duration_ms = 3000  # 預設 3 秒
         
         import re
-        # 匹配數字 + 秒
-        time_match = re.search(r'(\d+)\s*秒', text)
-        if time_match:
-            seconds = int(time_match.group(1))
-            duration_ms = seconds * 1000
+        
+        # 中文數字對應表
+        chinese_numbers = {
+            '一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
+            '六': 6, '七': 7, '八': 8, '九': 9, '十': 10
+        }
+        
+        # 先嘗試匹配中文數字 + 秒
+        for chinese, value in chinese_numbers.items():
+            if f'{chinese}秒' in text:
+                duration_ms = value * 1000
+                break
+        else:
+            # 再嘗試匹配阿拉伯數字 + 秒
+            time_match = re.search(r'(\d+)\s*秒', text)
+            if time_match:
+                seconds = int(time_match.group(1))
+                duration_ms = seconds * 1000
         
         return {
             "action_name": action_name,

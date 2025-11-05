@@ -3,7 +3,6 @@ MCP FastAPI 服務
 提供 HTTP API 介面
 """
 
-import asyncio
 import base64
 import logging
 from datetime import datetime

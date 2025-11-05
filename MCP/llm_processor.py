@@ -4,6 +4,7 @@ LLM 處理器模組
 """
 
 import logging
+import re
 from typing import Dict, Any, Optional, Tuple
 from .models import CommandSpec, CommandTarget, Priority
 
@@ -175,8 +176,6 @@ class LLMProcessor:
         
         # 提取時間（秒）
         duration_ms = self.DEFAULT_DURATION_MS  # 使用類常數
-        
-        import re
         
         # 中文數字對應表
         chinese_numbers = {

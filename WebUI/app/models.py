@@ -58,6 +58,8 @@ class Robot(db.Model):
     name = db.Column(db.String(64), unique=True, nullable=False)
     type = db.Column(db.String(64), nullable=False)
     status = db.Column(db.String(64), default='idle')
+    battery = db.Column(db.Integer, default=100)  # 電池電量百分比 (0-100)
+    location = db.Column(db.String(128))  # 機器人位置
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
 
     def __repr__(self) -> str:

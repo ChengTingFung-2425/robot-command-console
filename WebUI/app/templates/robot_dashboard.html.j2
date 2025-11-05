@@ -1,29 +1,204 @@
 {% extends "base.html.j2" %}
 {% block app_content %}
+<style>
+.robot-card {
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  margin-bottom: 20px;
+}
+.robot-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+.video-feed-container {
+  width: 480px;
+  height: 360px; /* 4:3 aspect ratio */
+  background-color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+.video-feed-canvas {
+  max-width: 100%;
+  max-height: 100%;
+}
+.video-placeholder {
+  color: #fff;
+  text-align: center;
+}
+.battery-indicator {
+  display: inline-block;
+  width: 60px;
+  height: 20px;
+  border: 2px solid #333;
+  border-radius: 3px;
+  position: relative;
+  vertical-align: middle;
+}
+.battery-level {
+  height: 100%;
+  transition: width 0.3s;
+}
+.battery-level.high {
+  background-color: #5cb85c;
+}
+.battery-level.medium {
+  background-color: #f0ad4e;
+}
+.battery-level.low {
+  background-color: #d9534f;
+}
+.robot-info {
+  padding: 10px;
+}
+.status-badge {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 3px;
+}
+</style>
+
 <h2>機器人儀表板</h2>
 <div class="row">
   {% for robot in robots %}
-  <div class="col-md-4">
-    <div class="panel panel-default">
+  <div class="col-md-6 col-lg-4">
+    <div class="panel panel-default robot-card" onclick="window.location.href='{{ url_for('webui.media_stream', robot_id=robot.id) }}'">
       <div class="panel-heading">
-        <strong>{{ robot.name }}</strong> ({{ robot.type }})
+        <strong>{{ robot.name }}</strong>
+        <span class="pull-right">
+          <span class="label label-{{ 'success' if robot.status == 'online' else 'warning' if robot.status == 'idle' else 'danger' }}">
+            {{ robot.status }}
+          </span>
+        </span>
       </div>
-      <div class="panel-body">
-        狀態：<span class="label label-{{ 'success' if robot.status == 'online' else 'danger' }}">{{ robot.status }}</span><br>
-        {% if robot.battery %}電量：{{ robot.battery }}%<br>{% endif %}
-        {% if robot.location %}位置：{{ robot.location }}<br>{% endif %}
-        <form action="{{ url_for('webui.send_command') }}" method="post">
-          <input type="hidden" name="robot_id" value="{{ robot.id }}">
-          <select name="command" class="form-control">
-            {% for action in robot.capabilities %}
-            <option value="{{ action }}">{{ action }}</option>
-            {% endfor %}
-          </select>
-          <button type="submit" class="btn btn-primary btn-block" style="margin-top:8px;">下達指令</button>
-        </form>
+      <div class="panel-body" style="padding: 0;">
+        <!-- 影片串流預覽 -->
+        <div class="video-feed-container">
+          <canvas id="robot-video-{{ robot.id }}" class="video-feed-canvas"></canvas>
+          <div class="video-placeholder" id="placeholder-{{ robot.id }}">
+            <i class="glyphicon glyphicon-facetime-video" style="font-size: 48px;"></i>
+            <p>等待視訊串流...</p>
+          </div>
+        </div>
+        
+        <!-- 機器人資訊 -->
+        <div class="robot-info">
+          <div style="margin-bottom: 8px;">
+            <strong>類型：</strong>{{ robot.type }}
+          </div>
+          
+          <!-- 電池電量 -->
+          <div style="margin-bottom: 8px;">
+            <strong>電量：</strong>
+            <div class="battery-indicator">
+              {% set battery_level = robot.battery if robot.battery is not none else 100 %}
+              <div class="battery-level {{ 'high' if battery_level > 50 else 'medium' if battery_level > 20 else 'low' }}" 
+                   style="width: {{ battery_level }}%;"></div>
+            </div>
+            <span style="margin-left: 5px;">{{ battery_level }}%</span>
+          </div>
+          
+          <!-- 位置資訊 -->
+          {% if robot.location %}
+          <div style="margin-bottom: 8px;">
+            <strong>位置：</strong>{{ robot.location }}
+          </div>
+          {% endif %}
+          
+          <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd;">
+            <small class="text-muted">
+              <i class="glyphicon glyphicon-hand-up"></i> 點擊查看完整狀態
+            </small>
+          </div>
+        </div>
       </div>
     </div>
   </div>
   {% endfor %}
 </div>
+
+{% if not robots %}
+<div class="alert alert-info">
+  <p>您還沒有註冊任何機器人。</p>
+  <a href="{{ url_for('webui.register_robot') }}" class="btn btn-primary">註冊機器人</a>
+</div>
+{% endif %}
+
+<script>
+// WebSocket connections for video feeds
+const robotConnections = {};
+
+{% for robot in robots %}
+(function() {
+  const robotId = {{ robot.id }};
+  const wsUrl = `ws://${window.location.host}/api/media/stream/${robotId}`;
+  
+  function connectRobotFeed() {
+    const ws = new WebSocket(wsUrl);
+    robotConnections[robotId] = ws;
+    
+    ws.onopen = function() {
+      console.log(`機器人 ${robotId} 視訊串流已連線`);
+      const placeholder = document.getElementById(`placeholder-${robotId}`);
+      if (placeholder) placeholder.style.display = 'none';
+    };
+    
+    ws.onmessage = function(event) {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'video') {
+          renderVideoFrame(robotId, data.frame);
+        }
+      } catch (e) {
+        console.error('解析視訊資料失敗:', e);
+      }
+    };
+    
+    ws.onerror = function(error) {
+      console.error(`機器人 ${robotId} 視訊串流錯誤:`, error);
+    };
+    
+    ws.onclose = function() {
+      console.log(`機器人 ${robotId} 視訊串流已斷線`);
+      const placeholder = document.getElementById(`placeholder-${robotId}`);
+      if (placeholder) placeholder.style.display = 'block';
+      
+      // 嘗試重新連線（5秒後）
+      setTimeout(connectRobotFeed, 5000);
+    };
+  }
+  
+  // 初始連線
+  connectRobotFeed();
+})();
+{% endfor %}
+
+function renderVideoFrame(robotId, frameData) {
+  const canvas = document.getElementById(`robot-video-${robotId}`);
+  if (!canvas) return;
+  
+  const ctx = canvas.getContext('2d');
+  const img = new Image();
+  
+  img.onload = function() {
+    // 設定 canvas 尺寸為 4:3 比例（480x360）
+    canvas.width = 480;
+    canvas.height = 360;
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  };
+  
+  img.src = 'data:image/jpeg;base64,' + frameData;
+}
+
+// 清理連線當頁面卸載時
+window.addEventListener('beforeunload', function() {
+  Object.values(robotConnections).forEach(ws => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.close();
+    }
+  });
+});
+</script>
 {% endblock %}

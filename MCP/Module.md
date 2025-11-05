@@ -1,114 +1,6 @@
 # MCP 服務模組設計說明
 
-本文件以精簡版本說明 MCP（Model Context Protocol）服務模組的職責邊界、資料契約、處理流程與完成定義，對齊 `Project.prompt.md` 及 `prosposal.md`，確保標準化、可擴充、可觀測與可追溯。
-
-## 1. 目標與原則
-- 對外提供統一 API（HTTP／WebSocket／MQTT 可插拔），安全地下達指令、查詢狀態、訂閱事件。
-- 資料契約標準化，貫穿 `trace_id` 與審計資訊。
-- 支援人類介入（審批／暫停／取消／覆寫），高可用、可觀測。
-
-## 2. 模組邊界與子模組
-- 指令處理（command）：接收、驗證、排隊、路由、重試、超時。
-- 上下文管理（context）：上下文與狀態歷史、冪等鍵。
-- 協定適配（protocols）：HTTP／WebSocket／MQTT／gRPC／ROS 適配與可靠傳輸。
-- 機器人路由（robot_routing）：依 `robot_id`／`robot_type` 路由至對應 Robot-Console。
-- 認證授權（auth）：身份驗證、RBAC／ABAC、權限審計。
-- 日誌監控（logging_monitor）：事件、審計、指標、追蹤。
-
-## 3. API 與資料契約（JSON）
-
-通用欄位（建議所有請求／回應／事件包含）：`trace_id`（UUIDv4）、`timestamp`（ISO8601 UTC）、`actor`、`source`、`labels`。
-
-### 3.1 指令請求 POST /api/command
-請求：
-```json
-{
-	"trace_id": "...",
-	"timestamp": "...",
-	"actor": { "type": "human|ai|system", "id": "..." },
-	"source": "webui|api|cli|scheduler",
-	"command": {
-		"id": "cmd-...",
-		"type": "robot.move|robot.stop|...",
-		"target": { "robot_id": "..." },
-		"params": {},
-		"timeout_ms": 10000,
-		"priority": "low|normal|high"
-	},
-	"auth": { "token": "<redacted>" },
-	"labels": {}
-}
-```
-
-回應：
-```json
-{
-	"trace_id": "...",
-	"timestamp": "...",
-	"command": { "id": "cmd-...", "status": "accepted|running|succeeded|failed|cancelled" },
-	"result": { "data": {}, "summary": "" },
-	"error": { "code": "", "message": "", "details": {} }
-}
-```
-
-備註（與 Robot-Console 對齊）：緊急停止（E-Stop）由 WebUI 觸發時，`type` 可用 `robot.stop` 或 `params.action_name = stop` 並提高 `priority`（如 `high`），以確保優先處理。
-
-### 3.2 查詢狀態 GET /api/status?command_id=...
-```json
-{
-	"trace_id": "...",
-	"timestamp": "...",
-	"command": { "id": "cmd-...", "status": "running|succeeded|failed|cancelled" },
-	"progress": { "percent": 42, "stage": "navigating" },
-	"error": { "code": "", "message": "", "details": {} }
-}
-```
-
-### 3.3 事件訂閱 WS /api/events（或 SSE /api/events）
-```json
-{
-	"trace_id": "...",
-	"timestamp": "...",
-	"severity": "INFO|WARN|ERROR",
-	"category": "command|auth|protocol|robot|audit",
-	"message": "...",
-	"context": { "command_id": "cmd-..." }
-}
-```
-
-### 3.4 上下文管理 GET／POST /api/context
-以 `trace_id` 或 `command.id` 為鍵查詢／更新上下文。
-
-### 3.5 錯誤格式（統一）
-```json
-{
-	"code": "ERR_TIMEOUT|ERR_UNAUTHORIZED|ERR_VALIDATION|ERR_ROUTING|ERR_PROTOCOL|ERR_INTERNAL",
-	"message": "...",
-	"details": {}
-}
-```
-
-## 4. 指令處理流程（精簡）
-1) 驗證：Schema＋業務規則；AuthN／AuthZ。
-2) 上下文與冪等：填充 metadata、處理冪等鍵。
-3) 機器人路由：解析 `robot_id`／`robot_type`，查註冊表（能力、協定、可用性），定位 Robot-Console。
-4) 執行與監控：Robot-Console 轉換並透過協定適配器發送（HTTP／MQTT／WS 等），控制超時／重試／併發。
-5) 事件：上報 accepted／running／succeeded／failed／cancelled。
-6) 回應：提供即時狀態與最終查詢；支持人類介入（pause／resume／cancel／override）。
-
-邊界條件：
-- 重試採指數退避＋抖動；避免雪崩效應。
-- 機器人級併發鎖；跨機器人隔離。
-- 錯誤分級：USER_ERROR（驗證／授權）與 SYSTEM_ERROR（協定／內部）。
-
-## 5. 錯誤碼表（最小集）
-- ERR_VALIDATION：請求資料不符合 Schema／業務規則。
-- ERR_UNAUTHORIZED：身份驗證或授權失敗。
-- ERR_ROUTING：無對應路由或目標不可達。
-````markdown
-# MCP 服務模組設計說明
-
-本文件以精簡版本說明 MCP（Model Context Protocol）服務模組的職責邊界、資料契約、處理流程與完成定義，對齊 `Project.prompt.md`，確保標準化、可擴充、可觀測與可追溯。
+本文件以精簡版本說明 MCP（Model Context Protocol）服務模組的職責邊界、資料契約、處理流程與完成定義，對齊 `Project.prompt.md` 及 `proposal.md`，確保標準化、可擴充、可觀測與可追溯。
 
 ## 1. 目標與原則
 - 對外提供統一 API（HTTP／WebSocket／MQTT 可插拔），安全地下達指令、查詢狀態、訂閱事件。
@@ -252,7 +144,7 @@
 - 同類型可形成機群；依 idle／busy 與負載分配。
 - 單一失敗自動重試其他實例（受限於語義與安全）。
 
-## 11. 機器人工具清單（由 機器人模組 管理）
+## 10. 機器人工具清單（由機器人模組管理）
 
 為了集中管理機器人可執行動作（便於能力查詢、版本化與對上游 API 的一致性），本專案將機器人模組的工具清單（原始位置：`Robot-Console/tools.py`）移交至 MCP 作為參考。MCP 會暴露能力查詢 API（例如：GET /api/robots/{robot_id}/capabilities 或 GET /api/tools），並提供每項工具的描述與參數 schema，以供 WebUI、LLM 代理與外部整合使用，並將這些項目傳遞給機器人模組。
 
@@ -303,11 +195,9 @@ wing_chun: 指示機器人執行詠春動作。
 - 版本化：工具的 schema 與描述會以版本號管理（例如：tools.v1、tools.v2），避免破壞向後相容性。
 - 同步機制：Robot-Console 仍保留 `tools.py` 作為本地執行器映射與快速測試用，但任何權威變更需先在 MCP 的工具庫中更新，並透過 CI 或同步腳本下放到 Robot-Console（參見後述遷移說明）。
 
-## 10. 下一步（Roadmap）
+## 11. 下一步（Roadmap）
 - 實作機器人註冊 API（POST /api/robots/register）。
 - 實作進階指令 API（POST／GET /api/advanced_commands）。
 - 文件化協定適配器介面（connect／send／receive／close、重試／超時）。
 - 與 WebUI 對齊審批／介入操作 API 與事件語意（含 E-Stop 優先級）。
 - 擴充錯誤碼表與狀態機定義；補齊整合測試。
-
-````

@@ -15,12 +15,16 @@ from .auth_manager import AuthManager
 from .command_handler import CommandHandler
 from .config import MCPConfig
 from .context_manager import ContextManager
+from .llm_processor import LLMProcessor
 from .logging_monitor import LoggingMonitor
 from .models import (
+    AudioCommandRequest,
+    AudioCommandResponse,
     CommandRequest,
     CommandResponse,
     Event,
     Heartbeat,
+    MediaStreamRequest,
     RobotRegistration,
     RobotStatus,
     StatusResponse,
@@ -59,6 +63,7 @@ context_manager = ContextManager()
 auth_manager = AuthManager()
 logging_monitor = LoggingMonitor()
 robot_router = RobotRouter()
+llm_processor = LLMProcessor()
 command_handler = CommandHandler(
     robot_router=robot_router,
     context_manager=context_manager,
@@ -254,6 +259,99 @@ async def login(username: str, password: str):
     token = await auth_manager.create_token(user_id, role)
     
     return {"token": token, "user_id": user_id, "role": role}
+
+
+# ===== 媒體串流 API =====
+
+@app.websocket("/api/media/stream/{robot_id}")
+async def stream_media(websocket: WebSocket, robot_id: str):
+    """媒體串流（WebSocket）"""
+    await websocket.accept()
+    logger.info(f"媒體串流連線建立: robot_id={robot_id}")
+    
+    try:
+        # 從機器人獲取媒體串流
+        robot = await robot_router.get_robot(robot_id)
+        if not robot:
+            await websocket.close(code=1008, reason="機器人不存在")
+            return
+        
+        # 持續推送媒體資料
+        while True:
+            # 接收來自 WebUI 的控制訊息（如切換格式等）
+            try:
+                data = await websocket.receive_json()
+                logger.debug(f"收到媒體串流控制訊息: {data}")
+            except:
+                # 如果沒有訊息，繼續
+                pass
+            
+            # 這裡應該從機器人端獲取實際的視訊/音訊資料
+            # 目前作為示範，發送狀態訊息
+            await websocket.send_json({
+                "type": "status",
+                "robot_id": robot_id,
+                "timestamp": datetime.utcnow().isoformat()
+            })
+            
+            # 避免過度發送
+            import asyncio
+            await asyncio.sleep(0.033)  # ~30 FPS
+            
+    except WebSocketDisconnect:
+        logger.info(f"媒體串流已中斷: robot_id={robot_id}")
+    except Exception as e:
+        logger.error(f"媒體串流錯誤: {e}", exc_info=True)
+        await websocket.close(code=1011, reason=f"串流錯誤: {str(e)}")
+
+
+@app.post("/api/media/audio/command", response_model=AudioCommandResponse)
+async def process_audio_command(request: AudioCommandRequest):
+    """處理音訊指令"""
+    try:
+        # 解碼 Base64 音訊資料
+        import base64
+        audio_bytes = base64.b64decode(request.audio_data)
+        
+        # 使用 LLM 處理器進行語音辨識
+        transcription, confidence = await llm_processor.transcribe_audio(
+            audio_bytes=audio_bytes,
+            audio_format=request.audio_format,
+            language=request.language
+        )
+        
+        # 使用 LLM 解析指令
+        command = await llm_processor.parse_command(
+            transcription=transcription,
+            robot_id=request.robot_id
+        )
+        
+        response = AudioCommandResponse(
+            trace_id=request.trace_id,
+            transcription=transcription,
+            command=command,
+            confidence=confidence
+        )
+        
+        # 記錄事件
+        await logging_monitor.log_event(
+            trace_id=request.trace_id,
+            severity="INFO",
+            category="command",
+            message=f"音訊指令處理完成: {transcription}",
+            context={
+                "robot_id": request.robot_id,
+                "transcription": transcription,
+                "confidence": confidence,
+                "command": command.dict() if command else None
+            }
+        )
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"處理音訊指令失敗: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":

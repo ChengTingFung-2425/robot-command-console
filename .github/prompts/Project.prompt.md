@@ -31,7 +31,7 @@ mode: agent
 目錄參考：
 - MCP：`MCP/Module.md`
 - WebUI：`WebUI/Module.md`
-- Robot-Console：`Robot-Console/Module.md`
+- Robot-Console：`Robot-Console/module.md`
 - 測試：`Test/` 下各模組測試檔
 
 ## 標準資料契約（JSON）

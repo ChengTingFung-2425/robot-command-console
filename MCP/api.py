@@ -3,6 +3,8 @@ MCP FastAPI 服務
 提供 HTTP API 介面
 """
 
+import asyncio
+import base64
 import logging
 from datetime import datetime
 from typing import List, Optional
@@ -295,7 +297,6 @@ async def stream_media(websocket: WebSocket, robot_id: str):
             })
             
             # 避免過度發送
-            import asyncio
             await asyncio.sleep(0.033)  # ~30 FPS
             
     except WebSocketDisconnect:
@@ -310,7 +311,6 @@ async def process_audio_command(request: AudioCommandRequest):
     """處理音訊指令"""
     try:
         # 解碼 Base64 音訊資料
-        import base64
         audio_bytes = base64.b64decode(request.audio_data)
         
         # 使用 LLM 處理器進行語音辨識

@@ -1,60 +1,10 @@
-# WebUI 目錄說明# WebUI 目錄說明
-
-
-
-本資料夾為「機器人指令中介層（MCP 伺服器）」的 Web 介面實作，依據專案提案（prosposal.md）設計，具備以下特點：
-
-
-
-## 目標## 目標
-
-WebUI 提供人類操作員與 AI 客戶端的互動入口，支援指令發送、狀態監控、日誌查詢與即時介入，確保人機協作安全與可追溯性。
-
-
-
-## 模組化架構## 模組化架構
-
-本 WebUI 採用模組化設計，主要模組包括：
-
-- 指令路由與處理（routes.py）- 网页路由與處理（routes.py）
-
-- 資料模型（models.py）- 数据库模型（models.py）
-
-- 錯誤處理（errors.py）- 錯誤處理（errors.py）
-
-- 郵件通知（email.py）- 郵件通知（email.py）
-
-- 表單驗證（forms.py）- 表單驗證（forms.py）
-
-- 日誌與監控（logging_monitor.py）- 設定管理（config.py）
-
-
-
-所有設定統一由專案根目錄 config.py 提供。各模組可獨立維護、擴充，便於未來整合新功能或新型機器人。
-
-
-
-## 目錄結構簡介## 目标功能
-
-- app/：WebUI 主程式與模組- 指令驗證、排隊、分派與回應
-
-- templates/：Jinja2 前端模板- 機器人狀態與指令結果監控
-
-- translations/：多語系翻譯檔- 完整日誌查詢與即時監督介面
-
-- migrations/：資料庫遷移管理- 認證授權與角色權限控管
-
-- 日誌與監控（可擴充 logging_monitor 模組）
-
----
-
-如需詳細設計理念與開發步驟，請參閱專案根目錄下的 prosposal.md。## 目錄結構簡介
-
 # WebUI 模組說明
 
 本資料夾包含機器人指令中介層（MCP，Middleware for Command Processing）專案的 Web 使用者介面實作。此 WebUI 提供給人類操作員（或管理者）一個直觀的介面，用於管理與監控下達給機器人或 AI 客戶端的指令、檢視狀態與日誌，以及在必要時進行即時干預。
 
 README 目的：本檔案說明 WebUI 的目的、主要功能、目錄結構、快速啟動指引與開發注意事項，方便開發者與維運人員快速上手。
+
+本資料夾為「機器人指令中介層（MCP 伺服器）」的 Web 介面實作，依據專案提案（proposal.md）設計。
 
 ## 核心目標
 
@@ -72,17 +22,30 @@ README 目的：本檔案說明 WebUI 的目的、主要功能、目錄結構、
 - 即時監控頁面（顯示機器人狀態、活動指令與統計數據）。
 - 管理與設定頁面（系統設定、通知設定、外部服務整合）。
 
+## 模組化架構
+
+本 WebUI 採用模組化設計，主要模組包括：
+
+- 指令路由與處理（routes.py）
+- 資料模型（models.py）
+- 錯誤處理（errors.py）
+- 郵件通知（email.py）
+- 表單驗證（forms.py）
+- 日誌與監控（logging_monitor.py）
+
+所有設定統一由專案根目錄 config.py 提供。各模組可獨立維護、擴充，便於未來整合新功能或新型機器人。
+
 ## 目錄結構
 
 請參考下列重要路徑（相對於 `WebUI/` 根目錄）：
 
 - `app/`：Web 應用程式主要模組，包含路由、表單、錯誤處理、郵件、日誌與資料模型等。
-	- `app/routes.py`：HTTP 路由與視圖處理（網頁端點）。
-	- `app/models.py`：資料庫模型定義（SQLAlchemy）。
-	- `app/forms.py`：WTForms 表單定義與驗證。
-	- `app/errors.py`：自訂錯誤處理邏輯。
-	- `app/email.py`：電子郵件通知功能。
-	- `app/logging_monitor.py`：日誌擷取與監控相關功能。
+- `app/routes.py`：HTTP 路由與視圖處理（網頁端點）。
+- `app/models.py`：資料庫模型定義（SQLAlchemy）。
+- `app/forms.py`：WTForms 表單定義與驗證。
+- `app/errors.py`：自訂錯誤處理邏輯。
+- `app/email.py`：電子郵件通知功能。
+- `app/logging_monitor.py`：日誌擷取與監控相關功能。
 
 - `templates/`：Jinja2 模板，用於網頁前端呈現（例如 `home.html.j2`, `advanced_commands.html.j2` 等）。
 - `static/`：靜態資源（CSS、JavaScript、images）。
@@ -147,3 +110,6 @@ pytest -q
 - 提供 Dockerfile 與 docker-compose 範例，快速建立相依服務（資料庫、郵件模擬器）。
 - 加入前端自動化測試（Selenium、Playwright）與 CI 流程。
 
+---
+
+如需詳細設計理念與開發步驟，請參閱專案根目錄下的 proposal.md。

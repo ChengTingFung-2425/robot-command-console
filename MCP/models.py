@@ -226,3 +226,65 @@ class Event(BaseModel):
         json_encoders = {
             datetime: lambda v: v.isoformat()
         }
+
+
+# ===== 媒體串流模型 =====
+
+class MediaType(str, Enum):
+    """媒體類型"""
+    VIDEO = "video"
+    AUDIO = "audio"
+    BOTH = "both"
+
+
+class StreamFormat(str, Enum):
+    """串流格式"""
+    MJPEG = "mjpeg"
+    H264 = "h264"
+    VP8 = "vp8"
+    OPUS = "opus"
+    PCM = "pcm"
+    MP3 = "mp3"
+
+
+class MediaStreamRequest(BaseModel):
+    """媒體串流請求"""
+    robot_id: str = Field(..., min_length=1)
+    media_type: MediaType = MediaType.BOTH
+    video_format: Optional[StreamFormat] = StreamFormat.MJPEG
+    audio_format: Optional[StreamFormat] = StreamFormat.OPUS
+    trace_id: str = Field(default_factory=lambda: str(uuid4()))
+    
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
+
+class AudioCommandRequest(BaseModel):
+    """音訊指令請求"""
+    robot_id: str = Field(..., min_length=1)
+    audio_data: str  # Base64 編碼的音訊資料
+    audio_format: StreamFormat = StreamFormat.OPUS
+    language: str = Field(default="zh-TW")
+    trace_id: str = Field(default_factory=lambda: str(uuid4()))
+    
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
+
+class AudioCommandResponse(BaseModel):
+    """音訊指令回應"""
+    trace_id: str
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    transcription: str  # 語音轉文字結果
+    command: Optional[CommandSpec] = None  # 解析出的指令
+    confidence: float = Field(ge=0.0, le=1.0)  # 信心度
+    error: Optional[ErrorDetail] = None
+    
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }

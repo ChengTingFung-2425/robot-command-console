@@ -9,7 +9,7 @@ mode: agent
 
 本文件定義本專案「機器人指令中介層」的設計原則、模組邊界、資料契約、處理流程與完成定義，確保系統模組化、可擴充、可監督、可追溯與高可用。
 
-> **說明：如遇規格疑義，請以 prosposal.md 為最終依據。**
+> **說明：如遇規格疑義，請以 proposal.md 為最終依據。**
 
 ## 目標與核心原則
 - 模組化與鬆耦合：MCP、指令/路由、通訊協定、認證/授權、日誌/監控、機器人抽象、WebUI 皆為清楚邊界的獨立模組。
@@ -17,7 +17,7 @@ mode: agent
 - 可監督與人類可介入：任何指令可被審批、暫停、取消、覆寫，且具即時狀態與審計軌跡。
 - 安全與合規：強制身份驗證、授權與審計；敏感資訊不落地至原始碼。
 - 高可用與可維護：明確的超時/重試策略、錯誤分級、可觀測性指標。
-- **所有設計、資料契約、流程、完成定義等，若與 prosposal.md 有出入，請以 prosposal.md 為準。**
+- **所有設計、資料契約、流程、完成定義等，若與 proposal.md 有出入，請以 proposal.md 為準。**
 
 ## 架構總覽（模組與職責）
 - MCP 服務模組：統一接入層，負責指令標準化、上下文管理、驗證、授權、路由、觀測事件產生。
@@ -43,7 +43,7 @@ mode: agent
 - source：入口來源（webui|api|cli|scheduler|…）。
 - labels：可選鍵值標籤（環境、租戶、任務編號等）。
 
-指令請求 CommandRequest（範例，詳見 prosposal.md）：
+指令請求 CommandRequest（範例，詳見 proposal.md）：
 ```json
 {
 	"trace_id": "uuid-v4",
@@ -79,7 +79,7 @@ mode: agent
 }
 ```
 
-指令回應 CommandResponse（範例，詳見 prosposal.md）：
+指令回應 CommandResponse（範例，詳見 proposal.md）：
 ```json
 {
 	"trace_id": "uuid-v4",
@@ -103,7 +103,7 @@ mode: agent
 }
 ```
 
-事件/日誌 EventLog（監控/審計用，詳見 prosposal.md）：
+事件/日誌 EventLog（監控/審計用，詳見 proposal.md）：
 ```json
 {
 	"trace_id": "uuid-v4",
@@ -119,7 +119,7 @@ mode: agent
 }
 ```
 
-錯誤格式（統一，詳見 prosposal.md）：
+錯誤格式（統一，詳見 proposal.md）：
 ```json
 {
 	"code": "ERR_TIMEOUT|ERR_UNAUTHORIZED|ERR_VALIDATION|ERR_ROUTING|ERR_PROTOCOL|ERR_INTERNAL",
@@ -185,7 +185,7 @@ mode: agent
 - 事件與審計：產生必要的 EventLog，包含 trace_id 與關鍵上下文。
 - 安全檢查：敏感資訊不落地；權限與輸入檢查通過；沒有硬編碼密鑰。
 - 可觀測性：關鍵指標（成功率、延遲、錯誤碼分佈）可被查詢。
-- **如有疑慮，請參考 prosposal.md 的 DoD 條目與範例。**
+- **如有疑慮，請參考 proposal.md 的 DoD 條目與範例。**
 
 ## 下一步與落地任務
 - 補齊 MCP 契約與處理流程細節：見 `MCP/Module.md`。

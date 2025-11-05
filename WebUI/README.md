@@ -74,27 +74,43 @@ README 目的：本檔案說明 WebUI 的目的、主要功能、目錄結構、
 
 ## 目錄結構
 
-請參考下列重要路徑（相對於 `WebUI/` 根目錄）：
+# WebUI 模組說明
 
-- `app/`：Web 應用程式主要模組，包含路由、表單、錯誤處理、郵件、日誌與資料模型等。
-	- `app/routes.py`：HTTP 路由與視圖處理（網頁端點）。
-	- `app/models.py`：資料庫模型定義（SQLAlchemy）。
-	- `app/forms.py`：WTForms 表單定義與驗證。
-	- `app/errors.py`：自訂錯誤處理邏輯。
-	- `app/email.py`：電子郵件通知功能。
-	- `app/logging_monitor.py`：日誌擷取與監控相關功能。
+子系統摘要：WebUI 提供給人類操作員與系統管理者的網頁介面，用於建立/管理指令、監控機器人狀態、檢視日誌與進行即時干預，並與 MCP 整合以下發指令與接收回報。
 
-- `templates/`：Jinja2 模板，用於網頁前端呈現（例如 `home.html.j2`, `advanced_commands.html.j2` 等）。
-- `static/`：靜態資源（CSS、JavaScript、images）。
-- `migrations/`：資料庫遷移腳本（alembic）。
-- `translations/`：國際化翻譯檔（如果啟用多語系）。
-- `logs/`：本地測試或開發環境的日誌檔案（不建議在生產中儲存在 repo）。
+## 核心目標
 
-## 快速啟動（開發環境）
+- 提供安全且可追溯的指令發送介面
+- 顯示機器人與任務之即時狀態與歷史事件
+- 支援進階指令建立、審核與權限控管
+- 整合通知與監控以提示異常或需要人工介入之情況
 
-以下為一組建議的步驟，假設你已在專案根目錄並已安裝 Python 3.8+：
+## 主要功能
 
-1. 建議建立虛擬環境並安裝需求套件：
+- 使用者認證與角色權限管理
+- 指令建立、送出、排程與複合指令支援
+- 指令路由與回應檢視（待處理／進行中／完成／失敗）
+- 日誌查詢與過濾（時間、指令 ID、使用者、狀態）
+- 即時監控頁面（機器人狀態、活動指令、統計）
+
+## 目錄結構（摘要）
+
+- `app/`：Web 應用主要模組（路由、models、forms、errors、email、logging_monitor）
+- `templates/`：Jinja2 前端模板
+- `static/`：CSS / JS / images
+- `migrations/`：alembic 資料庫遷移
+- `translations/`：多語系翻譯檔
+- `logs/`：開發/測試日誌（生產請使用集中式日誌）
+
+重要檔案（相對於 `WebUI/`）：
+
+- `microblog.py` — WebUI 啟動程式範例
+- `requirements.txt` — WebUI 依賴
+- `app/routes.py`, `app/models.py`, `app/forms.py`, `app/errors.py`, `app/email.py`
+
+## 快速啟動（開發）
+
+1. 建立虛擬環境並安裝依賴：
 
 ```bash
 python3 -m venv .venv
@@ -102,15 +118,15 @@ source .venv/bin/activate
 pip install -r WebUI/requirements.txt
 ```
 
-2. 設定必要的環境變數（示範）：
+2. 設定環境變數（示範）：
 
 ```bash
 export FLASK_APP=WebUI/microblog.py
 export FLASK_ENV=development
-# 若使用資料庫或郵件服務，設定相應的連線字串與憑證
+# 若使用資料庫或郵件服務，設定相應連線字串
 ```
 
-3. 執行遷移（若需要）：
+3. 執行資料庫遷移（如需要）：
 
 ```bash
 alembic -c WebUI/migrations/alembic.ini upgrade head
@@ -122,28 +138,29 @@ alembic -c WebUI/migrations/alembic.ini upgrade head
 flask run --host=0.0.0.0 --port=5000
 ```
 
-開啟瀏覽器並前往 http://localhost:5000 檢視 WebUI。
+打開 http://localhost:5000 檢視 WebUI。
 
 ## 開發者注意事項
 
-- 設定值與機密（例如資料庫連線字串、郵件金鑰）應放在專案根目錄的 `config.py` 或透過環境變數注入，避免直接放在 repo 中。
-- 前端模板使用 Jinja2，若修改樣板請留意 XSS 與輸出逃逸機制。
-- 若新增資料表或模型，請同時建立 Alembic migration 檔並測試升級流程。
-- 日誌檔 `WebUI/logs/` 僅供開發測試，生產環境應設計集中式日誌（例如 ELK、CloudWatch）。
+- 敏感設定（DB 連線字串、API 金鑰）請使用環境變數或 `config.py`，避免放在 repo
+- 模板使用 Jinja2，請留意 XSS 與輸出逃逸
+- 新增資料表時務必建立 Alembic migration 並測試升級流程
 
 ## 測試
 
-本專案內含單元測試（位於 repo 的 `Test/` 與 `Web/` 資料夾）。建議在修改核心邏輯後執行相關測試套件。
-
-例如使用 pytest：
+專案包含多項測試（位於 `Test/` 及 `Web/`），建議在變更後執行：
 
 ```bash
 pytest -q
 ```
 
-## 後續改進建議
+## 改進建議
 
-- 新增 API 文件（OpenAPI/Swagger）以便外部系統整合。
-- 提供 Dockerfile 與 docker-compose 範例，快速建立相依服務（資料庫、郵件模擬器）。
-- 加入前端自動化測試（Selenium、Playwright）與 CI 流程。
+- 新增 OpenAPI / Swagger 文件以利系統整合
+- 提供 Dockerfile 與 docker-compose 範例以快速建立相依服務
+- 加入前端自動化測試與 CI
+
+---
+
+更多細節請參閱專案根目錄之 `prosposal.md` 與 `WebUI/module.md`。
 

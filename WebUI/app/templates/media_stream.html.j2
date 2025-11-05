@@ -1,0 +1,328 @@
+{% extends "base.html.j2" %}
+
+{% block app_content %}
+<h2>機器人媒體串流</h2>
+
+<div class="row">
+  <div class="col-md-8">
+    <!-- 視訊串流區域 -->
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <strong>視訊串流</strong>
+        <span class="pull-right">
+          <span id="stream-status" class="label label-default">未連線</span>
+        </span>
+      </div>
+      <div class="panel-body">
+        <div id="video-container" style="background-color: #000; min-height: 400px; display: flex; align-items: center; justify-content: center;">
+          <canvas id="video-canvas" style="max-width: 100%; height: auto;"></canvas>
+          <div id="video-placeholder" style="color: #fff; text-align: center;">
+            <i class="glyphicon glyphicon-facetime-video" style="font-size: 48px;"></i>
+            <p>等待視訊串流...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 音訊控制區域 -->
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <strong>語音指令</strong>
+      </div>
+      <div class="panel-body">
+        <div class="form-group">
+          <button id="record-btn" class="btn btn-danger btn-lg">
+            <i class="glyphicon glyphicon-record"></i> 開始錄音
+          </button>
+          <button id="stop-btn" class="btn btn-default btn-lg" disabled>
+            <i class="glyphicon glyphicon-stop"></i> 停止錄音
+          </button>
+          <span id="recording-status" style="margin-left: 15px;"></span>
+        </div>
+        
+        <div id="transcription-result" class="alert alert-info" style="display: none;">
+          <strong>轉錄結果：</strong>
+          <span id="transcription-text"></span>
+          <br>
+          <small>信心度：<span id="confidence-score"></span></small>
+        </div>
+        
+        <div id="command-result" class="alert alert-success" style="display: none;">
+          <strong>解析指令：</strong>
+          <pre id="command-json" style="background: #fff; padding: 10px;"></pre>
+          <button id="execute-cmd-btn" class="btn btn-primary">
+            <i class="glyphicon glyphicon-play"></i> 執行指令
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <!-- 機器人資訊 -->
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <strong>機器人資訊</strong>
+      </div>
+      <div class="panel-body">
+        <p><strong>名稱：</strong> <span id="robot-name">{{ robot.name if robot else '未選擇' }}</span></p>
+        <p><strong>類型：</strong> <span id="robot-type">{{ robot.type if robot else '-' }}</span></p>
+        <p><strong>狀態：</strong> 
+          <span id="robot-status" class="label label-{{ 'success' if robot and robot.status == 'online' else 'default' }}">
+            {{ robot.status if robot else '離線' }}
+          </span>
+        </p>
+        
+        <hr>
+        
+        <div class="form-group">
+          <label>選擇機器人：</label>
+          <select id="robot-select" class="form-control">
+            {% for r in robots %}
+            <option value="{{ r.id }}" {% if robot and r.id == robot.id %}selected{% endif %}>{{ r.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <button id="connect-btn" class="btn btn-success btn-block">
+          <i class="glyphicon glyphicon-link"></i> 連線
+        </button>
+        <button id="disconnect-btn" class="btn btn-warning btn-block" disabled>
+          <i class="glyphicon glyphicon-remove"></i> 斷線
+        </button>
+      </div>
+    </div>
+
+    <!-- 串流統計 -->
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <strong>串流統計</strong>
+      </div>
+      <div class="panel-body">
+        <p><small>FPS：<span id="fps-counter">0</span></small></p>
+        <p><small>延遲：<span id="latency-ms">0</span> ms</small></p>
+        <p><small>資料量：<span id="data-received">0</span> KB</small></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// WebSocket 連線
+let ws = null;
+let mediaRecorder = null;
+let audioChunks = [];
+let currentRobotId = null;
+let parsedCommand = null;
+
+// 連線按鈕事件
+document.getElementById('connect-btn').addEventListener('click', function() {
+    const robotId = document.getElementById('robot-select').value;
+    connectToRobot(robotId);
+});
+
+// 斷線按鈕事件
+document.getElementById('disconnect-btn').addEventListener('click', function() {
+    disconnectFromRobot();
+});
+
+// 連線到機器人
+function connectToRobot(robotId) {
+    if (ws) {
+        ws.close();
+    }
+    
+    currentRobotId = robotId;
+    const wsUrl = `ws://${window.location.host}/api/media/stream/${robotId}`;
+    
+    ws = new WebSocket(wsUrl);
+    
+    ws.onopen = function() {
+        document.getElementById('stream-status').className = 'label label-success';
+        document.getElementById('stream-status').textContent = '已連線';
+        document.getElementById('connect-btn').disabled = true;
+        document.getElementById('disconnect-btn').disabled = false;
+        document.getElementById('video-placeholder').style.display = 'none';
+    };
+    
+    ws.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        
+        // 處理視訊幀（如果有）
+        if (data.type === 'video') {
+            renderVideoFrame(data.frame);
+        }
+        
+        // 處理狀態更新
+        if (data.type === 'status') {
+            updateStreamStats(data);
+        }
+    };
+    
+    ws.onerror = function(error) {
+        console.error('WebSocket 錯誤:', error);
+        document.getElementById('stream-status').className = 'label label-danger';
+        document.getElementById('stream-status').textContent = '錯誤';
+    };
+    
+    ws.onclose = function() {
+        document.getElementById('stream-status').className = 'label label-default';
+        document.getElementById('stream-status').textContent = '未連線';
+        document.getElementById('connect-btn').disabled = false;
+        document.getElementById('disconnect-btn').disabled = true;
+        document.getElementById('video-placeholder').style.display = 'block';
+    };
+}
+
+// 斷開連線
+function disconnectFromRobot() {
+    if (ws) {
+        ws.close();
+        ws = null;
+    }
+}
+
+// 渲染視訊幀
+function renderVideoFrame(frameData) {
+    const canvas = document.getElementById('video-canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // TODO: 將 Base64 編碼的圖像資料渲染到 canvas
+    // const img = new Image();
+    // img.onload = function() {
+    //     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    // };
+    // img.src = 'data:image/jpeg;base64,' + frameData;
+}
+
+// 更新串流統計
+function updateStreamStats(data) {
+    // TODO: 實際計算並更新統計資訊
+}
+
+// 錄音功能
+document.getElementById('record-btn').addEventListener('click', async function() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+        
+        mediaRecorder.ondataavailable = function(event) {
+            audioChunks.push(event.data);
+        };
+        
+        mediaRecorder.onstop = function() {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            processAudioCommand(audioBlob);
+        };
+        
+        mediaRecorder.start();
+        
+        document.getElementById('record-btn').disabled = true;
+        document.getElementById('stop-btn').disabled = false;
+        document.getElementById('recording-status').innerHTML = '<span class="text-danger">● 錄音中...</span>';
+        
+    } catch (error) {
+        console.error('無法存取麥克風:', error);
+        alert('無法存取麥克風，請檢查瀏覽器權限設定。');
+    }
+});
+
+document.getElementById('stop-btn').addEventListener('click', function() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        mediaRecorder.stream.getTracks().forEach(track => track.stop());
+        
+        document.getElementById('record-btn').disabled = false;
+        document.getElementById('stop-btn').disabled = true;
+        document.getElementById('recording-status').textContent = '';
+    }
+});
+
+// 處理音訊指令
+async function processAudioCommand(audioBlob) {
+    try {
+        // 將音訊轉換為 Base64
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        
+        reader.onloadend = async function() {
+            const base64Audio = reader.result.split(',')[1];
+            
+            // 發送到後端處理
+            const response = await fetch('/api/media/audio/command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    robot_id: currentRobotId,
+                    audio_data: base64Audio,
+                    audio_format: 'opus',
+                    language: 'zh-TW'
+                })
+            });
+            
+            const result = await response.json();
+            
+            // 顯示轉錄結果
+            document.getElementById('transcription-text').textContent = result.transcription;
+            document.getElementById('confidence-score').textContent = (result.confidence * 100).toFixed(1) + '%';
+            document.getElementById('transcription-result').style.display = 'block';
+            
+            // 顯示解析的指令
+            if (result.command) {
+                parsedCommand = result.command;
+                document.getElementById('command-json').textContent = JSON.stringify(result.command, null, 2);
+                document.getElementById('command-result').style.display = 'block';
+            }
+        };
+        
+    } catch (error) {
+        console.error('處理音訊指令失敗:', error);
+        alert('處理音訊指令時發生錯誤。');
+    }
+}
+
+// 執行解析的指令
+document.getElementById('execute-cmd-btn').addEventListener('click', async function() {
+    if (!parsedCommand) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/command', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                trace_id: parsedCommand.trace_id || new Date().getTime().toString(),
+                timestamp: new Date().toISOString(),
+                actor: {
+                    type: 'human',
+                    id: 'user-{{ current_user.id if current_user.is_authenticated else "anonymous" }}'
+                },
+                source: 'webui',
+                command: parsedCommand
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.command.status === 'accepted' || result.command.status === 'running') {
+            alert('指令已送出執行！');
+            document.getElementById('command-result').style.display = 'none';
+            document.getElementById('transcription-result').style.display = 'none';
+        } else {
+            alert('指令執行失敗：' + (result.error ? result.error.message : '未知錯誤'));
+        }
+        
+    } catch (error) {
+        console.error('執行指令失敗:', error);
+        alert('執行指令時發生錯誤。');
+    }
+});
+</script>
+
+{% endblock %}

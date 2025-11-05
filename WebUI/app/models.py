@@ -64,6 +64,15 @@ class Robot(db.Model):
 
     def __repr__(self) -> str:
         return f'<Robot {self.name}>'
+    
+    def set_battery(self, value: int) -> None:
+        """設定電池電量，確保值在 0-100 範圍內"""
+        if value < 0:
+            self.battery = 0
+        elif value > 100:
+            self.battery = 100
+        else:
+            self.battery = value
 
 
 class Command(db.Model):

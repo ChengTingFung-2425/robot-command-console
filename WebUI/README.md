@@ -73,19 +73,6 @@ README 目的：本檔案說明 WebUI 的目的、主要功能、目錄結構、
 - 日誌查詢與過濾（時間、指令 ID、使用者、狀態）
 - 即時監控頁面（機器人狀態、活動指令、統計）
 
-## 模組化架構
-
-本 WebUI 採用模組化設計，主要模組包括：
-
-- 指令路由與處理（routes.py）
-- 資料模型（models.py）
-- 錯誤處理（errors.py）
-- 郵件通知（email.py）
-- 表單驗證（forms.py）
-- 日誌與監控（logging_monitor.py）
-
-所有設定統一由專案根目錄 config.py 提供。各模組可獨立維護、擴充，便於未來整合新功能或新型機器人。
-
 ## 目錄結構（摘要）
 
 - `app/`：Web 應用主要模組（路由、models、forms、errors、email、logging_monitor）
@@ -149,9 +136,13 @@ pytest -q
 
 ## 改進建議
 
-- 新增 API 文件（OpenAPI/Swagger）以便外部系統整合。
-- 提供 Dockerfile 與 docker-compose 範例，快速建立相依服務（資料庫、郵件模擬器）。
-- 加入前端自動化測試（Selenium、Playwright）與 CI 流程。
+- 新增 OpenAPI / Swagger 文件以利系統整合
+- 提供 Dockerfile 與 docker-compose 範例以快速建立相依服務
+- 加入前端自動化測試與 CI
+
+---
+
+更多細節請參閱專案根目錄之 `proposal.md` 與 `WebUI/Module.md`。
 
 ---
 

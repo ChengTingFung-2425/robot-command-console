@@ -4,6 +4,7 @@ LLM 處理器模組
 """
 
 import logging
+import re
 from typing import Dict, Any, Optional, Tuple
 from .models import CommandSpec, CommandTarget, Priority
 
@@ -19,7 +20,6 @@ class LLMProcessor:
     
     def __init__(self):
         """初始化 LLM 處理器"""
-        self.logger = logging.getLogger(__name__)
         # TODO: 初始化實際的語音辨識和 LLM 客戶端
         # 例如: OpenAI Whisper, Google Speech-to-Text
         # 例如: OpenAI GPT, Claude, etc.
@@ -54,14 +54,14 @@ class LLMProcessor:
             # confidence = response.get("confidence", 0.9)
             
             # 目前返回模擬結果
-            self.logger.info(f"轉錄音訊，格式={audio_format}, 語言={language}")
+            logger.info(f"轉錄音訊，格式={audio_format}, 語言={language}")
             transcription = "向前移動三秒"
             confidence = 0.95
             
             return transcription, confidence
             
         except Exception as e:
-            self.logger.error(f"音訊轉錄失敗: {e}", exc_info=True)
+            logger.error(f"音訊轉錄失敗: {e}", exc_info=True)
             raise
     
     async def parse_command(
@@ -130,7 +130,7 @@ class LLMProcessor:
             return None
             
         except Exception as e:
-            self.logger.error(f"指令解析失敗: {e}", exc_info=True)
+            logger.error(f"指令解析失敗: {e}", exc_info=True)
             return None
     
     def _simple_parse(self, text: str) -> Optional[Dict[str, Any]]:
@@ -175,8 +175,6 @@ class LLMProcessor:
         
         # 提取時間（秒）
         duration_ms = self.DEFAULT_DURATION_MS  # 使用類常數
-        
-        import re
         
         # 中文數字對應表
         chinese_numbers = {

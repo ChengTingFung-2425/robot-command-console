@@ -1,6 +1,6 @@
 # MCP 服務模組設計說明
 
-本文件以精簡版本說明 MCP（Model Context Protocol）服務模組的職責邊界、資料契約、處理流程與完成定義，對齊 `Project.prompt.md` 及 `prosposal.md`，確保標準化、可擴充、可觀測與可追溯。
+本文件以精簡版本說明 MCP（Model Context Protocol）服務模組的職責邊界、資料契約、處理流程與完成定義，對齊 `Project.prompt.md` 及 `proposal.md`，確保標準化、可擴充、可觀測與可追溯。
 
 ## 1. 目標與原則
 - 對外提供統一 API（HTTP／WebSocket／MQTT 可插拔），安全地下達指令、查詢狀態、訂閱事件。

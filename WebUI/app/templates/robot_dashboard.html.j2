@@ -11,14 +11,16 @@
   box-shadow: 0 4px 8px rgba(0,0,0,0.2);
 }
 .video-feed-container {
-  width: 480px;
-  height: 360px; /* 4:3 aspect ratio */
+  width: 100%;
+  max-width: 480px;
+  aspect-ratio: 4/3;
   background-color: #000;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   overflow: hidden;
+  margin: 0 auto;
 }
 .video-feed-canvas {
   max-width: 100%;
@@ -93,7 +95,7 @@
           <div style="margin-bottom: 8px;">
             <strong>電量：</strong>
             <div class="battery-indicator">
-              {% set battery_level = robot.battery if robot.battery is not none else 100 %}
+              {% set battery_level = robot.battery if robot.battery is not None else 100 %}
               <div class="battery-level {{ 'high' if battery_level > 50 else 'medium' if battery_level > 20 else 'low' }}" 
                    style="width: {{ battery_level }}%;"></div>
             </div>
@@ -129,11 +131,13 @@
 <script>
 // WebSocket connections for video feeds
 const robotConnections = {};
+const reconnectDelays = {}; // Track reconnection delays per robot
 
 {% for robot in robots %}
 (function() {
   const robotId = {{ robot.id }};
-  const wsUrl = `ws://${window.location.host}/api/media/stream/${robotId}`;
+  reconnectDelays[robotId] = 1000; // Start with 1 second
+  const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/media/stream/${robotId}`;
   
   function connectRobotFeed() {
     const ws = new WebSocket(wsUrl);
@@ -141,6 +145,7 @@ const robotConnections = {};
     
     ws.onopen = function() {
       console.log(`機器人 ${robotId} 視訊串流已連線`);
+      reconnectDelays[robotId] = 1000; // Reset delay on successful connection
       const placeholder = document.getElementById(`placeholder-${robotId}`);
       if (placeholder) placeholder.style.display = 'none';
     };
@@ -165,8 +170,12 @@ const robotConnections = {};
       const placeholder = document.getElementById(`placeholder-${robotId}`);
       if (placeholder) placeholder.style.display = 'block';
       
-      // 嘗試重新連線（5秒後）
-      setTimeout(connectRobotFeed, 5000);
+      // Exponential backoff with max delay of 30 seconds
+      const delay = Math.min(reconnectDelays[robotId], 30000);
+      reconnectDelays[robotId] = delay * 2;
+      
+      console.log(`將在 ${delay/1000} 秒後重新連線...`);
+      setTimeout(connectRobotFeed, delay);
     };
   }
   

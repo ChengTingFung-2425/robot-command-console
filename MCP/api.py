@@ -296,7 +296,6 @@ async def stream_media(websocket: WebSocket, robot_id: str):
             })
             
             # 避免過度發送
-            import asyncio
             await asyncio.sleep(0.033)  # ~30 FPS
             
     except WebSocketDisconnect:

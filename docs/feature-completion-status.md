@@ -73,7 +73,7 @@
 - ✅ 管理員專用篩選與排序 UI
 
 ### 9. 文檔
-- ✅ 專案提案文檔 (`prosposal.md`)
+- ✅ 專案提案文檔 (`proposal.md`)
 - ✅ WebUI 模組文檔 (`WebUI/Module.md`)
 - ✅ MCP 模組文檔 (`MCP/Module.md`)
 - ✅ 用戶參與系統設計 (`docs/user-engagement-system.md`)

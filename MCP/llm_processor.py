@@ -13,6 +13,10 @@ logger = logging.getLogger(__name__)
 class LLMProcessor:
     """LLM 處理器，負責語音辨識與指令解析"""
     
+    # 預設配置常數
+    DEFAULT_DURATION_MS = 3000  # 預設持續時間（毫秒）
+    DEFAULT_CONFIDENCE = 0.95   # 預設信心度
+    
     def __init__(self):
         """初始化 LLM 處理器"""
         self.logger = logging.getLogger(__name__)
@@ -170,7 +174,7 @@ class LLMProcessor:
             return None
         
         # 提取時間（秒）
-        duration_ms = 3000  # 預設 3 秒
+        duration_ms = self.DEFAULT_DURATION_MS  # 使用類常數
         
         import re
         

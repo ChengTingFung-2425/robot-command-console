@@ -128,8 +128,19 @@ async def demo_audio_command_processing():
     print("3. JSON 序列化測試")
     print("-" * 60)
     
+    def datetime_handler(obj):
+        """自訂 JSON 序列化處理器"""
+        if hasattr(obj, 'isoformat'):
+            return obj.isoformat()
+        raise TypeError(f'Object of type {type(obj)} is not JSON serializable')
+    
     response_dict = audio_response.model_dump()
-    response_json = json.dumps(response_dict, indent=2, ensure_ascii=False, default=str)
+    response_json = json.dumps(
+        response_dict, 
+        indent=2, 
+        ensure_ascii=False, 
+        default=datetime_handler
+    )
     print(f"  JSON 輸出:")
     print("  " + "\n  ".join(response_json.split("\n")))
     print()

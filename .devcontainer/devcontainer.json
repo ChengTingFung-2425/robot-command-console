@@ -1,12 +1,12 @@
 {
-  "name": "Python 3 & PostgreSQL",
+  "name": "Flask & PostgreSQL",
   "dockerComposeFile": "docker-compose.yml",
   "service": "app", 
   "hostRequirements": {
     "cpus": 2
   },
   "waitFor": "onCreateCommand",
-  "postCreateCommand": "cd WebUI && flask --debug run --host=0.0.0.0 --port=5000 & sleep 5",
+  "postCreateCommand": "cd WebUI && flask --debug run --host=0.0.0.0 --port=5000 & ",
   "portsAttributes": {
     "5000": {
       "label": "Flask Apps",

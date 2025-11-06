@@ -81,6 +81,135 @@ class UserProfile(db.Model):
     created_at = db.Column(db.DateTime, index=True, default=db.func.now())
     updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
 
+    @staticmethod
+    def get_level_from_points(points: int) -> int:
+        """Calculate level based on points.
+        
+        Level ranges:
+        - Bronze (L1-10): 0-500 points
+        - Silver (L11-20): 501-2000 points
+        - Gold (L21-30): 2001-5000 points
+        - Platinum (L31-40): 5001-10000 points
+        - Diamond (L41+): 10000+ points
+        """
+        if points < 0:
+            return 1
+        elif points < 50:
+            return 1
+        elif points < 100:
+            return 2
+        elif points < 150:
+            return 3
+        elif points < 200:
+            return 4
+        elif points < 300:
+            return 5
+        elif points < 400:
+            return 6
+        elif points < 500:
+            return 7
+        elif points < 700:
+            return 8
+        elif points < 1000:
+            return 9
+        elif points < 1300:
+            return 10  # Bronze complete
+        elif points < 1600:
+            return 11
+        elif points < 2000:
+            return 12
+        elif points < 2500:
+            return 13
+        elif points < 3000:
+            return 14
+        elif points < 3500:
+            return 15
+        elif points < 4000:
+            return 16
+        elif points < 4500:
+            return 17
+        elif points < 5000:
+            return 18
+        elif points < 5500:
+            return 19
+        elif points < 6000:
+            return 20  # Silver complete
+        elif points < 7000:
+            return 21
+        elif points < 8000:
+            return 22
+        elif points < 9000:
+            return 23
+        elif points < 10000:
+            return 24
+        else:
+            # Diamond tier: 1 level per 1000 points after 10000
+            return min(40 + (points - 10000) // 1000, 99)
+
+    def add_points(self, amount: int) -> None:
+        """Add points to user profile and update level if needed."""
+        if amount <= 0:
+            return
+        self.points += amount
+        new_level = self.get_level_from_points(self.points)
+        if new_level != self.level:
+            self.level = new_level
+        self.updated_at = db.func.now()
+
+    def get_rank_tier(self) -> str:
+        """Get rank tier name based on level."""
+        if self.level <= 10:
+            return 'Bronze (青銅)'
+        elif self.level <= 20:
+            return 'Silver (白銀)'
+        elif self.level <= 30:
+            return 'Gold (黃金)'
+        elif self.level <= 40:
+            return 'Platinum (鉑金)'
+        else:
+            return 'Diamond (鑽石)'
+
+    def get_points_for_next_level(self) -> int:
+        """Get points needed to reach next level."""
+        points_for_next = [
+            50, 100, 150, 200, 300, 400, 500, 700, 1000, 1300,  # L1-10
+            1600, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000,  # L11-20
+            7000, 8000, 9000, 10000, 11000, 12000, 13000, 14000, 15000, 16000,  # L21-30
+            17000, 18000, 19000, 20000, 21000, 22000, 23000, 24000, 25000, 26000  # L31-40
+        ]
+        if self.level - 1 < len(points_for_next):
+            return points_for_next[self.level - 1]
+        return 26000 + (self.level - 40) * 1000
+
+    def get_progress_to_next_level(self) -> dict:
+        """Get progress info to next level."""
+        current_points = self.points
+        next_level_points = self.get_points_for_next_level()
+        
+        # Get previous level points
+        if self.level == 1:
+            prev_points = 0
+        else:
+            points_for_levels = [
+                0, 50, 100, 150, 200, 300, 400, 500, 700, 1000, 1300,  # L0-10
+                1600, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000,  # L11-20
+                7000, 8000, 9000, 10000, 11000, 12000, 13000, 14000, 15000, 16000,  # L21-30
+                17000, 18000, 19000, 20000, 21000, 22000, 23000, 24000, 25000, 26000  # L31-40
+            ]
+            prev_points = points_for_levels[self.level - 1] if self.level - 1 < len(points_for_levels) else 26000 + (self.level - 41) * 1000
+        
+        progress = current_points - prev_points
+        needed = next_level_points - prev_points
+        percent = int((progress / needed * 100)) if needed > 0 else 100
+        
+        return {
+            'current': current_points,
+            'next_level_required': next_level_points,
+            'progress': progress,
+            'needed': needed,
+            'percent': min(percent, 100)
+        }
+
     def __repr__(self) -> str:
         return f'<UserProfile user_id={self.user_id} level={self.level} points={self.points}>'
 
@@ -212,3 +341,45 @@ class AdvancedCommand(db.Model):
 
     def __repr__(self) -> str:
         return f'<AdvancedCommand {self.name}>'
+
+
+class Achievement(db.Model):
+    """Achievement/Badge template that users can earn.
+    
+    Stores the definition of achievements/badges available in the system.
+    Each achievement has specific criteria for earning (handled in business logic).
+    """
+    __tablename__ = 'achievement'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(64), nullable=False, unique=True, index=True)
+    emoji = db.Column(db.String(8), default='🏆')  # Unicode emoji for badge
+    description = db.Column(db.Text, nullable=False)
+    category = db.Column(db.String(32), nullable=False)  # exploration/contribution/social/challenge
+    points_required = db.Column(db.Integer, default=0)  # points threshold for automatic awarding
+    is_title = db.Column(db.Boolean, default=False)  # True if this is a title/badge level
+    
+    created_at = db.Column(db.DateTime, index=True, default=db.func.now())
+    
+    def __repr__(self) -> str:
+        return f'<Achievement {self.name}>'
+
+
+class UserAchievement(db.Model):
+    """Tracks which achievements a user has earned and when.
+    
+    Junction table between User and Achievement.
+    """
+    __tablename__ = 'user_achievement'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    achievement_id = db.Column(db.Integer, db.ForeignKey('achievement.id'), nullable=False, index=True)
+    earned_at = db.Column(db.DateTime, index=True, default=db.func.now())
+    
+    user = db.relationship('User', backref=db.backref('earned_achievements', lazy='dynamic', cascade='all, delete-orphan'))
+    achievement = db.relationship('Achievement', backref=db.backref('earned_by_users', lazy='dynamic'))
+    
+    __table_args__ = (db.UniqueConstraint('user_id', 'achievement_id', name='uq_user_achievement'),)
+    
+    def __repr__(self) -> str:
+        return f'<UserAchievement user_id={self.user_id} achievement_id={self.achievement_id}>'
+

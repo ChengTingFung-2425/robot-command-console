@@ -22,7 +22,7 @@
                 </button>
                 <a class="navbar-brand" href="{{ url_for('webui.home') }}">機器人指令中介層</a>
             </div>
-            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                        <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
                 <ul class="nav navbar-nav">
                     <li>
                         <a href="{{ url_for('webui.home') }}">{{ _('Home') }}</a>
@@ -34,6 +34,11 @@
                     <li>
                         <a href="{{ url_for('webui.advanced_commands') }}">{{ _('Advanced Commands') }}</a>
                     </li>
+                    <li>
+                        <a href="{{ url_for('webui.leaderboard') }}">
+                            <i class="fa fa-trophy"></i> 排行榜
+                        </a>
+                    </li>
                     {% endif %}
                 </ul>
                 <ul class="nav navbar-nav navbar-right">
@@ -42,12 +47,40 @@
                             <a href="{{ url_for('webui.login') }}">{{ _('Login') }}</a>
                         </li>
                     {% else %}
-                        <li>
-                            <a href="{{ url_for('webui.logout') }}">{{ _('Logout') }}</a>
+                        <!-- User Profile Info Dropdown -->
+                        <li class="dropdown">
+                            <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
+                                <i class="fa fa-user"></i> {{ current_user.username }}
+                                {% if current_user.profile %}
+                                    <span class="badge" title="等級">{{ current_user.profile.level }}</span>
+                                    <span class="label label-warning" title="積分">{{ current_user.profile.points }} ⭐</span>
+                                {% endif %}
+                                <span class="caret"></span>
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li>
+                                    <a href="{{ url_for('webui.user_profile', username=current_user.username) }}">
+                                        <i class="fa fa-user-circle"></i> 我的檔案
+                                    </a>
+                                </li>
+                                <li>
+                                    <a href="{{ url_for('webui.edit_profile') }}">
+                                        <i class="fa fa-cog"></i> 設定
+                                    </a>
+                                </li>
+                                <li role="separator" class="divider"></li>
+                                <li>
+                                    <a href="{{ url_for('webui.logout') }}">
+                                        <i class="fa fa-sign-out"></i> 登出
+                                    </a>
+                                </li>
+                            </ul>
                         </li>
                     {% endif %}
                 </ul>
             </div>
+
+
         </div>
     </nav>
 {% endblock %}

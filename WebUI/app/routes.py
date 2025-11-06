@@ -3,9 +3,10 @@
 from flask import Blueprint, jsonify, request, render_template, redirect, url_for, flash, session, abort
 from flask_login import current_user, login_user, logout_user, login_required
 from WebUI.app import db
-from WebUI.app.models import Robot, Command, User, AdvancedCommand
+from WebUI.app.models import Robot, Command, User, AdvancedCommand, UserProfile
 from WebUI.app.forms import LoginForm, RegisterForm, RegisterRobotForm, ResetPasswordRequestForm, ResetPasswordForm, AdvancedCommandForm
 from WebUI.app.email import send_email
+from WebUI.app.engagement import award_on_registration, get_or_create_user_profile
 
 # blueprint
 bp = Blueprint('webui', __name__)
@@ -39,7 +40,16 @@ def register():
         user = User(username=form.username.data, email=form.email.data)
         user.set_password(form.password.data)
         db.session.add(user)
+        db.session.flush()  # Ensure user.id is generated
+        
+        # Create user profile with engagement metrics
+        profile = UserProfile(user_id=user.id)
+        db.session.add(profile)
         db.session.commit()
+        
+        # Award registration points
+        award_on_registration(user.id)
+        
         flash('註冊成功，請登入。')
         return redirect(url_for('webui.login'))
     return render_template('register.html.j2', form=form)
@@ -65,15 +75,79 @@ def logout():
     logout_user()
     return redirect(url_for('webui.home'))
 
+# 用戶檔案頁面
+@bp.route('/user/<username>')
+def user_profile(username):
+    """Display user profile with engagement metrics and achievements."""
+    user = User.query.filter_by(username=username).first_or_404()
+    profile = get_or_create_user_profile(user)
+    
+    # Get user's earned achievements
+    from WebUI.app.models import UserAchievement, Achievement
+    user_achievements = db.session.query(Achievement).join(
+        UserAchievement
+    ).filter(
+        UserAchievement.user_id == user.id
+    ).all()
+    
+    return render_template(
+        'user.html.j2',
+        user=user,
+        profile=profile,
+        user_achievements=user_achievements
+    )
+
+# 編輯用戶檔案
+@bp.route('/user/edit_profile', methods=['GET', 'POST'])
+@login_required
+def edit_profile():
+    """Edit current user's profile preferences."""
+    if request.method == 'POST':
+        current_user.ui_duration_unit = request.form.get('ui_duration_unit', 's')
+        current_user.ui_verify_collapsed = request.form.get('ui_verify_collapsed', False) == 'on'
+        db.session.commit()
+        flash('檔案已更新。')
+        return redirect(url_for('webui.user_profile', username=current_user.username))
+    
+    return render_template('edit_profile.html.j2')
+
+# 排行榜
+@bp.route('/leaderboard')
+def leaderboard():
+    """Display leaderboard of top users."""
+    from WebUI.app.engagement import get_leaderboard
+    
+    sort_by = request.args.get('sort', 'points')
+    limit = request.args.get('limit', 50, type=int)
+    
+    if sort_by not in ['points', 'level', 'reputation', 'commands']:
+        sort_by = 'points'
+    
+    if limit > 100:
+        limit = 100
+    
+    leaderboard_data = get_leaderboard(limit=limit, sort_by=sort_by)
+    
+    return render_template(
+        'leaderboard.html.j2',
+        leaderboard=leaderboard_data,
+        sort_by=sort_by
+    )
+
 # 註冊機器人
 @bp.route('/register_robot', methods=['GET', 'POST'])
 @login_required
 def register_robot():
+    from WebUI.app.engagement import award_on_robot_registration
     form = RegisterRobotForm()
     if form.validate_on_submit():
         robot = Robot(name=form.name.data, type=form.type.data, owner=current_user)
         db.session.add(robot)
         db.session.commit()
+        
+        # Award points for robot registration
+        award_on_robot_registration(current_user.id)
+        
         flash('機器人註冊成功！')
         return redirect(url_for('webui.robot_dashboard'))
     return render_template('register_robot.html.j2', form=form)

@@ -53,6 +53,38 @@ def load_user(id):
     return User.query.get(int(id))
 
 
+class UserProfile(db.Model):
+    """User engagement and gamification profile.
+    
+    Stores user engagement metrics including:
+    - Points: accumulated through various actions
+    - Level: calculated based on points
+    - Title: current badge/title for the user
+    - Statistics: total commands, advanced commands, robots, reputation
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, unique=True, index=True)
+    user = db.relationship('User', backref=db.backref('profile', uselist=False))
+    
+    # Engagement metrics
+    points = db.Column(db.Integer, default=0, index=True)
+    level = db.Column(db.Integer, default=1, index=True)
+    title = db.Column(db.String(64), default='新手探索者')
+    
+    # Statistics
+    total_commands = db.Column(db.Integer, default=0)
+    total_advanced_commands = db.Column(db.Integer, default=0)
+    total_robots = db.Column(db.Integer, default=0)
+    reputation = db.Column(db.Integer, default=0)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, index=True, default=db.func.now())
+    updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
+
+    def __repr__(self) -> str:
+        return f'<UserProfile user_id={self.user_id} level={self.level} points={self.points}>'
+
+
 class Robot(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(64), unique=True, nullable=False)

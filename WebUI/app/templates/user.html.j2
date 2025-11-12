@@ -1,48 +1,269 @@
 {% extends "base.html.j2" %}
+
 {% block app_content %}
-    <table class="table table-hover">
-        <tr>
-            <td width="256px">
-                <img src="{{ user.avatar(256) }}">
-            </td>
-            <td>
-                <h1>{{ _('User') }}: {{ user.username }}</h1>
-                {% if user.about_me %}<p>{{ user.about_me }}</p>{% endif %}
-                {% if user.last_seen %}<p>{{ _('Last seen on') }}: {{ moment(user.last_seen).format('LLL') }}</p>{% endif %}
-                <p>
-                    {{ _('%(count)d followers', count=user.followers.count()) }}, {{ _('%(count)d following', count=user.followed.count()) }}
-                </p>
-                {% if user == current_user %}
-                    <p>
-                        <a href="{{ url_for('edit_profile') }}">{{ _('Edit your profile') }}</a>
-                    </p>
-                {% elif not current_user.is_following(user) %}
-                    <p>
-                        <a href="{{ url_for('follow', username=user.username) }}">{{ _('Follow') }}</a>
-                    </p>
-                {% else %}
-                    <p>
-                        <a href="{{ url_for('unfollow', username=user.username) }}">{{ _('Unfollow') }}</a>
-                    </p>
-                {% endif %}
-            </td>
-        </tr>
-    </table>
-    {% for post in posts %}
-        {% include '_post.html.j2' %}
-    {% endfor %}
-    <nav aria-label="...">
-        <ul class="pager">
-            <li class="previous{% if not prev_url %} disabled{% endif %}">
-                <a href="{{ prev_url or '#' }}">
-                    <span aria-hidden="true">&larr;</span> {{ _('Newer posts') }}
+<div class="container-fluid">
+    <div class="row">
+        <!-- User Profile Header -->
+        <div class="col-md-12">
+            <div class="panel panel-primary" style="margin-top: 20px;">
+                <div class="panel-heading">
+                    <h3 class="panel-title">
+                        👤 使用者檔案
+                        {% if user == current_user %}
+                            <a href="{{ url_for('webui.edit_profile') }}" class="btn btn-sm btn-default pull-right">
+                                <span class="glyphicon glyphicon-edit"></span> 編輯
+                            </a>
+                        {% endif %}
+                    </h3>
+                </div>
+                <div class="panel-body">
+                    <div class="row">
+                        <!-- Left: User Info -->
+                        <div class="col-md-6">
+                            <table class="table table-bordered table-hover">
+                                <tr>
+                                    <td><strong>用戶名稱</strong></td>
+                                    <td>{{ user.username }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>電子郵件</strong></td>
+                                    <td>{{ user.email }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>角色</strong></td>
+                                    <td>
+                                        <span class="label {% if user.role == 'admin' %}label-danger{% elif user.role == 'auditor' %}label-warning{% elif user.role == 'operator' %}label-info{% else %}label-default{% endif %}">
+                                            {{ user.role }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>加入日期</strong></td>
+                                    <td>{{ profile.created_at.strftime('%Y-%m-%d') }}</td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <!-- Right: Engagement Metrics -->
+                        <div class="col-md-6">
+                            <div class="row">
+                                <div class="col-xs-6">
+                                    <div class="panel panel-success" style="margin-bottom: 10px;">
+                                        <div class="panel-heading">
+                                            <div class="row">
+                                                <div class="col-xs-3 text-right">
+                                                    <i class="fa fa-star fa-3x text-success"></i>
+                                                </div>
+                                                <div class="col-xs-9 text-right">
+                                                    <div class="huge">{{ profile.points }}</div>
+                                                    <div>總積分</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-xs-6">
+                                    <div class="panel panel-info" style="margin-bottom: 10px;">
+                                        <div class="panel-heading">
+                                            <div class="row">
+                                                <div class="col-xs-3 text-right">
+                                                    <i class="fa fa-level-up fa-3x text-info"></i>
+                                                </div>
+                                                <div class="col-xs-9 text-right">
+                                                    <div class="huge">{{ profile.level }}</div>
+                                                    <div>等級</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="well" style="margin-top: 10px;">
+                                <p><strong>等級進度</strong></p>
+                                <div class="progress" style="margin-bottom: 0;">
+                                    {% set progress = profile.get_progress_to_next_level() %}
+                                    <div class="progress-bar" role="progressbar" 
+                                         aria-valuenow="{{ progress.percent }}" 
+                                         aria-valuemin="0" aria-valuemax="100" 
+                                         style="width: {{ progress.percent }}%">
+                                        {{ progress.percent }}%
+                                    </div>
+                                </div>
+                                <small class="text-muted">
+                                    {{ progress.current }} / {{ progress.next_level_required }} 積分
+                                    (需要 {{ progress.needed }} 積分達到下一等級)
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Title/Badge Section -->
+                    <hr>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <h4><i class="fa fa-trophy"></i> 目前稱號</h4>
+                            <div class="well" style="background-color: #f5f5f5; border-left: 4px solid #5cb85c;">
+                                <p style="font-size: 18px; margin: 0;">
+                                    <strong>{{ profile.title }}</strong>
+                                </p>
+                                <p style="margin: 5px 0 0 0; color: #666;">
+                                    {{ profile.get_rank_tier() }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Section -->
+    <div class="row" style="margin-top: 20px;">
+        <div class="col-md-3">
+            <div class="panel panel-warning">
+                <div class="panel-heading">
+                    <div class="row">
+                        <div class="col-xs-3 text-right">
+                            <i class="fa fa-list fa-3x"></i>
+                        </div>
+                        <div class="col-xs-9 text-right">
+                            <div class="huge">{{ profile.total_commands }}</div>
+                            <div>指令執行</div>
+                        </div>
+                    </div>
+                </div>
+                <a href="#">
+                    <div class="panel-footer">
+                        <span class="pull-left">查看詳情</span>
+                        <span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span>
+                        <div class="clearfix"></div>
+                    </div>
                 </a>
-            </li>
-            <li class="next{% if not next_url %} disabled{% endif %}">
-                <a href="{{ next_url or '#' }}">
-                    {{ _('Older posts') }} <span aria-hidden="true">&rarr;</span>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="panel panel-primary">
+                <div class="panel-heading">
+                    <div class="row">
+                        <div class="col-xs-3 text-right">
+                            <i class="fa fa-cog fa-3x"></i>
+                        </div>
+                        <div class="col-xs-9 text-right">
+                            <div class="huge">{{ profile.total_robots }}</div>
+                            <div>機器人</div>
+                        </div>
+                    </div>
+                </div>
+                <a href="{{ url_for('webui.robot_dashboard') }}">
+                    <div class="panel-footer">
+                        <span class="pull-left">查看詳情</span>
+                        <span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span>
+                        <div class="clearfix"></div>
+                    </div>
                 </a>
-            </li>
-        </ul>
-    </nav>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="panel panel-success">
+                <div class="panel-heading">
+                    <div class="row">
+                        <div class="col-xs-3 text-right">
+                            <i class="fa fa-flash fa-3x"></i>
+                        </div>
+                        <div class="col-xs-9 text-right">
+                            <div class="huge">{{ profile.total_advanced_commands }}</div>
+                            <div>進階指令</div>
+                        </div>
+                    </div>
+                </div>
+                <a href="{{ url_for('webui.list_advanced_commands') }}">
+                    <div class="panel-footer">
+                        <span class="pull-left">查看詳情</span>
+                        <span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span>
+                        <div class="clearfix"></div>
+                    </div>
+                </a>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="panel panel-danger">
+                <div class="panel-heading">
+                    <div class="row">
+                        <div class="col-xs-3 text-right">
+                            <i class="fa fa-heart fa-3x"></i>
+                        </div>
+                        <div class="col-xs-9 text-right">
+                            <div class="huge">{{ profile.reputation }}</div>
+                            <div>聲譽值</div>
+                        </div>
+                    </div>
+                </div>
+                <a href="#">
+                    <div class="panel-footer">
+                        <span class="pull-left">查看詳情</span>
+                        <span class="pull-right"><i class="fa fa-arrow-circle-right"></i></span>
+                        <div class="clearfix"></div>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Achievements Section -->
+    {% if user_achievements or not user_achievements %}
+    <div class="row" style="margin-top: 20px;">
+        <div class="col-md-12">
+            <div class="panel panel-primary">
+                <div class="panel-heading">
+                    <h4 class="panel-title">
+                        <i class="fa fa-trophy"></i> 成就與勳章 
+                        <span class="badge">{{ user_achievements|length }}</span>
+                    </h4>
+                </div>
+                <div class="panel-body">
+                    {% if user_achievements %}
+                        <div class="row">
+                            {% for achievement in user_achievements %}
+                            <div class="col-md-3 col-sm-4 col-xs-6" style="margin-bottom: 15px;">
+                                <div class="panel panel-default" style="cursor: pointer; transition: all 0.3s;"
+                                     onmouseover="this.style.boxShadow='0 0 10px rgba(0,0,0,0.2)';"
+                                     onmouseout="this.style.boxShadow='none';">
+                                    <div class="panel-body text-center">
+                                        <div style="font-size: 32px; margin-bottom: 10px;">{{ achievement.emoji }}</div>
+                                        <h5>{{ achievement.name }}</h5>
+                                        <p style="font-size: 12px; color: #666; margin: 5px 0;">
+                                            <small>{{ achievement.description }}</small>
+                                        </p>
+                                        <span class="label label-primary" style="margin-top: 5px;">
+                                            {{ achievement.category }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <p><i class="fa fa-info-circle"></i> 還沒有獲得任何成就。繼續參與平台，解鎖更多勳章！</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .huge {
+        font-size: 26px;
+    }
+    .panel {
+        border-radius: 4px;
+    }
+    .panel-heading {
+        background-color: #f5f5f5;
+        border-color: #ddd;
+    }
+</style>
 {% endblock %}

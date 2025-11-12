@@ -2,6 +2,17 @@
 
 本文件說明 `Robot-Console` 模組（機器人抽象層）的職責、檔案結構、介面契約、核心流程與擴充指引，對齊專案的 MCP 架構與契約檔（見 `docs/contract/*.schema.json`）。
 
+## ⚠️ 重要變更：進階指令解碼職責轉移
+
+**從此版本開始，進階指令的展開和解碼已移至 WebUI/上游服務處理。**
+
+- **Robot-Console** 現在只接收預先解碼的基礎動作列表（如 `{"actions": ["go_forward", "turn_left", ...]}`）
+- **WebUI/前端** 負責所有進階指令的展開、使用者互動和命令巨集的 UX
+- **`advanced_decoder.py`** 已標記為棄用，僅保留用於向後相容
+- 向後相容：仍支援舊的 `toolName` 格式和舊式進階指令（需在設定中啟用）
+
+詳細說明請參閱第 13 節「進階指令處理（職責變更）」。
+
 ---
 
 ## 1. 模組定位與邊界
@@ -17,9 +28,10 @@
 ## 2. 資料夾與檔案說明
 
 - `action_executor.py`：動作執行引擎（佇列、排程、超時、停止、並行下發本地/遠端）。
-- `pubsub.py`：AWS IoT MQTT 發佈/訂閱用戶端（mTLS 與 WebSocket 雙模式、自動切換、重連）。
+- `pubsub.py`：AWS IoT MQTT 發佈/訂閱用戶端（mTLS 與 WebSocket 雙模式、自動切換、重連）。現在優先處理 `actions` 陣列格式。
+- `advanced_decoder.py`：⚠️ **已棄用** - 僅用於向後相容。新實作應在 WebUI 進行指令展開。
 - `tools.py`：本地執行器使用的工具映射（`TOOL_LIST`、`TOOLS` 與各動作的 JSON Schema）。注意：MCP 為工具清單的權威來源，請勿直接在此檔案中變更正式工具定義——變更應先在 MCP 更新，然後透過同步機制或 CI 下放到本模組。
-- `settings.yaml`：機器人與 AWS IoT 相關設定。
+- `settings.yaml`：機器人與 AWS IoT 相關設定。可選設定 `enable_legacy_decoder: true` 以啟用舊式解碼器。
 - `requirements.txt`：此模組的依賴套件清單。
 - `create_virtual_env.sh`：建立虛擬環境與安裝依賴。
 - `create_deploy_package.sh`：建立部署套件（排除 venv/cache）。
@@ -252,30 +264,61 @@ idle → accepted → running → {succeeded | failed | cancelled}
 
 ---
 
-## 13. 進階指令（插件機制）
+## 13. 進階指令處理（職責變更）
 
-設計理念：以組合方式將多個基礎指令形成「進階指令」，並支援用戶投稿與審核。
+⚠️ **重要變更**：從此版本開始，進階指令的展開與解碼由 **WebUI/上游服務** 負責。
+Robot-Console 模組現在只接收預先解碼的基礎動作列表。
 
-### 13.1 資料格式（示例）
+### 13.1 新的資料格式
+
+Robot-Console 現在預期接收已展開的動作列表：
 
 ```json
-[
-  { "command": "go_forward", "duration_ms": 3000, "speed": "normal" },
-  { "command": "turn_left",   "duration_ms": 1000 },
-  { "command": "go_forward", "duration_ms": 2000 }
-]
+{
+  "actions": ["go_forward", "turn_left", "go_forward", "stand"]
+}
 ```
 
-### 13.2 流程
-1. MCP 選擇標準化指令。
-2. 本模組展開為基礎指令序列。
-3. 逐步執行，維持 `trace_id` 貫穿；失敗可選擇中止或繼續。
-4. 回傳彙整結果與過程事件。
+每個動作名稱必須是 `action_executor.py` 中定義的有效基礎動作。
 
-### 13.3 權限與審核
-- 提交：登入用戶建立進階指令，初始狀態 `pending`。
-- 審核：Admin/Auditor 可將狀態改為 `approved` 或 `rejected`。
-- 公開：通過審核者可被其他用戶引用。
+### 13.2 向後相容性
+
+為保持向後相容，仍支援以下格式（不建議新實作使用）：
+
+1. 單一動作格式：
+```json
+{ "toolName": "go_forward" }
+```
+
+2. 舊式進階指令（需要在 `settings.yaml` 中設定 `enable_legacy_decoder: true`）：
+```json
+{ "type": "sequence", "steps": [{"action": "go_forward"}, {"action": "turn_left"}] }
+```
+
+### 13.3 新的職責劃分
+
+1. **WebUI/前端**：
+   - 負責進階指令的建立、編輯、儲存
+   - 負責將進階指令展開為基礎動作序列
+   - 負責使用者互動和命令巨集的 UX
+   - 發送預先解碼的動作列表到 Robot-Console
+
+2. **Robot-Console（本模組）**：
+   - 只接收並執行基礎動作列表
+   - 不再負責進階指令的解碼或展開
+   - `advanced_decoder.py` 已標記為棄用，僅用於向後相容
+
+3. **權限與審核**（在 WebUI 層處理）：
+   - 提交：登入用戶建立進階指令，初始狀態 `pending`
+   - 審核：Admin/Auditor 可將狀態改為 `approved` 或 `rejected`
+   - 公開：通過審核者可被其他用戶引用
+
+### 13.4 優點
+
+- 更簡單的後端邏輯，易於維護
+- 更靈活的前端 UX，便於建立命令序列和巨集
+- 更清晰的職責劃分
+- 減少 Robot-Console 的複雜度
 
 ---
 

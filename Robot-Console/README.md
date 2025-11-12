@@ -2,6 +2,15 @@
 
 機器人指令抽象層 - 根據 module.md 設計文件完整重建
 
+## ⚠️ 重要變更
+
+**進階指令解碼已移至 WebUI 處理**
+
+從此版本開始：
+- Robot-Console 只接收預先解碼的基礎動作列表：`{"actions": ["go_forward", "turn_left", ...]}`
+- WebUI/前端負責所有進階指令的展開和使用者互動
+- `advanced_decoder.py` 已棄用（保留僅用於向後相容）
+
 ## 📚 文件
 
 - [module.md](module.md) - 完整模組設計說明
@@ -16,6 +25,7 @@
 - ✅ 多協定支援（MQTT/HTTP/WebSocket）
 - ✅ 標準化契約（完全對齊 MCP）
 - ✅ 端到端追蹤（trace_id）
+- ✅ 接收預先解碼的動作列表（新格式）
 
 ## 🚀 快速開始
 

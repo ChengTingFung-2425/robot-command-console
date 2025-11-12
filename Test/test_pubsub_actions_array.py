@@ -9,7 +9,7 @@
 
 import json
 import unittest
-from unittest.mock import Mock, MagicMock, patch, call
+from unittest.mock import Mock, MagicMock, patch
 import sys
 import os
 
@@ -244,7 +244,7 @@ class TestPubSubActionsArray(unittest.TestCase):
         settings_with_legacy['mcp_base_url'] = 'http://localhost:5000'
 
         # 建立客戶端
-        client = PubSubClient(settings_with_legacy, self.mock_executor)
+        _ = PubSubClient(settings_with_legacy, self.mock_executor)
 
         # 驗證：應該建立 AdvancedDecoder
         mock_decoder_class.assert_called_once_with(

@@ -17,6 +17,10 @@ from awsiot import mqtt5_client_builder
 
 TIMEOUT = 5
 
+# Maximum recommended size for actions array to avoid performance issues
+# Arrays larger than this will still be processed but may cause delays
+MAX_RECOMMENDED_ACTIONS = 100
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
@@ -72,11 +76,30 @@ class PubSubClient:
                 # Primary: Handle pre-decoded actions array from WebUI/upper layer
                 if "actions" in payload:
                     actions = payload["actions"]
-                    if isinstance(actions, list) and all(isinstance(a, str) for a in actions):
-                        logging.info("Processing pre-decoded actions list: %s", actions)
-                        self.executor.add_actions_to_queue(actions)
-                    else:
-                        logging.error("Invalid 'actions' format in payload: expected list of strings")
+                    
+                    # Validate actions is a list
+                    if not isinstance(actions, list):
+                        logging.error("Invalid 'actions' format in payload: expected list, got %s", type(actions).__name__)
+                        return
+                    
+                    # Warn if actions array is very large (may impact performance)
+                    if len(actions) > MAX_RECOMMENDED_ACTIONS:
+                        logging.warning(
+                            "Actions array size (%d) exceeds recommended maximum (%d). Consider breaking into smaller batches.",
+                            len(actions), MAX_RECOMMENDED_ACTIONS
+                        )
+                    
+                    # Validate all actions are strings (short-circuits on first non-string)
+                    for i, action in enumerate(actions):
+                        if not isinstance(action, str):
+                            logging.error(
+                                "Invalid action at index %d: expected string, got %s",
+                                i, type(action).__name__
+                            )
+                            return
+                    
+                    logging.info("Processing pre-decoded actions list: %s", actions)
+                    self.executor.add_actions_to_queue(actions)
                     return
                 
                 # Legacy: Try decoder if enabled (backward compatibility)

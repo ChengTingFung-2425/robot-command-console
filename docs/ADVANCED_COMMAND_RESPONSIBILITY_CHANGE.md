@@ -242,6 +242,11 @@ A: 可以。啟用 `enable_legacy_decoder` 後，所有舊格式都繼續工作�
 
 A: actions 陣列必須是字串列表，每個字串必須是有效的基礎動作名稱。
 
+**效能考量**：
+- 建議單次發送的 actions 陣列大小不超過 100 個動作
+- 超過此限制的陣列仍會被處理，但可能導致效能問題
+- 對於大量動作序列，建議分批發送以獲得最佳效能和錯誤處理
+
 ### Q: 如何知道動作列表是否有效？
 
 A: 參考 `Robot-Console/action_executor.py` 中的 `actions` 字典，或查看 `tools.py` 中的 `TOOL_LIST`。

@@ -251,6 +251,74 @@ class TestPubSubActionsArray(unittest.TestCase):
             mcp_base_url='http://localhost:5000'
         )
 
+    @patch('pubsub.mqtt5')
+    @patch('pubsub.AdvancedDecoder')
+    @patch('pubsub.logging')
+    def test_large_actions_array_warning(self, mock_logging, mock_decoder_class, mock_mqtt5):
+        """測試大型 actions 陣列會產生警告"""
+        from pubsub import PubSubClient, MAX_RECOMMENDED_ACTIONS
+
+        # 建立客戶端
+        client = PubSubClient(self.settings, self.mock_executor)
+
+        # 建立包含大量動作的負載（超過建議上限）
+        large_actions = [f"action_{i}" for i in range(MAX_RECOMMENDED_ACTIONS + 10)]
+        payload = {"actions": large_actions}
+
+        # 建立 mock 的 publish packet
+        mock_packet = Mock()
+        mock_packet.topic = self.settings['input_topic']
+        mock_packet.payload = json.dumps(payload).encode('utf-8')
+        
+        # Mock the PublishPacket class
+        mock_mqtt5.PublishPacket = type('PublishPacket', (), {})
+        mock_packet.__class__ = mock_mqtt5.PublishPacket
+
+        mock_packet_data = Mock()
+        mock_packet_data.publish_packet = mock_packet
+
+        # 呼叫處理函數
+        client.on_publish_received(mock_packet_data)
+
+        # 驗證：應該記錄警告訊息
+        mock_logging.warning.assert_called_once()
+        warning_call = mock_logging.warning.call_args[0][0]
+        self.assertIn("exceeds recommended maximum", warning_call)
+
+        # 驗證：仍然應該處理動作
+        self.mock_executor.add_actions_to_queue.assert_called_once_with(large_actions)
+
+    @patch('pubsub.mqtt5')
+    @patch('pubsub.AdvancedDecoder')
+    def test_actions_not_list_error(self, mock_decoder_class, mock_mqtt5):
+        """測試 actions 不是列表時的錯誤處理"""
+        from pubsub import PubSubClient
+
+        # 建立客戶端
+        client = PubSubClient(self.settings, self.mock_executor)
+
+        # 建立包含非列表 actions 的負載
+        payload = {"actions": "not_a_list"}
+
+        # 建立 mock 的 publish packet
+        mock_packet = Mock()
+        mock_packet.topic = self.settings['input_topic']
+        mock_packet.payload = json.dumps(payload).encode('utf-8')
+        
+        # Mock the PublishPacket class
+        mock_mqtt5.PublishPacket = type('PublishPacket', (), {})
+        mock_packet.__class__ = mock_mqtt5.PublishPacket
+
+        mock_packet_data = Mock()
+        mock_packet_data.publish_packet = mock_packet
+
+        # 呼叫處理函數
+        client.on_publish_received(mock_packet_data)
+
+        # 驗證：不應該呼叫任何執行方法
+        self.mock_executor.add_actions_to_queue.assert_not_called()
+        self.mock_executor.add_action_to_queue.assert_not_called()
+
 
 class TestPubSubBackwardCompatibility(unittest.TestCase):
     """測試向後相容性"""

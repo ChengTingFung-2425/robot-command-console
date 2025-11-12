@@ -90,16 +90,10 @@ def send_to_robot(robot_id, command_id):
 確保所有動作名稱都在允許的清單中：
 
 ```python
+# 範例動作，完整清單請參考 Robot-Console/action_executor.py 中的 actions 字典
 VALID_ACTIONS = [
-    "back_fast", "bow", "chest", "dance_eight", "dance_five",
-    "dance_four", "dance_nine", "dance_seven", "dance_six",
-    "dance_ten", "dance_three", "dance_two", "go_forward",
-    "kung_fu", "left_kick", "left_move_fast", "left_shot_fast",
-    "left_uppercut", "push_ups", "right_kick", "right_move_fast",
-    "right_shot_fast", "right_uppercut", "sit_ups", "squat",
-    "squat_up", "stand", "stand_up_back", "stand_up_front",
-    "stepping", "stop", "turn_left", "turn_right", "twist",
-    "wave", "weightlifting", "wing_chun"
+    "go_forward", "turn_left", "stand", "stop"
+    # ... 其餘動作請見 action_executor.py
 ]
 
 def validate_actions(actions):

@@ -9,7 +9,7 @@
 
 import json
 import unittest
-from unittest.mock import Mock, MagicMock, patch, call
+from unittest.mock import Mock, MagicMock, patch
 import sys
 import os
 

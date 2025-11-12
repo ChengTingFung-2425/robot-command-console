@@ -228,7 +228,63 @@
 
 **相關函式**：
 - `expand_advanced_command(advanced_cmd)`: 展開進階指令為動作列表
-- `send_actions_to_robot(robot, actions)`: 發送動作到機器人
+- `send_actions_to_robot(robot, actions)`: 發送動作到機器人（整合 MQTT）
+
+**傳輸機制**：
+- **主要方式**：透過 MQTT 直接發送到機器人主題 `{robot_name}/topic`
+- **MQTT 配置**：需要在環境變數中啟用（`MQTT_ENABLED=true`）
+- **備用方案**：MQTT 不可用時記錄到日誌（用於測試環境）
+- **訊息格式**：`{"actions": ["go_forward", "turn_left", ...]}`
+- **QoS**：AT_LEAST_ONCE（確保訊息送達）
+
+**MQTT 整合**：
+- 使用 AWS IoT Core MQTT5 協定
+- 單例模式管理連接（避免重複連接）
+- 自動使用機器人憑證進行身份驗證
+- 線程安全的實作
 
 **測試覆蓋**：參見 `Test/test_advanced_command_execution.py`
+
+**安全性**：
+- 所有錯誤訊息已脫敏處理
+- 堆疊追蹤資訊僅記錄到伺服器日誌
+- 返回給用戶的錯誤訊息通用化
+
+### 11.2 MQTT 配置說明
+
+WebUI 使用 MQTT 客戶端將進階指令發送到機器人的 Robot-Console。
+
+**環境變數**：
+```bash
+# 啟用 MQTT
+MQTT_ENABLED=true
+
+# MQTT broker 地址（AWS IoT Core）
+MQTT_BROKER=a1qlex7vqi1791-ats.iot.us-east-1.amazonaws.com
+
+# MQTT 端口（TLS）
+MQTT_PORT=8883
+
+# 憑證路徑
+MQTT_CERT_PATH=/path/to/certificates
+
+# CA 憑證
+MQTT_CA_CERT=AmazonRootCA1.pem
+
+# 超時設定（秒）
+MQTT_TIMEOUT=5
+```
+
+**憑證結構**：
+```
+certificates/
+├── AmazonRootCA1.pem
+└── robot_7/
+    ├── robot_7.cert.pem
+    └── robot_7.private.key
+```
+
+**相關模組**：
+- `WebUI/app/mqtt_client.py`: MQTT 客戶端管理器
+- `config.py`: MQTT 配置選項
 

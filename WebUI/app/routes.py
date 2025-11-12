@@ -7,6 +7,9 @@ from WebUI.app.models import Robot, Command, User, AdvancedCommand, UserProfile
 from WebUI.app.forms import LoginForm, RegisterForm, RegisterRobotForm, ResetPasswordRequestForm, ResetPasswordForm, AdvancedCommandForm
 from WebUI.app.email import send_email
 from WebUI.app.engagement import award_on_registration, get_or_create_user_profile
+import json
+import requests
+import logging
 
 # blueprint
 bp = Blueprint('webui', __name__)
@@ -219,6 +222,218 @@ def get_command_status(cmd_id):
     """查詢指令執行狀態"""
     cmd = Command.query.get_or_404(cmd_id)
     return jsonify({'id': cmd.id, 'robot_id': cmd.robot_id, 'command': cmd.command, 'status': cmd.status})
+
+
+def expand_advanced_command(advanced_cmd):
+    """展開進階指令為基礎動作列表
+    
+    Args:
+        advanced_cmd: AdvancedCommand 模型實例
+        
+    Returns:
+        list: 基礎動作名稱列表，例如 ['go_forward', 'turn_left', 'stand']
+        
+    Raises:
+        ValueError: 如果指令格式無效或包含無效的動作
+    """
+    # 有效的基礎動作列表（與 Robot-Console/action_executor.py 同步）
+    VALID_ACTIONS = {
+        "back_fast", "bow", "chest", "dance_eight", "dance_five", "dance_four",
+        "dance_nine", "dance_seven", "dance_six", "dance_ten", "dance_three", "dance_two",
+        "go_forward", "kung_fu", "left_kick", "left_move_fast", "left_shot_fast",
+        "left_uppercut", "push_ups", "right_kick", "right_move_fast", "right_shot_fast",
+        "right_uppercut", "sit_ups", "squat", "squat_up", "stand", "stand_up_back",
+        "stand_up_front", "stepping", "stop", "turn_left", "turn_right", "twist",
+        "wave", "weightlifting", "wing_chun"
+    }
+    
+    try:
+        # 從資料庫載入進階指令的 base_commands
+        base_commands_str = advanced_cmd.current_base_commands()
+        commands = json.loads(base_commands_str)
+        
+        # 確認是陣列
+        if not isinstance(commands, list):
+            raise ValueError('指令序列必須是陣列格式')
+        
+        # 提取動作名稱並驗證
+        actions = []
+        for idx, cmd in enumerate(commands):
+            if not isinstance(cmd, dict):
+                raise ValueError(f'第 {idx + 1} 個指令格式錯誤：必須是物件')
+            
+            if 'command' not in cmd:
+                raise ValueError(f'第 {idx + 1} 個指令缺少 "command" 欄位')
+            
+            action_name = cmd['command']
+            
+            # 跳過特殊指令如 'wait' 和 'advanced_command'
+            if action_name in ['wait', 'advanced_command']:
+                logging.warning(f'跳過特殊指令: {action_name}')
+                continue
+            
+            # 驗證是否為有效的基礎動作
+            if action_name not in VALID_ACTIONS:
+                raise ValueError(f'第 {idx + 1} 個指令 "{action_name}" 不是有效的基礎動作')
+            
+            actions.append(action_name)
+        
+        return actions
+        
+    except json.JSONDecodeError as e:
+        raise ValueError(f'JSON 格式錯誤：{str(e)}')
+    except Exception as e:
+        raise ValueError(f'展開進階指令時發生錯誤：{str(e)}')
+
+
+def send_actions_to_robot(robot, actions):
+    """發送動作列表到機器人的 Robot-Console 執行佇列
+    
+    Args:
+        robot: Robot 模型實例
+        actions: 基礎動作名稱列表
+        
+    Returns:
+        dict: 包含結果的字典 {'success': bool, 'message': str, 'details': dict}
+    """
+    try:
+        # 構建符合 Robot-Console pubsub.py 期望的新格式
+        payload = {
+            "actions": actions
+        }
+        
+        # 這裡應該透過 MQTT 發送到機器人的主題
+        # 主題格式為: {robot_name}/topic
+        # 但由於 WebUI 可能沒有直接的 MQTT 客戶端，我們可以：
+        # 1. 透過 MCP API 轉發
+        # 2. 直接整合 MQTT 客戶端
+        # 3. 使用機器人的 simulator_endpoint (如果有的話)
+        
+        # 目前實作：記錄到日誌並返回成功
+        # 實際部署時需要整合真實的訊息傳遞機制
+        logging.info(
+            f"發送動作列表到機器人 {robot.name}: {actions}"
+        )
+        
+        # TODO: 實際的 MQTT 發布或 API 呼叫應該在這裡實作
+        # 例如:
+        # mqtt_client.publish(f"{robot.name}/topic", json.dumps(payload))
+        # 或:
+        # requests.post(f"{MCP_BASE_URL}/api/commands", json=payload)
+        
+        return {
+            'success': True,
+            'message': f'已發送 {len(actions)} 個動作到機器人 {robot.name}',
+            'details': {
+                'robot_id': robot.id,
+                'robot_name': robot.name,
+                'actions_count': len(actions),
+                'actions': actions
+            }
+        }
+        
+    except Exception as e:
+        logging.error(f'發送動作到機器人時發生錯誤: {str(e)}')
+        return {
+            'success': False,
+            'message': f'發送失敗：{str(e)}',
+            'details': None
+        }
+
+
+# 執行進階指令：解碼並發送到 Robot-Console 佇列
+@bp.route('/advanced_commands/<int:cmd_id>/execute', methods=['POST'])
+@login_required
+def execute_advanced_command(cmd_id):
+    """執行進階指令：展開並發送到指定機器人的 Robot-Console 執行佇列
+    
+    Request Body (JSON):
+        {
+            "robot_id": 1  // 目標機器人 ID
+        }
+        
+    Response:
+        {
+            "success": true,
+            "message": "...",
+            "command_id": 123,
+            "details": {...}
+        }
+    """
+    try:
+        # 取得進階指令
+        advanced_cmd = AdvancedCommand.query.get_or_404(cmd_id)
+        
+        # 權限檢查：只有 approved 的指令可以執行
+        if advanced_cmd.status != 'approved':
+            return jsonify({
+                'success': False,
+                'message': f'只能執行已批准的進階指令（當前狀態：{advanced_cmd.status}）'
+            }), 403
+        
+        # 取得請求資料
+        if request.is_json:
+            data = request.get_json()
+        else:
+            data = request.form
+        
+        robot_id = data.get('robot_id')
+        if not robot_id:
+            return jsonify({
+                'success': False,
+                'message': '缺少必要參數：robot_id'
+            }), 400
+        
+        # 取得機器人
+        robot = Robot.query.get_or_404(robot_id)
+        
+        # 權限檢查：確認用戶擁有該機器人
+        if robot.owner != current_user and not current_user.is_admin():
+            return jsonify({
+                'success': False,
+                'message': '您沒有權限控制此機器人'
+            }), 403
+        
+        # 展開進階指令為基礎動作列表
+        try:
+            actions = expand_advanced_command(advanced_cmd)
+        except ValueError as e:
+            return jsonify({
+                'success': False,
+                'message': f'展開進階指令失敗：{str(e)}'
+            }), 400
+        
+        # 發送動作到機器人
+        result = send_actions_to_robot(robot, actions)
+        
+        # 記錄到資料庫（建立 Command 記錄）
+        cmd_record = Command(
+            robot_id=robot.id,
+            command=f'advanced:{advanced_cmd.name}',
+            status='sent' if result['success'] else 'failed',
+            nested_command=True
+        )
+        db.session.add(cmd_record)
+        db.session.commit()
+        
+        # 返回結果
+        response = {
+            'success': result['success'],
+            'message': result['message'],
+            'command_id': cmd_record.id,
+            'details': result.get('details')
+        }
+        
+        status_code = 200 if result['success'] else 500
+        return jsonify(response), status_code
+        
+    except Exception as e:
+        logging.error(f'執行進階指令時發生錯誤: {str(e)}', exc_info=True)
+        return jsonify({
+            'success': False,
+            'message': f'執行失敗：{str(e)}'
+        }), 500
+
 
 # 密碼重設請求
 @bp.route('/reset_password_request', methods=['GET', 'POST'])

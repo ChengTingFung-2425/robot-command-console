@@ -45,6 +45,7 @@ jobs:
           echo "$BRANCHES"
 
           failures=()
+          skipped=()
 
           for branch in $BRANCHES; do
             echo "\n--- Processing branch: $branch ---"
@@ -57,23 +58,31 @@ jobs:
               git checkout -b $branch origin/$branch
             fi
 
+            # Check if branch is already up-to-date with main
+            if git merge-base --is-ancestor origin/main origin/$branch; then
+              echo "Branch '$branch' is already up-to-date with main. Skipping merge."
+              skipped+=("$branch")
+              continue
+            fi
+
             # Try to merge origin/main into the branch
             if git merge --no-edit origin/main; then
               echo "Merge succeeded for $branch, pushing..."
               git push origin $branch
             else
               echo "Merge failed or conflict for $branch. Aborting merge and skipping push."
-              # abort merge state if present
               git merge --abort || true
-              # return to main to keep workspace clean
               git checkout main || true
               failures+=("$branch")
             fi
           done
 
+          if [ ${#skipped[@]} -ne 0 ]; then
+            echo "The following branches are already up-to-date and were skipped: ${skipped[*]}"
+          fi
+
           if [ ${#failures[@]} -ne 0 ]; then
             echo "The following branches had merge conflicts and were skipped: ${failures[*]}"
-            # set a non-zero exit code to mark job as failed (optional). To avoid failing the whole workflow, comment out the following line.
             # exit 1
           else
             echo "All branches processed successfully."

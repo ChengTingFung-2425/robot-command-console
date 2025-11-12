@@ -17,6 +17,10 @@ from awsiot import mqtt5_client_builder
 
 TIMEOUT = 5
 
+# Maximum recommended size for actions array to avoid performance issues
+# Arrays larger than this will still be processed but may cause delays
+MAX_RECOMMENDED_ACTIONS = 100
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
@@ -48,9 +52,9 @@ class PubSubClient:
     def __init__(self, settings: Dict[str, Any], executor: ActionExecutor):
         self.settings = settings
         self.executor = executor
-        # Create decoder using MCP base URL if provided in settings
+        # Create decoder using MCP base URL if provided in settings (optional, for legacy support)
         mcp_base = settings.get("mcp_base_url") or settings.get("MCP_BASE_URL")
-        self.decoder = AdvancedDecoder(mcp_base_url=mcp_base)
+        self.decoder = AdvancedDecoder(mcp_base_url=mcp_base) if settings.get("enable_legacy_decoder", False) else None
         self.client: Optional[mqtt5.Client] = None
         self.future_stopped = Future()
         self.future_connection_success = Future()
@@ -68,24 +72,55 @@ class PubSubClient:
             )
             try:
                 payload = json.loads(publish_packet.payload)
-                # First try to decode as advanced command sequence; falls back to
-                # single-tool semantics if decoder returns empty list.
-                decoded = []
-                try:
-                    decoded = self.decoder.decode(payload)
-                except Exception as e:
-                    logging.warning("Decoder error, falling back: %s", e)
-
-                if decoded:
-                    # enqueue decoded sequence preserving order
-                    self.executor.add_actions_to_queue(decoded)
+                
+                # Primary: Handle pre-decoded actions array from WebUI/upper layer
+                if "actions" in payload:
+                    actions = payload["actions"]
+                    
+                    # Validate actions is a list
+                    if not isinstance(actions, list):
+                        logging.error("Invalid 'actions' format in payload: expected list, got %s", type(actions).__name__)
+                        return
+                    
+                    # Warn if actions array is very large (may impact performance)
+                    if len(actions) > MAX_RECOMMENDED_ACTIONS:
+                        logging.warning(
+                            "Actions array size (%d) exceeds recommended maximum (%d). Consider breaking into smaller batches.",
+                            len(actions), MAX_RECOMMENDED_ACTIONS
+                        )
+                    
+                    # Validate all actions are strings (short-circuits on first non-string)
+                    for i, action in enumerate(actions):
+                        if not isinstance(action, str):
+                            logging.error(
+                                "Invalid action at index %d: expected string, got %s",
+                                i, type(action).__name__
+                            )
+                            return
+                    
+                    logging.info("Processing pre-decoded actions list: %s", actions)
+                    self.executor.add_actions_to_queue(actions)
+                    return
+                
+                # Legacy: Try decoder if enabled (backward compatibility)
+                if self.decoder:
+                    try:
+                        decoded = self.decoder.decode(payload)
+                        if decoded:
+                            logging.info("Using legacy decoder, decoded actions: %s", decoded)
+                            self.executor.add_actions_to_queue(decoded)
+                            return
+                    except Exception as e:
+                        logging.warning("Legacy decoder error: %s", e)
+                
+                # Fallback: legacy single toolName field
+                action_name = payload.get("toolName")
+                if action_name:
+                    logging.info("Processing legacy toolName: %s", action_name)
+                    self.executor.add_action_to_queue(action_name)
                 else:
-                    # fallback: legacy single toolName field
-                    action_name = payload.get("toolName")
-                    if action_name:
-                        self.executor.add_action_to_queue(action_name)
-                    else:
-                        logging.warning("No actionable command found in payload: %s", payload)
+                    logging.warning("No actionable command found in payload: %s", payload)
+                    
             except json.JSONDecodeError:
                 logging.error("Invalid JSON payload received")
         except Exception as e:

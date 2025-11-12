@@ -1,5 +1,12 @@
 """Advanced command decoder.
 
+⚠️ DEPRECATED: This module is now deprecated. Advanced command expansion should be
+handled by the WebUI or upstream services before sending commands to Robot-Console.
+This module is kept only for backward compatibility with legacy systems.
+
+New implementations should send pre-decoded action lists in the format:
+    { "actions": ["go_forward", "turn_left", ...] }
+
 This module provides a small, pluggable decoder that converts high-level
 advanced commands into sequences of base action names that the ActionExecutor
 understands. By default it supports a local "sequence" style payload, but it
@@ -20,6 +27,11 @@ class AdvancedDecoder:
     def __init__(self, mcp_base_url: Optional[str] = None, timeout: float = 2.0) -> None:
         """Create an AdvancedDecoder.
 
+        ⚠️ DEPRECATED: Use pre-decoded action lists from WebUI instead.
+        
+        This decoder is kept for backward compatibility only. New code should send
+        commands with an "actions" array already expanded by the WebUI.
+
         Args:
             mcp_base_url: if provided, decoder will attempt to POST the advanced
                 command to MCP at {mcp_base_url}/api/advanced_commands/expand to
@@ -27,6 +39,9 @@ class AdvancedDecoder:
         """
         self.mcp_base_url = mcp_base_url
         self.timeout = timeout
+        logger.warning(
+            "AdvancedDecoder is deprecated. Please use pre-decoded action lists from WebUI."
+        )
 
     def decode(self, payload: Dict[str, Any]) -> List[str]:
         """Decode an advanced command payload into a list of base action names.

@@ -148,3 +148,87 @@
   - 映像預設不在容器內終止 TLS，而是將 HTTP（5000）暴露出來；生產環境建議放置反向代理（nginx）處理 TLS 與靜態檔。 
   - 若希望我把現有根目錄中的 Docker 文件（若仍存在複製）移除或同步到 `WebUI/docker/`，或加入 `nginx` + TLS 範例，請回覆我想要的選項，我將清理與補齊必要的 CI 與文件。
 
+## 11. API 端點說明
+
+### 11.1 進階指令執行
+
+#### POST `/advanced_commands/<cmd_id>/execute`
+
+執行已批准的進階指令：展開為基礎動作序列並發送到指定機器人的 Robot-Console 執行佇列。
+
+**需要認證**：是（需要登入）
+
+**請求參數**：
+- Path 參數：
+  - `cmd_id` (integer): 進階指令的 ID
+
+- Body（JSON）：
+```json
+{
+  "robot_id": 1  // 目標機器人 ID（必填）
+}
+```
+
+**權限要求**：
+- 用戶必須是機器人的擁有者，或
+- 用戶必須具有 admin/auditor 角色
+
+**處理流程**：
+1. 驗證進階指令狀態（必須為 `approved`）
+2. 驗證用戶權限（必須擁有該機器人）
+3. 展開進階指令：
+   - 從資料庫載入 `base_commands` JSON
+   - 解析為動作序列：`[{"command": "go_forward"}, ...] → ["go_forward", ...]`
+   - 驗證所有動作都是有效的基礎動作（參照 Robot-Console/action_executor.py）
+4. 構建符合 Robot-Console 期望的格式：`{"actions": ["go_forward", "turn_left", ...]}`
+5. 發送到機器人（目前記錄到日誌，實際傳輸機制待整合）
+6. 建立 Command 記錄到資料庫
+
+**成功回應**（200 OK）：
+```json
+{
+  "success": true,
+  "message": "已發送 3 個動作到機器人 test_robot",
+  "command_id": 123,
+  "details": {
+    "robot_id": 1,
+    "robot_name": "test_robot",
+    "actions_count": 3,
+    "actions": ["go_forward", "turn_left", "stand"]
+  }
+}
+```
+
+**錯誤回應**：
+- 400 Bad Request：缺少 robot_id 或進階指令格式錯誤
+```json
+{
+  "success": false,
+  "message": "缺少必要參數：robot_id"
+}
+```
+
+- 403 Forbidden：未批准的指令或無權限控制該機器人
+```json
+{
+  "success": false,
+  "message": "只能執行已批准的進階指令（當前狀態：pending）"
+}
+```
+
+- 404 Not Found：進階指令或機器人不存在
+
+- 500 Internal Server Error：執行失敗
+```json
+{
+  "success": false,
+  "message": "執行失敗：..."
+}
+```
+
+**相關函式**：
+- `expand_advanced_command(advanced_cmd)`: 展開進階指令為動作列表
+- `send_actions_to_robot(robot, actions)`: 發送動作到機器人
+
+**測試覆蓋**：參見 `Test/test_advanced_command_execution.py`
+

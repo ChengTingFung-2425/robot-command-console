@@ -1,0 +1,84 @@
+name: Sync main to branches
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Configure git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - id: list_branches
+        name: Fetch and list remote branches
+        run: |
+          git fetch origin --prune
+          # list remote branches, exclude HEAD, main and common deployment branches
+          branches=$(git for-each-ref --format='%(refname:short)' refs/remotes/origin | grep -vE '^origin/(HEAD|main|gh-pages)$' | sed 's#^origin/##' | sort -u)
+          echo "branches<<EOF" >> $GITHUB_OUTPUT
+          echo "$branches" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Merge main into branches and push
+        if: ${{ steps.list_branches.outputs.branches != '' }}
+        env:
+          BRANCHES: ${{ steps.list_branches.outputs.branches }}
+        run: |
+          set -euo pipefail
+          echo "Branches to process:" 
+          echo "$BRANCHES"
+
+          failures=()
+
+          for branch in $BRANCHES; do
+            echo "\n--- Processing branch: $branch ---"
+
+            # ensure we have the remote branch locally
+            if git show-ref --verify --quiet refs/heads/$branch; then
+              git checkout $branch
+              git reset --hard origin/$branch
+            else
+              git checkout -b $branch origin/$branch
+            fi
+
+            # Try to merge origin/main into the branch
+            if git merge --no-edit origin/main; then
+              echo "Merge succeeded for $branch, pushing..."
+              git push origin $branch
+            else
+              echo "Merge failed or conflict for $branch. Aborting merge and skipping push."
+              # abort merge state if present
+              git merge --abort || true
+              # return to main to keep workspace clean
+              git checkout main || true
+              failures+=("$branch")
+            fi
+          done
+
+          if [ ${#failures[@]} -ne 0 ]; then
+            echo "The following branches had merge conflicts and were skipped: ${failures[*]}"
+            # set a non-zero exit code to mark job as failed (optional). To avoid failing the whole workflow, comment out the following line.
+            # exit 1
+          else
+            echo "All branches processed successfully."
+          fi
+
+      - name: Summary
+        run: |
+          echo "Sync job completed. See logs for merge results. Note: protected branches may block pushes; use a PAT with push rights if needed."

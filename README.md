@@ -34,7 +34,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-2. 依需求啟動單一元件：例如啟動 WebUI 開發伺服器或 MCP 服務（詳見各子資料夾 `README.md`）：
+1. 依需求啟動單一元件：例如啟動 WebUI 開發伺服器或 MCP 服務（詳見各子資料夾 `README.md`）：
 
 ```bash
 # 例如：啟動主應用（若有 app.py）
@@ -45,7 +45,7 @@ cd WebUI
 python microblog.py
 ```
 
-3. 執行測試：
+1. 執行測試：
 
 ```bash
 # 在專案根目錄
@@ -66,6 +66,14 @@ pytest -q
 
 - 專案內 `docs/` 與各子模組的 `README.md` 提供更詳細的設計說明與部署指引。  
 
----
+## CI: 自動將 main 同步到各分支（新增）
 
-（此檔為依據專案提案撰寫的摘要說明；如需更精細的部署步驟或 CI/CD 設定，可將具體需求告知，我可以進一步補齊。）
+本倉庫新增了一個 GitHub Actions 工作流程 `./github/workflows/sync-main-to-branches.yml`，會在 `main` 有 push（例如合併 PR）時嘗試把 `origin/main` merge 回其他遠端分支，並將合併後的結果 push 回對應分支。
+
+注意事項：
+
+- 使用預設的 `GITHUB_TOKEN` 應可執行一般的 push，但若目標分支設定為受保護（protected）且需要額外審查或強制檢查，push 可能會被拒絕。若需要跨受保護分支自動推送，請改用有適當權限的 Personal Access Token（PAT），並將其存為 repository secret，再在 workflow 中使用該 PAT（取代預設憑證）。
+- 若某分支與 `main` 的合併發生衝突，該分支會被跳過（workflow 會記錄失敗的分支）。目前實作不會自動解決衝突或建立 PR；若希望自動建立包含衝突的 PR 以便手動處理，可進一步擴充 workflow。
+- 請注意避免把不應自動同步的分支（例如臨時測試分支或維護分支）放入同步列表；目前 workflow 會自動排除 `main`、`gh-pages` 與 `HEAD`，你可以根據需要再修改檔案以排除更多分支。
+
+如果需要，我可以把 README 中這段改為更詳細的操作範例（包含如何用 PAT 推送與示範保護分支設定）。

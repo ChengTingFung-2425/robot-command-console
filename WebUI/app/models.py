@@ -58,10 +58,21 @@ class Robot(db.Model):
     name = db.Column(db.String(64), unique=True, nullable=False)
     type = db.Column(db.String(64), nullable=False)
     status = db.Column(db.String(64), default='idle')
+    battery = db.Column(db.Integer, default=100)  # 電池電量百分比 (0-100)
+    location = db.Column(db.String(128))  # 機器人位置
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
 
     def __repr__(self) -> str:
         return f'<Robot {self.name}>'
+    
+    def set_battery(self, value: int) -> None:
+        """設定電池電量，確保值在 0-100 範圍內"""
+        if value < 0:
+            self.battery = 0
+        elif value > 100:
+            self.battery = 100
+        else:
+            self.battery = value
 
 
 class Command(db.Model):

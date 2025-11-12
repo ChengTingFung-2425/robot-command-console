@@ -1,0 +1,102 @@
+/* Robot Dashboard Styles */
+
+.robot-card {
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  margin-bottom: 20px;
+}
+
+.robot-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.video-feed-container {
+  width: 100%;
+  max-width: 480px;
+  /* Fallback for older browsers */
+  padding-bottom: 75%; /* 4:3 aspect ratio = 3/4 = 75% */
+  height: 0;
+  position: relative;
+  background-color: #000;
+  overflow: hidden;
+  margin: 0 auto;
+}
+
+/* Modern browsers with aspect-ratio support */
+@supports (aspect-ratio: 4/3) {
+  .video-feed-container {
+    padding-bottom: 0;
+    height: auto;
+    aspect-ratio: 4/3;
+    position: static;
+  }
+}
+
+/* Children positioned absolutely in fallback mode */
+.video-feed-container > * {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Reset positioning in modern browsers */
+@supports (aspect-ratio: 4/3) {
+  .video-feed-container > * {
+    position: static;
+    width: auto;
+    height: auto;
+  }
+}
+
+.video-feed-canvas {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.video-placeholder {
+  color: #fff;
+  text-align: center;
+}
+
+.battery-indicator {
+  display: inline-block;
+  width: 60px;
+  height: 20px;
+  border: 2px solid #333;
+  border-radius: 3px;
+  position: relative;
+  vertical-align: middle;
+}
+
+.battery-level {
+  height: 100%;
+  transition: width 0.3s;
+}
+
+.battery-level.high {
+  background-color: #5cb85c;
+}
+
+.battery-level.medium {
+  background-color: #f0ad4e;
+}
+
+.battery-level.low {
+  background-color: #d9534f;
+}
+
+.robot-info {
+  padding: 10px;
+}
+
+.status-badge {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 3px;
+}

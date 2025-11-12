@@ -30,7 +30,7 @@ jobs:
         run: |
           git fetch origin --prune
           # list remote branches, exclude HEAD, main and common deployment branches
-          branches=$(git for-each-ref --format='%(refname:short)' refs/remotes/origin | grep -vE '^origin/(HEAD|main|gh-pages)$' | sed 's#^origin/##' | sort -u)
+          branches=$(git for-each-ref --format='%(refname:short)' refs/remotes/origin | grep -vE '^origin/(HEAD|main|gh-pages|origin)$' | sed 's#^origin/##' | sort -u)
           echo "branches<<EOF" >> $GITHUB_OUTPUT
           echo "$branches" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT

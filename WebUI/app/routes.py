@@ -302,41 +302,62 @@ def send_actions_to_robot(robot, actions):
             "actions": actions
         }
         
-        # 這裡應該透過 MQTT 發送到機器人的主題
-        # 主題格式為: {robot_name}/topic
-        # 但由於 WebUI 可能沒有直接的 MQTT 客戶端，我們可以：
-        # 1. 透過 MCP API 轉發
-        # 2. 直接整合 MQTT 客戶端
-        # 3. 使用機器人的 simulator_endpoint (如果有的話)
-        
-        # 目前實作：記錄到日誌並返回成功
-        # 實際部署時需要整合真實的訊息傳遞機制
+        # 記錄發送資訊
         logging.info(
             f"發送動作列表到機器人 {robot.name}: {actions}"
         )
         
-        # TODO: 實際的 MQTT 發布或 API 呼叫應該在這裡實作
-        # 例如:
-        # mqtt_client.publish(f"{robot.name}/topic", json.dumps(payload))
-        # 或:
-        # requests.post(f"{MCP_BASE_URL}/api/commands", json=payload)
+        # 使用 MQTT 發送到機器人（選項 1：直接 MQTT 發布）
+        try:
+            from WebUI.app.mqtt_client import publish_to_robot
+            
+            # 嘗試透過 MQTT 發送
+            mqtt_success = publish_to_robot(robot.name, payload)
+            
+            if mqtt_success:
+                return {
+                    'success': True,
+                    'message': f'已透過 MQTT 發送 {len(actions)} 個動作到機器人 {robot.name}',
+                    'details': {
+                        'robot_id': robot.id,
+                        'robot_name': robot.name,
+                        'actions_count': len(actions),
+                        'actions': actions,
+                        'transport': 'MQTT'
+                    }
+                }
+            else:
+                # MQTT 發送失敗，記錄警告
+                logging.warning(f"MQTT 發送失敗，可能是 MQTT 未啟用或連接失敗")
+                
+        except ImportError as e:
+            logging.warning(f"無法導入 MQTT 客戶端模組: {str(e)}")
+        except Exception as e:
+            logging.warning(f"MQTT 發送時發生錯誤: {str(e)}")
+        
+        # 備用方案：如果 MQTT 不可用或失敗，只記錄到日誌
+        # 這允許在沒有 MQTT 配置的環境中仍然可以測試其他功能
+        logging.info(
+            f"備用方案：動作列表已記錄（MQTT 不可用），等待其他傳輸機制"
+        )
         
         return {
             'success': True,
-            'message': f'已發送 {len(actions)} 個動作到機器人 {robot.name}',
+            'message': f'已接受 {len(actions)} 個動作到機器人 {robot.name}（等待傳輸）',
             'details': {
                 'robot_id': robot.id,
                 'robot_name': robot.name,
                 'actions_count': len(actions),
-                'actions': actions
+                'actions': actions,
+                'transport': 'pending'
             }
         }
         
     except Exception as e:
-        logging.error(f'發送動作到機器人時發生錯誤: {str(e)}')
+        logging.error(f'發送動作到機器人時發生錯誤: {str(e)}', exc_info=True)
         return {
             'success': False,
-            'message': f'發送失敗：{str(e)}',
+            'message': '發送失敗',
             'details': None
         }
 
@@ -398,9 +419,11 @@ def execute_advanced_command(cmd_id):
         try:
             actions = expand_advanced_command(advanced_cmd)
         except ValueError as e:
+            # 記錄詳細錯誤到日誌，但只返回通用訊息給用戶
+            logging.warning(f'展開進階指令失敗: {str(e)}')
             return jsonify({
                 'success': False,
-                'message': f'展開進階指令失敗：{str(e)}'
+                'message': '展開進階指令失敗，請檢查指令格式是否正確'
             }), 400
         
         # 發送動作到機器人
@@ -417,21 +440,30 @@ def execute_advanced_command(cmd_id):
         db.session.commit()
         
         # 返回結果
-        response = {
-            'success': result['success'],
-            'message': result['message'],
-            'command_id': cmd_record.id,
-            'details': result.get('details')
-        }
-        
-        status_code = 200 if result['success'] else 500
-        return jsonify(response), status_code
+        if result['success']:
+            response = {
+                'success': True,
+                'message': result['message'],
+                'command_id': cmd_record.id,
+                'details': result.get('details')
+            }
+            return jsonify(response), 200
+        else:
+            # 發送失敗時只返回通用錯誤訊息，詳細錯誤已記錄到日誌
+            logging.warning(f'發送指令到機器人失敗: {result["message"]}')
+            response = {
+                'success': False,
+                'message': '發送指令到機器人失敗，請稍後再試',
+                'command_id': cmd_record.id
+            }
+            return jsonify(response), 500
         
     except Exception as e:
+        # 記錄詳細錯誤到日誌（包含堆疊追蹤），但只返回通用訊息給用戶
         logging.error(f'執行進階指令時發生錯誤: {str(e)}', exc_info=True)
         return jsonify({
             'success': False,
-            'message': f'執行失敗：{str(e)}'
+            'message': '執行指令時發生內部錯誤，請聯繫管理員'
         }), 500
 
 

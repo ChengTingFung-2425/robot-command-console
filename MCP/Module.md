@@ -252,7 +252,7 @@
 - 同類型可形成機群；依 idle／busy 與負載分配。
 - 單一失敗自動重試其他實例（受限於語義與安全）。
 
-## 11. 機器人工具清單（由 機器人模組 管理）
+## 10. 機器人工具清單（由機器人模組管理）
 
 為了集中管理機器人可執行動作（便於能力查詢、版本化與對上游 API 的一致性），本專案將機器人模組的工具清單（原始位置：`Robot-Console/tools.py`）移交至 MCP 作為參考。MCP 會暴露能力查詢 API（例如：GET /api/robots/{robot_id}/capabilities 或 GET /api/tools），並提供每項工具的描述與參數 schema，以供 WebUI、LLM 代理與外部整合使用，並將這些項目傳遞給機器人模組。
 
@@ -303,11 +303,9 @@ wing_chun: 指示機器人執行詠春動作。
 - 版本化：工具的 schema 與描述會以版本號管理（例如：tools.v1、tools.v2），避免破壞向後相容性。
 - 同步機制：Robot-Console 仍保留 `tools.py` 作為本地執行器映射與快速測試用，但任何權威變更需先在 MCP 的工具庫中更新，並透過 CI 或同步腳本下放到 Robot-Console（參見後述遷移說明）。
 
-## 10. 下一步（Roadmap）
+## 11. 下一步（Roadmap）
 - 實作機器人註冊 API（POST /api/robots/register）。
 - 實作進階指令 API（POST／GET /api/advanced_commands）。
 - 文件化協定適配器介面（connect／send／receive／close、重試／超時）。
 - 與 WebUI 對齊審批／介入操作 API 與事件語意（含 E-Stop 優先級）。
 - 擴充錯誤碼表與狀態機定義；補齊整合測試。
-
-````

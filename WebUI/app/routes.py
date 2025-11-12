@@ -100,6 +100,26 @@ def list_robots():
     ])
 
 
+# 媒體串流頁面
+@bp.route('/media_stream', methods=['GET'])
+@bp.route('/media_stream/<int:robot_id>', methods=['GET'])
+@login_required
+def media_stream(robot_id=None):
+    """媒體串流頁面"""
+    robots = Robot.query.filter_by(owner=current_user).all()
+    robot = None
+    if robot_id:
+        robot = Robot.query.get_or_404(robot_id)
+        # 確保用戶有權限存取此機器人
+        if robot.owner != current_user:
+            abort(403)
+    elif robots:
+        # 預設選擇第一個機器人
+        robot = robots[0]
+    
+    return render_template('media_stream.html.j2', robots=robots, robot=robot)
+
+
 # 指令下達（支援表單與 API）
 @bp.route('/commands', methods=['POST'])
 def send_command():

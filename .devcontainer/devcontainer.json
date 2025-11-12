@@ -6,7 +6,7 @@
     "cpus": 2
   },
   "waitFor": "onCreateCommand",
-  "postCreateCommand": "",
+  "postCreateCommand": "cd WebUI && flask --debug run --host=0.0.0.0 --port=5000 & sleep 5",
   "portsAttributes": {
     "5000": {
       "label": "Flask Apps",

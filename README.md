@@ -24,6 +24,18 @@
 - 執行器抽象與模擬（便於開發與測試）。
 - 日誌、監控與事件記錄。
 
+## ⚠️ 重要變更：進階指令職責轉移
+
+**從 2025-11-12 開始，進階指令的解碼已從 Robot-Console 轉移到 WebUI 處理。**
+
+- **Robot-Console** 現在只接收預先解碼的基礎動作列表
+- **WebUI** 負責進階指令的展開和使用者互動
+- 向後相容：仍支援舊格式（可選啟用）
+
+詳細說明請參閱：
+- [進階指令職責變更說明](docs/ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md)
+- [遷移指南](Robot-Console/MIGRATION_GUIDE.md)
+
 ## 快速啟動（開發者）
 
 1. 建立虛擬環境並安裝依賴（請根據不同子專案執行相應 requirements.txt）：

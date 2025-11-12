@@ -1,8 +1,81 @@
 {% extends "base.html.j2" %}
-{% import 'bootstrap/wtf.html' as wtf %}
+
 {% block app_content %}
-    <h1>{{ _('Edit Profile') }}</h1>
-    <div class="row">
-        <div class="col-md-4">{{ wtf.quick_form(form) }}</div>
+<div class="container">
+    <div class="row" style="margin-top: 20px;">
+        <div class="col-md-8 col-md-offset-2">
+            <div class="panel panel-primary">
+                <div class="panel-heading">
+                    <h3 class="panel-title">
+                        <span class="glyphicon glyphicon-edit"></span> 編輯使用者檔案
+                    </h3>
+                </div>
+                <div class="panel-body">
+                    <form method="POST" class="form-horizontal">
+                        <div class="form-group">
+                            <label for="username" class="col-sm-2 control-label">用戶名稱</label>
+                            <div class="col-sm-10">
+                                <p class="form-control-static">{{ current_user.username }}</p>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="email" class="col-sm-2 control-label">電子郵件</label>
+                            <div class="col-sm-10">
+                                <p class="form-control-static">{{ current_user.email }}</p>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <h4 style="margin-top: 20px;">介面設定</h4>
+
+                        <div class="form-group">
+                            <label for="ui_duration_unit" class="col-sm-2 control-label">時間單位</label>
+                            <div class="col-sm-10">
+                                <select class="form-control" name="ui_duration_unit" id="ui_duration_unit">
+                                    <option value="s" {% if current_user.ui_duration_unit == 's' %}selected{% endif %}>
+                                        秒 (s)
+                                    </option>
+                                    <option value="ms" {% if current_user.ui_duration_unit == 'ms' %}selected{% endif %}>
+                                        毫秒 (ms)
+                                    </option>
+                                </select>
+                                <p class="help-block">選擇您偏好的時間單位顯示方式</p>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="ui_verify_collapsed" class="col-sm-2 control-label">認證設定</label>
+                            <div class="col-sm-10">
+                                <div class="checkbox">
+                                    <label>
+                                        <input type="checkbox" name="ui_verify_collapsed" 
+                                               {% if current_user.ui_verify_collapsed %}checked{% endif %}>
+                                        預設隱藏認證區域
+                                    </label>
+                                </div>
+                                <p class="help-block">勾選此選項將在頁面載入時預設隱藏認證區域</p>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <div class="form-group">
+                            <div class="col-sm-offset-2 col-sm-10">
+                                <button type="submit" class="btn btn-primary">
+                                    <span class="glyphicon glyphicon-ok"></span> 保存變更
+                                </button>
+                                <a href="{{ url_for('webui.user_profile', username=current_user.username) }}" 
+                                   class="btn btn-default">
+                                    <span class="glyphicon glyphicon-remove"></span> 取消
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
+</div>
 {% endblock %}

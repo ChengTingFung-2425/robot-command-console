@@ -12,60 +12,98 @@ from flask_moment import Moment
 from flask_babel import Babel
 from config import Config
 
-# app 實例與初始化
-app = Flask(__name__)
-app.config.from_object(Config)
-# Configure SQLAlchemy. Set session options so objects are not expired on commit
-# which makes testing patterns (creating objects then accessing them across
-# commits) more convenient.
+# Database and extensions
 db = SQLAlchemy(session_options={"expire_on_commit": False})
-db.init_app(app)
-migrate = Migrate(app, db)
+migrate = Migrate()
 login = LoginManager()
-login.login_view = "webui.login"  # type: ignore[assignment]
-login.init_app(app)
-mail = Mail(app)
-bootstrap = Bootstrap(app)
-moment = Moment(app)
-babel = Babel(app)
+mail = Mail()
+bootstrap = Bootstrap()
+moment = Moment()
+babel = Babel()
 
-# logging 設定（如需）
-if not app.debug:
-    root = logging.getLogger()
-    if app.config["MAIL_SERVER"]:
-        auth = None
-        if app.config['MAIL_USERNAME'] or app.config['MAIL_PASSWORD']:
-            auth = (app.config['MAIL_USERNAME'], app.config['MAIL_PASSWORD'])
-        secure = None
-        if app.config['MAIL_USE_TLS']:
-            secure = ()
-        mail_handler = SMTPHandler(
-            mailhost=(app.config['MAIL_SERVER'], app.config['MAIL_PORT']),
-            fromaddr='no-reply@' + app.config['MAIL_SERVER'],
-            toaddrs=app.config['ADMINS'], subject='Microblog Failure',
-            credentials=auth, secure=secure)
-        mail_handler.setLevel(logging.ERROR)
-        root.addHandler(mail_handler)
+# Global app instance for backward compatibility
+app = None
 
-    if not os.path.exists('logs'):
-        os.mkdir('logs')
-    file_handler = RotatingFileHandler('logs/microblog.log', maxBytes=10240,
-                                       backupCount=10)
-    file_handler.setFormatter(logging.Formatter(
-        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'))
-    file_handler.setLevel(logging.INFO)
-    root.addHandler(file_handler)
-    root.setLevel(logging.INFO)
-    root.info('Microblog startup')
 
-@babel.localeselector
-def get_locale():
-    return request.accept_languages.best_match(app.config['LANGUAGES'])
+def create_app(config_name='default'):
+    """Create and configure Flask application instance."""
+    global app
+    
+    flask_app = Flask(__name__)
+    
+    # Apply configuration
+    if config_name == 'testing':
+        flask_app.config['TESTING'] = True
+        flask_app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+        flask_app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+        flask_app.config['SECRET_KEY'] = 'test-secret-key'
+        flask_app.config['WTF_CSRF_ENABLED'] = False
+        flask_app.config['LANGUAGES'] = ['en', 'es', 'zh']
+    else:
+        flask_app.config.from_object(Config)
+    
+    # Initialize extensions
+    db.init_app(flask_app)
+    migrate.init_app(flask_app, db)
+    login.init_app(flask_app)
+    login.login_view = "webui.login"
+    mail.init_app(flask_app)
+    bootstrap.init_app(flask_app)
+    moment.init_app(flask_app)
+    babel.init_app(flask_app)
+    
+    # Configure logging (only for non-testing)
+    if not flask_app.testing and not flask_app.debug:
+        root = logging.getLogger()
+        if flask_app.config.get("MAIL_SERVER"):
+            auth = None
+            if flask_app.config.get('MAIL_USERNAME') or flask_app.config.get('MAIL_PASSWORD'):
+                auth = (flask_app.config['MAIL_USERNAME'], flask_app.config['MAIL_PASSWORD'])
+            secure = None
+            if flask_app.config.get('MAIL_USE_TLS'):
+                secure = ()
+            mail_handler = SMTPHandler(
+                mailhost=(flask_app.config['MAIL_SERVER'], flask_app.config['MAIL_PORT']),
+                fromaddr='no-reply@' + flask_app.config['MAIL_SERVER'],
+                toaddrs=flask_app.config['ADMINS'], subject='Microblog Failure',
+                credentials=auth, secure=secure)
+            mail_handler.setLevel(logging.ERROR)
+            root.addHandler(mail_handler)
 
-# You must keep the routes registration at the end.
-# Register blueprint for WebUI routes
-from WebUI.app.routes import bp as webui_bp
-app.register_blueprint(webui_bp)
+        if not os.path.exists('logs'):
+            os.mkdir('logs')
+        file_handler = RotatingFileHandler('logs/microblog.log', maxBytes=10240,
+                                           backupCount=10)
+        file_handler.setFormatter(logging.Formatter(
+            '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'))
+        file_handler.setLevel(logging.INFO)
+        root.addHandler(file_handler)
+        root.setLevel(logging.INFO)
+        root.info('Microblog startup')
 
-# Register error handlers (import after app is set up)
-from WebUI.app import errors
+    @babel.localeselector
+    def get_locale():
+        return request.accept_languages.best_match(flask_app.config['LANGUAGES'])
+
+    # Register blueprint for WebUI routes
+    from WebUI.app.routes import bp as webui_bp
+    flask_app.register_blueprint(webui_bp)
+
+    # Register error handlers
+    from WebUI.app.errors import register_error_handlers
+    register_error_handlers(flask_app)
+
+    # Create app context and update global app
+    if app is None:
+        app = flask_app
+    
+    return flask_app
+
+
+# Create default app instance for backward compatibility
+try:
+    app = create_app()
+except:
+    # If we can't create the app in this context (e.g., during testing), 
+    # we'll create it explicitly in tests
+    pass

@@ -148,3 +148,143 @@
   - 映像預設不在容器內終止 TLS，而是將 HTTP（5000）暴露出來；生產環境建議放置反向代理（nginx）處理 TLS 與靜態檔。 
   - 若希望我把現有根目錄中的 Docker 文件（若仍存在複製）移除或同步到 `WebUI/docker/`，或加入 `nginx` + TLS 範例，請回覆我想要的選項，我將清理與補齊必要的 CI 與文件。
 
+## 11. API 端點說明
+
+### 11.1 進階指令執行
+
+#### POST `/advanced_commands/<cmd_id>/execute`
+
+執行已批准的進階指令：展開為基礎動作序列並發送到指定機器人的 Robot-Console 執行佇列。
+
+**需要認證**：是（需要登入）
+
+**請求參數**：
+- Path 參數：
+  - `cmd_id` (integer): 進階指令的 ID
+
+- Body（JSON）：
+```json
+{
+  "robot_id": 1  // 目標機器人 ID（必填）
+}
+```
+
+**權限要求**：
+- 用戶必須是機器人的擁有者，或
+- 用戶必須具有 admin/auditor 角色
+
+**處理流程**：
+1. 驗證進階指令狀態（必須為 `approved`）
+2. 驗證用戶權限（必須擁有該機器人）
+3. 展開進階指令：
+   - 從資料庫載入 `base_commands` JSON
+   - 解析為動作序列：`[{"command": "go_forward"}, ...] → ["go_forward", ...]`
+   - 驗證所有動作都是有效的基礎動作（參照 Robot-Console/action_executor.py）
+4. 構建符合 Robot-Console 期望的格式：`{"actions": ["go_forward", "turn_left", ...]}`
+5. 發送到機器人（目前記錄到日誌，實際傳輸機制待整合）
+6. 建立 Command 記錄到資料庫
+
+**成功回應**（200 OK）：
+```json
+{
+  "success": true,
+  "message": "已發送 3 個動作到機器人 test_robot",
+  "command_id": 123,
+  "details": {
+    "robot_id": 1,
+    "robot_name": "test_robot",
+    "actions_count": 3,
+    "actions": ["go_forward", "turn_left", "stand"]
+  }
+}
+```
+
+**錯誤回應**：
+- 400 Bad Request：缺少 robot_id 或進階指令格式錯誤
+```json
+{
+  "success": false,
+  "message": "缺少必要參數：robot_id"
+}
+```
+
+- 403 Forbidden：未批准的指令或無權限控制該機器人
+```json
+{
+  "success": false,
+  "message": "只能執行已批准的進階指令（當前狀態：pending）"
+}
+```
+
+- 404 Not Found：進階指令或機器人不存在
+
+- 500 Internal Server Error：執行失敗
+```json
+{
+  "success": false,
+  "message": "執行失敗：..."
+}
+```
+
+**相關函式**：
+- `expand_advanced_command(advanced_cmd)`: 展開進階指令為動作列表
+- `send_actions_to_robot(robot, actions)`: 發送動作到機器人（整合 MQTT）
+
+**傳輸機制**：
+- **主要方式**：透過 MQTT 直接發送到機器人主題 `{robot_name}/topic`
+- **MQTT 配置**：需要在環境變數中啟用（`MQTT_ENABLED=true`）
+- **備用方案**：MQTT 不可用時記錄到日誌（用於測試環境）
+- **訊息格式**：`{"actions": ["go_forward", "turn_left", ...]}`
+- **QoS**：AT_LEAST_ONCE（確保訊息送達）
+
+**MQTT 整合**：
+- 使用 AWS IoT Core MQTT5 協定
+- 單例模式管理連接（避免重複連接）
+- 自動使用機器人憑證進行身份驗證
+- 線程安全的實作
+
+**測試覆蓋**：參見 `Test/test_advanced_command_execution.py`
+
+**安全性**：
+- 所有錯誤訊息已脫敏處理
+- 堆疊追蹤資訊僅記錄到伺服器日誌
+- 返回給用戶的錯誤訊息通用化
+
+### 11.2 MQTT 配置說明
+
+WebUI 使用 MQTT 客戶端將進階指令發送到機器人的 Robot-Console。
+
+**環境變數**：
+```bash
+# 啟用 MQTT
+MQTT_ENABLED=true
+
+# MQTT broker 地址（AWS IoT Core）
+MQTT_BROKER=a1qlex7vqi1791-ats.iot.us-east-1.amazonaws.com
+
+# MQTT 端口（TLS）
+MQTT_PORT=8883
+
+# 憑證路徑
+MQTT_CERT_PATH=/path/to/certificates
+
+# CA 憑證
+MQTT_CA_CERT=AmazonRootCA1.pem
+
+# 超時設定（秒）
+MQTT_TIMEOUT=5
+```
+
+**憑證結構**：
+```
+certificates/
+├── AmazonRootCA1.pem
+└── robot_7/
+    ├── robot_7.cert.pem
+    └── robot_7.private.key
+```
+
+**相關模組**：
+- `WebUI/app/mqtt_client.py`: MQTT 客戶端管理器
+- `config.py`: MQTT 配置選項
+

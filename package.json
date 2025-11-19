@@ -1,0 +1,48 @@
+{
+  "name": "robot-command-console",
+  "version": "1.0.0",
+  "description": "本專案（robot-command-console）是一個用於機器人指令管理、路由與執行的整合式控制台與服務平台。目標是提供一套模組化、可測試且可部署的系統，用來接收、驗證、路由並執行來自各種介面（WebUI、API、排程或其他整合服務）的指令，同時保留豐富的日誌、驗證與合約（schema）檢查。",
+  "main": "main.js",
+  "directories": {
+    "doc": "docs",
+    "example": "examples"
+  },
+  "scripts": {
+    "start": "electron .",
+    "start:dev": "NODE_ENV=development electron .",
+    "build": "electron-builder --linux",
+    "build:appimage": "electron-builder --linux AppImage",
+    "test": "node test_integration.js"
+  },
+  "keywords": [
+    "robot",
+    "command",
+    "console",
+    "electron",
+    "flask"
+  ],
+  "author": "",
+  "license": "ISC",
+  "build": {
+    "appId": "com.robotcommandconsole.app",
+    "productName": "Robot Command Console",
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Development"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "flask_service.py",
+      "renderer/**/*",
+      "node_modules/**/*"
+    ],
+    "extraResources": []
+  },
+  "devDependencies": {
+    "electron": "^39.2.2",
+    "electron-builder": "^26.0.12"
+  }
+}

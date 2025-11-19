@@ -129,6 +129,15 @@ dmypy.json
 
 logs/*
 
+# Node / Electron
+node_modules/
+package-lock.json
+dist/
+*.AppImage
+*.deb
+*.rpm
+.electron-builder/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

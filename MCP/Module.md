@@ -233,6 +233,57 @@
 - 資料最小化與脫敏；錯誤訊息不洩漏敏感資訊。
 
 ## 8. 完成定義（DoD）
+
+### Phase 1 合規性檢查清單 ✅
+
+**標準 JSON 契約強制執行：**
+- [x] 所有 API 請求/回應包含必要欄位 (trace_id, timestamp, actor, source 等)
+- [x] CommandRequest/CommandResponse/EventLog 完整 JSON Schema 驗證
+- [x] Schema 驗證器整合到所有 API 端點
+- [x] Pydantic 模型與 JSON Schema 雙重驗證
+
+**EventLog 發送與 trace_id 傳播：**
+- [x] 所有指令/API 呼叫發送 EventLog
+- [x] trace_id 在整個請求鏈中傳播並返回
+- [x] Auth 失敗事件（身份驗證、授權）
+- [x] 驗證失敗事件
+- [x] 指令生命週期事件（accepted, running, succeeded, failed）
+
+**AuthN/AuthZ 實作：**
+- [x] JWT Token 驗證與生成
+- [x] RBAC 權限檢查 (admin, operator, viewer)
+- [x] Auth 失敗時返回標準錯誤響應
+- [x] 所有 auth 事件審計日誌記錄
+- [x] Token 在所有需要的端點強制執行
+
+**TDD 測試覆蓋：**
+- [x] 成功路徑測試 (test_contract_compliance.py)
+- [x] 驗證失敗測試 (schema 不合規)
+- [x] Auth 失敗測試 (無效/缺失 token, 權限不足)
+- [x] 超時測試 (錯誤處理)
+- [x] 錯誤回應測試 (所有錯誤代碼)
+- [x] 契約驅動測試 (15 個 schema 測試 + 14 個 auth 測試 + 8 個整合測試)
+
+**文件更新：**
+- [x] Module.md 更新契約合規性
+- [x] DoD 檢查清單已加入
+- [x] 參考 proposal.md/Project.prompt.md
+
+### 測試覆蓋統計
+- **契約合規性測試**: 15 個測試全部通過
+- **認證授權測試**: 14 個測試全部通過
+- **指令處理整合測試**: 8 個測試全部通過
+- **總計**: 37 個測試，100% 通過率
+
+### 技術實作詳情
+1. **schema_validator.py**: JSON Schema 驗證器，支援 CommandRequest, CommandResponse, EventLog
+2. **auth_manager.py**: 增強審計日誌，記錄所有 auth 事件
+3. **command_handler.py**: 整合 schema 驗證，在所有關鍵點發送 EventLog
+4. **requirements.txt**: 新增 jsonschema>=4.20.0 依賴
+
+---
+
+**原 DoD（保留作為持續要求）：**
 - API 與資料契約文件化，附最小 JSON 範例。
 - 測試涵蓋：成功、驗證錯、授權錯、超時／重試、事件產生。
 - 事件／指標可查詢；錯誤碼表同步文件。

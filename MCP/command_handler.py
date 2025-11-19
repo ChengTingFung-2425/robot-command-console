@@ -21,6 +21,7 @@ from .models import (
     EventCategory,
     EventSeverity,
 )
+from .schema_validator import validator
 
 
 logger = logging.getLogger(__name__)
@@ -43,8 +44,43 @@ class CommandHandler:
         trace_id = request.trace_id
         
         try:
+            # 0. Schema 驗證
+            request_dict = request.dict()
+            # 確保 timestamp 為 ISO8601 格式
+            if isinstance(request_dict.get("timestamp"), str):
+                pass  # 已是字串
+            else:
+                request_dict["timestamp"] = request.timestamp.isoformat()
+            
+            is_valid, error_msg = validator.validate_command_request(request_dict)
+            if not is_valid:
+                await self._emit_event(
+                    trace_id,
+                    EventSeverity.WARN,
+                    EventCategory.COMMAND,
+                    f"指令驗證失敗: {error_msg}",
+                    {"command_id": command_id, "error": error_msg}
+                )
+                return self._create_error_response(
+                    trace_id,
+                    command_id,
+                    ErrorCode.ERR_VALIDATION,
+                    f"請求資料不符合 Schema: {error_msg}"
+                )
+            
             # 1. 驗證身份與授權
             if not await self._authenticate(request):
+                await self._emit_event(
+                    trace_id,
+                    EventSeverity.WARN,
+                    EventCategory.AUTH,
+                    f"身份驗證失敗: command_id={command_id}",
+                    {
+                        "command_id": command_id,
+                        "actor_id": request.actor.id,
+                        "actor_type": request.actor.type
+                    }
+                )
                 return self._create_error_response(
                     trace_id,
                     command_id,
@@ -53,6 +89,18 @@ class CommandHandler:
                 )
             
             if not await self._authorize(request):
+                await self._emit_event(
+                    trace_id,
+                    EventSeverity.WARN,
+                    EventCategory.AUTH,
+                    f"授權失敗: command_id={command_id}",
+                    {
+                        "command_id": command_id,
+                        "actor_id": request.actor.id,
+                        "action": request.command.type,
+                        "resource": request.command.target.robot_id
+                    }
+                )
                 return self._create_error_response(
                     trace_id,
                     command_id,
@@ -246,7 +294,10 @@ class CommandHandler:
         if not request.auth or not request.auth.get("token"):
             return False
         
-        return await self.auth_manager.verify_token(request.auth["token"])
+        return await self.auth_manager.verify_token(
+            request.auth["token"],
+            trace_id=request.trace_id
+        )
     
     async def _authorize(self, request: CommandRequest) -> bool:
         """授權檢查"""

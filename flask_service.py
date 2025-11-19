@@ -135,7 +135,8 @@ def after_request(response):
             'duration_seconds': duration
         })
     
-    ACTIVE_CONNECTIONS.dec()
+    if hasattr(g, 'start_time'):
+        ACTIVE_CONNECTIONS.dec()
     
     # 添加 correlation ID 到 response headers
     if hasattr(g, 'correlation_id'):

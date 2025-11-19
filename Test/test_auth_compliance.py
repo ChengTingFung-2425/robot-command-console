@@ -17,9 +17,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from MCP.auth_manager import AuthManager
 from MCP.logging_monitor import LoggingMonitor
 from MCP.models import (
-    Event,
     EventCategory,
-    EventSeverity,
 )
 
 

@@ -10,13 +10,13 @@ from typing import Any, Dict, Optional, Tuple
 from jsonschema import Draft7Validator, ValidationError, validate
 from pydantic import ValidationError as PydanticValidationError
 
-from .models import (
-    CommandRequest,
-    CommandResponse,
-    Event,
-    EventCategory,
-    EventSeverity,
-)
+# from .models import (
+#     CommandRequest,
+#     CommandResponse,
+#     Event,
+#     EventCategory,
+#     EventSeverity,
+# )
 
 
 logger = logging.getLogger(__name__)

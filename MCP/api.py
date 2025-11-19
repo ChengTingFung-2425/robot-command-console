@@ -187,6 +187,17 @@ async def track_requests(request: Request, call_next):
             error_type=type(e).__name__
         ).inc()
         
+        # 在異常時也記錄 REQUEST_COUNT 和 REQUEST_LATENCY
+        REQUEST_COUNT.labels(
+            method=request.method,
+            endpoint=request.url.path,
+            status=500
+        ).inc()
+        REQUEST_LATENCY.labels(
+            method=request.method,
+            endpoint=request.url.path
+        ).observe(duration)
+        
         raise
 
 

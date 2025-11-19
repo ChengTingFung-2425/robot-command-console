@@ -363,7 +363,7 @@ class TestCommandHandlerCompliance(unittest.TestCase):
         )
         
         # 處理指令
-        response = self.loop.run_until_complete(
+        self.loop.run_until_complete(
             self.handler.process_command(request)
         )
         

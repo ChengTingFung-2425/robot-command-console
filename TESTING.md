@@ -177,14 +177,7 @@ ls -lh dist/*.AppImage
 
 應看到類似：
 ```
--rwxr-xr-x 1 user user 150M Nov 19 03:00 robot-command-console-1.0.0.AppImage
-```
-
-### 測試 AppImage（如果在 Linux 上）
-
-```bash
-chmod +x dist/robot-command-console-*.AppImage
-./dist/robot-command-console-*.AppImage
+-rwxr-xr-x 1 user user 150M Nov 19 03:00 Robot Command Console-1.0.0.AppImage
 ```
 
 ## 疑難排解

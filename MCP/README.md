@@ -57,8 +57,31 @@ python api.py
 - GET /api/command/{command_id} — 查詢指令狀態
 - POST /api/robots/register — 註冊機器人
 - GET /health — 健康檢查
+- GET /metrics — Prometheus metrics 端點（可觀測性）
 
 完整 API 列表請參考程式碼路由或 Module.md。
+
+## 可觀測性（Observability）
+
+MCP 服務已整合 Prometheus metrics 和結構化 JSON 日誌：
+
+### Metrics
+訪問 `http://localhost:8000/metrics` 取得即時指標，包括：
+- 請求計數和延遲
+- 指令處理統計
+- 機器人註冊數量
+- WebSocket 連線數
+- 錯誤率統計
+
+### 結構化日誌
+所有日誌以 JSON 格式輸出，包含：
+- timestamp（ISO 8601 格式）
+- level（DEBUG, INFO, WARN, ERROR）
+- trace_id（用於分散式追蹤）
+- correlation_id（跨服務追蹤）
+- 詳細的上下文資訊
+
+詳細說明請參閱專案根目錄的 [可觀測性指南](../docs/observability.md)。
 
 ## 設定選項（環境變數）
 

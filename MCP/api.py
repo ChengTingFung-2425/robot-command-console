@@ -61,8 +61,8 @@ app.add_middleware(
 
 # 初始化模組
 context_manager = ContextManager()
-auth_manager = AuthManager()
 logging_monitor = LoggingMonitor()
+auth_manager = AuthManager(logging_monitor=logging_monitor)
 robot_router = RobotRouter()
 llm_processor = LLMProcessor()
 command_handler = CommandHandler(

@@ -19,10 +19,11 @@ logger = logging.getLogger(__name__)
 class AuthManager:
     """認證授權管理器"""
     
-    def __init__(self):
+    def __init__(self, logging_monitor=None):
         """初始化管理器"""
         self.users: Dict[str, Dict[str, Any]] = {}
         self.roles: Dict[str, Dict[str, Any]] = {}
+        self.logging_monitor = logging_monitor
         self._init_default_roles()
     
     def _init_default_roles(self):
@@ -48,7 +49,7 @@ class AuthManager:
             }
         }
     
-    async def verify_token(self, token: str) -> bool:
+    async def verify_token(self, token: str, trace_id: Optional[str] = None) -> bool:
         """驗證 Token"""
         try:
             payload = jwt.decode(
@@ -61,15 +62,32 @@ class AuthManager:
             exp = payload.get("exp")
             if exp and datetime.fromtimestamp(exp) < datetime.utcnow():
                 logger.warning("Token 已過期")
+                await self._log_audit_event(
+                    trace_id or "unknown",
+                    "token_expired",
+                    {"user_id": payload.get("user_id")}
+                )
                 return False
             
+            # 記錄成功驗證（僅在 DEBUG 模式）
+            logger.debug(f"Token 驗證成功: user_id={payload.get('user_id')}")
             return True
             
         except jwt.InvalidTokenError as e:
             logger.warning(f"Token 驗證失敗: {e}")
+            await self._log_audit_event(
+                trace_id or "unknown",
+                "token_invalid",
+                {"error": str(e)}
+            )
             return False
         except Exception as e:
             logger.error(f"Token 驗證錯誤: {e}")
+            await self._log_audit_event(
+                trace_id or "unknown",
+                "token_error",
+                {"error": str(e)}
+            )
             return False
     
     async def check_permission(
@@ -180,3 +198,29 @@ class AuthManager:
     def _verify_password(self, password: str, password_hash: str) -> bool:
         """驗證密碼（使用 bcrypt）"""
         return bcrypt.verify(password, password_hash)
+    
+    async def _log_audit_event(
+        self,
+        trace_id: str,
+        action: str,
+        context: Dict[str, Any]
+    ):
+        """記錄審計事件"""
+        if not self.logging_monitor:
+            return
+        
+        from .models import Event, EventSeverity, EventCategory
+        
+        event = Event(
+            trace_id=trace_id,
+            timestamp=datetime.utcnow(),
+            severity=EventSeverity.INFO,
+            category=EventCategory.AUDIT,
+            message=f"Auth action: {action}",
+            context=context
+        )
+        
+        try:
+            await self.logging_monitor.emit_event(event)
+        except Exception as e:
+            logger.error(f"Failed to log audit event: {e}")

@@ -11,6 +11,7 @@ httpx>=0.25.0
 
 # 資料驗證
 pydantic>=2.5.0
+jsonschema>=4.20.0
 
 # 認證
 PyJWT>=2.8.0

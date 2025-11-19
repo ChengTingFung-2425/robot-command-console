@@ -33,11 +33,16 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
         log_record['timestamp'] = datetime.now(timezone.utc).isoformat()
         log_record['level'] = record.levelname
         log_record['event'] = record.name
-        # 添加 request_id 如果存在
-        if hasattr(g, 'request_id'):
-            log_record['request_id'] = g.request_id
-        if hasattr(g, 'correlation_id'):
-            log_record['correlation_id'] = g.correlation_id
+        log_record['service'] = 'flask-service'
+        # 添加 request_id 如果在請求上下文中
+        try:
+            if hasattr(g, 'request_id'):
+                log_record['request_id'] = g.request_id
+            if hasattr(g, 'correlation_id'):
+                log_record['correlation_id'] = g.correlation_id
+        except RuntimeError:
+            # 不在請求上下文中，略過
+            pass
 
 # 配置日誌處理器
 log_handler = logging.StreamHandler(sys.stdout)

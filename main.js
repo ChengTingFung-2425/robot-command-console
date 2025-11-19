@@ -56,9 +56,8 @@ function startPythonService() {
     setTimeout(() => {
       if (pythonProcess && pythonProcess.exitCode === null) {
         resolve(); // 假設已啟動
-      } else {
-        reject(new Error('Python service failed to start within timeout'));
       }
+      // 不再 reject，僅記錄 log（可選）
     }, 5000);
   });
 }

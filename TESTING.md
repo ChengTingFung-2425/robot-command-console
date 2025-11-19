@@ -180,6 +180,13 @@ ls -lh dist/*.AppImage
 -rwxr-xr-x 1 user user 150M Nov 19 03:00 Robot Command Console-1.0.0.AppImage
 ```
 
+### 測試 AppImage（如果在 Linux 上）
+
+```bash
+chmod +x "dist/Robot Command Console-"*.AppImage
+"./dist/Robot Command Console-"*.AppImage
+```
+
 ## 疑難排解
 
 ### Flask 無法啟動

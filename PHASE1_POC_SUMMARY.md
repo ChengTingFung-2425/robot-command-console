@@ -217,7 +217,7 @@ node test_integration.js
 
 ## Phase 2 規劃
 
-- [ ] Token 自動刷新機制
+- [ ] Token 過期與自動刷新機制
 - [ ] Flask 錯誤監控與自動重啟
 - [ ] 生產級 WSGI 伺服器整合
 - [ ] CI/CD pipeline

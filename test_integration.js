@@ -43,10 +43,10 @@ function startPythonService(token) {
       console.log(`Flask service exited with code ${code}`);
     });
     
-    // 給服務一些時間啟動
+    // 等待一小段時間讓服務開始啟動，然後透過健康檢查確認
     setTimeout(() => {
       resolve(pythonProcess);
-    }, 3000);
+    }, 1000);
   });
 }
 

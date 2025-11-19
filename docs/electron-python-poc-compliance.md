@@ -346,17 +346,28 @@ try {
 
 ### Token 管理
 
-1. **儲存**: 使用 Electron 的 safe-storage API
+1. **儲存**: 使用 Electron 的 safeStorage API，**切勿將敏感資訊存於 localStorage！**
+
+   > ⚠️ **警告：此範例僅供教學，生產環境請勿將敏感資訊存於 localStorage，建議將加密 token 儲存於檔案系統或僅於記憶體中暫存。**
+
    ```javascript
-   const { safeStorage } = require('electron');
-   
+   // 需在主程序 (main process) 執行
+   const { app, safeStorage } = require('electron');
+   const fs = require('fs');
+   const path = require('path');
+
+   // 取得 appData 目錄下的 token 儲存路徑
+   const tokenPath = path.join(app.getPath('userData'), 'token.enc');
+
    // 儲存 token
    const encryptedToken = safeStorage.encryptString(token);
-   localStorage.setItem('token', encryptedToken.toString('base64'));
-   
+   fs.writeFileSync(tokenPath, encryptedToken);
+
    // 讀取 token
-   const buffer = Buffer.from(localStorage.getItem('token'), 'base64');
-   const token = safeStorage.decryptString(buffer);
+   if (fs.existsSync(tokenPath)) {
+     const encryptedBuffer = fs.readFileSync(tokenPath);
+     const token = safeStorage.decryptString(encryptedBuffer);
+   }
    ```
 
 2. **自動刷新**: 在 token 即將過期時自動刷新

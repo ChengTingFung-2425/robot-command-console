@@ -231,22 +231,26 @@ Content-Type: application/json
 2. 開啟 DevTools: `npm run start:dev`
 3. 查看控制台錯誤訊息
 
-## 已知限制
+## 已知限制（Phase 1 範圍）
 
-1. **單一 Token**: 目前每次啟動生成一個固定 token，無刷新機制
-2. **無持久化**: Token 不保存，每次重啟都會變更
-3. **基礎錯誤處理**: 錯誤處理較簡單，未涵蓋所有情況
-4. **無 CI**: 此 POC 不包含 CI 配置
-5. **Linux Only**: 主要測試 Linux，其他平台未完整測試
+Phase 1 POC 專注於基本整合驗證，以下為有意的限制，將在後續階段改進：
 
-## 下一步（未包含在此 PR）
+1. **單一 Token**: 目前每次啟動生成一個固定 token，無刷新機制（Phase 2）
+2. **無持久化**: Token 不保存，每次重啟都會變更（Phase 2）
+3. **基礎錯誤處理**: 錯誤處理較簡單，未涵蓋所有情況（Phase 2）
+4. **無 CI**: 此 POC 不包含 CI 配置（依問題說明，CI 不在此 PR 範圍）
+5. **Linux Only**: 主要測試 Linux，其他平台未完整測試（Phase 2）
+
+## Phase 2 計劃功能
 
 - [ ] CI/CD 配置
 - [ ] Token 刷新機制
+- [ ] Flask 錯誤自動恢復
 - [ ] 更多 API 端點
 - [ ] 整合完整的 MCP 後端
 - [ ] WebSocket 即時通訊
-- [ ] macOS 和 Windows 支援
+- [ ] macOS 和 Windows 完整支援
+- [ ] 生產級 WSGI 伺服器（gunicorn/uwsgi）
 
 ## 參考文件
 

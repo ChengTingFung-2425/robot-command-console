@@ -233,8 +233,10 @@ chmod +x dist/robot-command-console-*.AppImage
 - Electron 視窗開啟：< 10 秒
 - 記憶體使用：< 200MB（含 Python）
 
-## 已知問題
+## 已知限制（Phase 2 改進項目）
 
-1. **開發模式警告**: Flask 顯示 "This is a development server" 警告 - 這是正常的，生產環境應使用 gunicorn 或 uwsgi
-2. **無 Token 刷新**: Token 在應用生命週期內固定，無自動刷新機制
-3. **無錯誤恢復**: Flask 崩潰後 Electron 不會自動重啟服務
+以下項目在 Phase 1 POC 中屬於已知限制，將在 Phase 2 中改進：
+
+1. **開發模式警告**: Flask 顯示 "This is a development server" 警告 - 這是正常的，生產環境應使用 gunicorn 或 uwsgi（Phase 2）
+2. **無 Token 刷新**: Token 在應用生命週期內固定，無自動刷新機制（Phase 2）
+3. **無錯誤恢復**: Flask 崩潰後 Electron 不會自動重啟服務（Phase 2）

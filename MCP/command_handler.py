@@ -46,12 +46,19 @@ class CommandHandler:
         try:
             # 0. Schema 驗證
             request_dict = request.dict()
-            # 確保 timestamp 為 ISO8601 格式
-            if isinstance(request_dict.get("timestamp"), str):
-                pass  # 已是字串
+            # 確保 timestamp 為 ISO8601 格式字串，並驗證格式
+            ts = request.timestamp
+            if isinstance(ts, datetime):
+                request_dict["timestamp"] = ts.isoformat() + "Z"
+            elif isinstance(ts, str):
+                try:
+                    # 支援 "Z" 結尾的 ISO8601
+                    datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                    request_dict["timestamp"] = ts
+                except (ValueError, TypeError):
+                    request_dict["timestamp"] = datetime.utcnow().isoformat() + "Z"
             else:
-                request_dict["timestamp"] = request.timestamp.isoformat()
-            
+                request_dict["timestamp"] = datetime.utcnow().isoformat() + "Z"
             is_valid, error_msg = validator.validate_command_request(request_dict)
             if not is_valid:
                 await self._emit_event(

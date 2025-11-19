@@ -49,7 +49,7 @@ curl http://127.0.0.1:5000/metrics
 rate(flask_request_count_total[5m])
 
 # 95% 請求延遲
-histogram_quantile(0.95, flask_request_latency_seconds)
+histogram_quantile(0.95, rate(flask_request_latency_seconds_bucket[5m]))
 
 # 錯誤率
 rate(flask_error_count_total[5m])

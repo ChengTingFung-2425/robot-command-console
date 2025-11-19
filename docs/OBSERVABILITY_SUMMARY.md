@@ -221,7 +221,7 @@ scrape_configs:
 rate(flask_request_count_total[5m])
 
 # 95% 延遲
-histogram_quantile(0.95, flask_request_latency_seconds_bucket)
+histogram_quantile(0.95, rate(flask_request_latency_seconds_bucket[5m]))
 
 # 錯誤率
 rate(flask_error_count_total[5m]) / rate(flask_request_count_total[5m])

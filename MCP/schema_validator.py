@@ -7,7 +7,7 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
 
-from jsonschema import Draft7Validator, ValidationError, validate
+from jsonschema import Draft7Validator, ValidationError
 from pydantic import ValidationError as PydanticValidationError
 
 # from .models import (

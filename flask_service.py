@@ -9,7 +9,7 @@ import os
 import sys
 from flask import Flask, jsonify, request
 from functools import wraps
-from datetime import datetime
+from datetime import datetime, timezone
 
 app = Flask(__name__)
 
@@ -63,7 +63,7 @@ def health_check():
     return jsonify({
         'status': 'healthy',
         'service': 'robot-command-console-flask',
-        'timestamp': datetime.utcnow().isoformat() + 'Z',
+        'timestamp': datetime.now(timezone.utc).isoformat(),
         'version': '1.0.0-poc'
     })
 
@@ -74,7 +74,7 @@ def api_ping():
     """測試端點：驗證 token 和往返通訊"""
     return jsonify({
         'message': 'pong',
-        'timestamp': datetime.utcnow().isoformat() + 'Z',
+        'timestamp': datetime.now(timezone.utc).isoformat(),
         'method': request.method,
         'authenticated': True
     })

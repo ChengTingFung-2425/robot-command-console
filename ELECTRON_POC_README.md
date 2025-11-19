@@ -12,7 +12,7 @@
 - **Electron**: v39.x
 - **Flask**: 2.x
 - **API 端口**: 5000
-- **認證**: Bearer Token (1小時有效期)
+- **認證**: Bearer Token（應用生命週期內有效）
 
 ## 架構
 

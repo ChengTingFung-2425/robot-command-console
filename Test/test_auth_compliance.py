@@ -9,7 +9,6 @@ import unittest
 import asyncio
 from datetime import datetime, timedelta
 from uuid import uuid4
-from unittest.mock import AsyncMock, MagicMock, patch
 
 # 添加 MCP 目錄到路徑
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))

@@ -509,9 +509,9 @@ describe('Electron-Python Integration', () => {
 
 發布 Electron 應用前：
 
-- [ ] Python 服務可執行檔已包含在應用包中
+- [ ] Python 服務可執行檔已納入應用包中
 - [ ] 依賴已正確打包（requirements.txt）
-- [ ] 配置檔案已包含（但不含敏感資訊）
+- [ ] 配置檔案已納入（但不含敏感資訊）
 - [ ] JWT Secret 透過環境變數或配置檔案設定
 - [ ] 健康檢查與錯誤恢復機制已測試
 - [ ] 所有 API 呼叫已符合契約

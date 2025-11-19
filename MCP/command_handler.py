@@ -44,7 +44,17 @@ class CommandHandler:
         trace_id = request.trace_id
         
         try:
-            # 0. Schema 驗證
+            # 0. Schema 驗證（延遲序列化以提升效能）
+            # 首先進行快速驗證必要欄位
+            if not request.trace_id or not request.command:
+                return self._create_error_response(
+                    trace_id,
+                    command_id,
+                    ErrorCode.ERR_VALIDATION,
+                    "缺少必要欄位: trace_id 或 command"
+                )
+            
+            # 僅在需要完整 schema 驗證時才序列化
             request_dict = request.dict()
             # 確保 timestamp 為 ISO8601 格式字串，並驗證格式
             ts = request.timestamp
@@ -59,6 +69,7 @@ class CommandHandler:
                     request_dict["timestamp"] = datetime.utcnow().isoformat() + "Z"
             else:
                 request_dict["timestamp"] = datetime.utcnow().isoformat() + "Z"
+            
             is_valid, error_msg = validator.validate_command_request(request_dict)
             if not is_valid:
                 await self._emit_event(

@@ -7,7 +7,7 @@ let mainWindow = null;
 let pythonProcess = null;
 let appToken = null;
 
-// 生成短期 token (1 小時有效)
+// 生成應用生命週期內有效的 token
 function generateToken() {
   return crypto.randomBytes(32).toString('hex');
 }

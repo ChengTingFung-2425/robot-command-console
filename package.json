@@ -12,7 +12,7 @@
     "start:dev": "NODE_ENV=development electron .",
     "build": "electron-builder --linux",
     "build:appimage": "electron-builder --linux AppImage",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node test_integration.js"
   },
   "keywords": [
     "robot",

@@ -47,7 +47,7 @@ class CLIRunner:
             '--workers',
             type=int,
             default=5,
-            help='Number of worker threads (default: 5)'
+            help='Number of worker coroutines (default: 5)'
         )
         
         parser.add_argument(

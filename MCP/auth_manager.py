@@ -90,6 +90,36 @@ class AuthManager:
             )
             return False
     
+    async def decode_token(self, token: str) -> Optional[Dict[str, Any]]:
+        """
+        解碼 Token 並返回 payload
+        
+        Args:
+            token: JWT token
+            
+        Returns:
+            Token payload，如果無效則返回 None
+        """
+        try:
+            payload = jwt.decode(
+                token,
+                MCPConfig.JWT_SECRET,
+                algorithms=[MCPConfig.JWT_ALGORITHM]
+            )
+            
+            # 檢查過期時間
+            exp = payload.get("exp")
+            if exp and datetime.fromtimestamp(exp) < datetime.utcnow():
+                return None
+            
+            return payload
+            
+        except jwt.InvalidTokenError:
+            return None
+        except Exception as e:
+            logger.error(f"Token 解碼錯誤: {e}")
+            return None
+    
     async def check_permission(
         self,
         user_id: str,

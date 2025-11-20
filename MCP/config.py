@@ -3,7 +3,7 @@ MCP 服務設定管理
 """
 
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 class MCPConfig:
@@ -22,7 +22,7 @@ class MCPConfig:
     # 認證設定
     JWT_SECRET = os.getenv("MCP_JWT_SECRET", "change-this-secret-key")
     JWT_ALGORITHM = "HS256"
-    JWT_EXPIRATION_HOURS = 24
+    JWT_EXPIRATION_HOURS = int(os.getenv("MCP_JWT_EXPIRATION_HOURS", "24"))
     
     # 指令處理設定
     COMMAND_TIMEOUT_MS = 10000  # 預設超時 10 秒
@@ -44,6 +44,10 @@ class MCPConfig:
     # SSL 設定
     SSL_VERIFY = os.getenv("MCP_SSL_VERIFY", "true").lower() in ("true", "1", "yes")
     
+    # 秘密儲存設定
+    SECRET_STORAGE_BACKEND = os.getenv("MCP_SECRET_STORAGE_BACKEND", "file")  # file, keychain, dpapi, chained
+    SECRET_STORAGE_FILE_PATH = os.getenv("MCP_SECRET_STORAGE_FILE_PATH")  # None = default path
+    
     @classmethod
     def get_config(cls) -> Dict[str, Any]:
         """取得所有設定"""
@@ -51,3 +55,32 @@ class MCPConfig:
             k: v for k, v in cls.__dict__.items()
             if not k.startswith("_") and k.isupper()
         }
+    
+    @classmethod
+    def get_secret_storage(cls):
+        """
+        獲取秘密儲存實例
+        
+        Returns:
+            SecretStorage 實例
+        """
+        from .secret_storage import (
+            FileSecretStorage,
+            KeychainSecretStorage,
+            DPAPISecretStorage,
+            create_default_storage
+        )
+        
+        backend = cls.SECRET_STORAGE_BACKEND.lower()
+        
+        if backend == "file":
+            return FileSecretStorage(cls.SECRET_STORAGE_FILE_PATH)
+        elif backend == "keychain":
+            return KeychainSecretStorage()
+        elif backend == "dpapi":
+            return DPAPISecretStorage()
+        elif backend == "chained":
+            return create_default_storage()
+        else:
+            # 預設使用鏈式儲存
+            return create_default_storage()

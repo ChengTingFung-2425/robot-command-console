@@ -176,7 +176,7 @@ MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
 7. 設定新密碼並驗證登入
 
 ### 單元測試
-建議在 `Test/Web/` 目錄下創建 `test_password_reset.py`：
+建議在 `tests/Web/` 目錄下創建 `test_password_reset.py`：
 - 測試 token 生成
 - 測試 token 驗證
 - 測試過期 token

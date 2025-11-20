@@ -202,10 +202,10 @@ Options:
 
 ```bash
 # 執行所有測試（包含新的佇列測試）
-python3 -m pytest Test/ -v
+python3 -m pytest tests/ -v
 
 # 只執行佇列測試
-python3 -m pytest Test/test_queue_system.py -v
+python3 -m pytest tests/test_queue_system.py -v
 ```
 
 ### 驗證 Electron 整合
@@ -326,7 +326,7 @@ service_manager = ServiceManager(queue=queue)
 
 - [Robot Service README](../src/robot_service/README.md) - 模組使用說明
 - [Queue Architecture](queue-architecture.md) - 佇列架構說明
-- [測試](../Test/test_queue_system.py) - 佇列系統測試
+- [測試](../tests/test_queue_system.py) - 佇列系統測試
 
 ## 支援
 

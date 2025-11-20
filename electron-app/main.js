@@ -30,7 +30,7 @@ function generateToken() {
 // 啟動 Python Flask 服務
 function startPythonService() {
   return new Promise((resolve, reject) => {
-    const pythonScript = path.join(__dirname, 'flask_service.py');
+    const pythonScript = path.join(__dirname, '..', 'flask_service.py');
     
     // 生成 token 並設定環境變數
     appToken = generateToken();

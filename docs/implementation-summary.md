@@ -57,7 +57,7 @@
 
 #### 2.3 測試與文件
 **測試**:
-- `Test/test_media_streaming.py` (233 行)
+- `tests/test_media_streaming.py` (233 行)
   - 12 個測試案例
   - 11 個測試通過，1 個跳過
   - 涵蓋率包含資料模型、LLM 處理器、API 端點
@@ -99,7 +99,7 @@
 
 #### 4.1 測試覆蓋
 ```bash
-pytest Test/test_media_streaming.py -v
+pytest tests/test_media_streaming.py -v
 # 結果: 11 passed, 1 skipped, 18 warnings
 ```
 

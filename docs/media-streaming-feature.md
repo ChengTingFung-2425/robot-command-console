@@ -234,7 +234,7 @@ curl -X POST http://localhost:8000/api/media/audio/command \
 
 ```bash
 cd /home/runner/work/robot-command-console/robot-command-console
-pytest Test/test_media_streaming.py -v
+pytest tests/test_media_streaming.py -v
 ```
 
 測試涵蓋：
@@ -299,7 +299,7 @@ export LLM_SERVICE_PROVIDER="gpt-4"  # gpt-4, claude, gemini
 - `/MCP/llm_processor.py` - LLM 處理器
 - `/WebUI/app/routes.py` - WebUI 路由
 - `/WebUI/app/templates/media_stream.html.j2` - 媒體串流頁面模板
-- `/Test/test_media_streaming.py` - 測試套件
+- `/tests/test_media_streaming.py` - 測試套件
 
 ## 支援
 

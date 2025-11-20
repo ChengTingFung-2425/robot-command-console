@@ -15,10 +15,12 @@
   - 本地佇列系統（記憶體內，可擴展至 Redis/Kafka）
   - Electron 整合模式與獨立 CLI 模式
   - 清晰的 API 界限與可測試架構
+- **electron-app/** - Electron 應用程序（主程序、預載入腳本、渲染器）
 - **MCP/** - 管理核心後端服務（API、身分驗證、指令處理、上下文管理、日誌監控）
 - **Robot-Console/** - 機器人執行層與相關工具（action executor、decoder、pubsub）
 - **WebUI/** - 提供使用者介面與微服務整合的範例實作（microblog 與 Web UI routes）
-- **Test/** - 專案的自動化測試集合，包含單元測試與整合測試範例
+- **tests/** - 專案的自動化測試集合，包含單元測試與整合測試範例
+- **config/** - 配置文件目錄（集中管理配置策略）
 
 ## 主要功能（摘要）
 
@@ -90,16 +92,16 @@ python microblog.py
 
 ```bash
 # 在專案根目錄執行所有測試
-python3 -m pytest Test/ -v
+python3 -m pytest tests/ -v
 
 # 執行特定測試
-python3 -m pytest Test/test_queue_system.py -v
+python3 -m pytest tests/test_queue_system.py -v
 ```
 
 ## 專案約定與延伸
 
 - JSON schema 檔案放置於 `docs/contract/`，用於請求/回應與錯誤合約驗證。  
-- 日誌檔與測試範例位於 `logs/` 與 `Test/` 資料夾。  
+- 日誌檔與測試範例位於 `logs/` 與 `tests/` 資料夾。  
 - 以模組化設計為主，便於替換不同的執行後端或外部整合。
 
 ## 貢獻

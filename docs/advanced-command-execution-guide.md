@@ -241,10 +241,10 @@ tail -f logs/microblog.log | grep MQTT
 
 ```bash
 # 執行所有進階指令測試
-python -m pytest Test/test_advanced_command_execution.py -v
+python -m pytest tests/test_advanced_command_execution.py -v
 
 # 執行特定測試
-python -m pytest Test/test_advanced_command_execution.py::TestAdvancedCommandExecution::test_execute_advanced_command_success -v
+python -m pytest tests/test_advanced_command_execution.py::TestAdvancedCommandExecution::test_execute_advanced_command_success -v
 ```
 
 ## 安全性
@@ -262,4 +262,4 @@ python -m pytest Test/test_advanced_command_execution.py::TestAdvancedCommandExe
 - [WebUI Module 文檔](../WebUI/Module.md)
 - [進階指令職責變更說明](ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md)
 - [Robot-Console 遷移指南](../Robot-Console/MIGRATION_GUIDE.md)
-- [API 測試](../Test/test_advanced_command_execution.py)
+- [API 測試](../tests/test_advanced_command_execution.py)

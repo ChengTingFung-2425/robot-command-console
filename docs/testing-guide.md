@@ -190,7 +190,7 @@ PYTHONPATH=/workspaces/robot-command-console:$PYTHONPATH flask shell
 ### 單元測試範例
 
 ```python
-# Test/Web/test_password_reset.py
+# tests/Web/test_password_reset.py
 import unittest
 from WebUI.app import app, db
 from WebUI.app.models import User
@@ -261,7 +261,7 @@ if __name__ == '__main__':
 
 ```bash
 cd /workspaces/robot-command-console
-python -m pytest Test/Web/test_password_reset.py -v
+python -m pytest tests/Web/test_password_reset.py -v
 ```
 
 ## 除錯技巧

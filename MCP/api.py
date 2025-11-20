@@ -244,13 +244,36 @@ context_manager = ContextManager()
 logging_monitor = LoggingMonitor()
 auth_manager = AuthManager(logging_monitor=logging_monitor)
 robot_router = RobotRouter()
-llm_processor = LLMProcessor()
+
 command_handler = CommandHandler(
     robot_router=robot_router,
     context_manager=context_manager,
     auth_manager=auth_manager,
     logging_monitor=logging_monitor
 )
+
+# 初始化 MCP 工具介面
+from .mcp_tool_interface import MCPToolInterface
+mcp_tool_interface = MCPToolInterface(command_handler=command_handler)
+
+# 初始化 LLM 提供商管理器和處理器（注入 MCP 工具介面）
+from .llm_provider_manager import LLMProviderManager
+llm_provider_manager = LLMProviderManager(mcp_tool_interface=mcp_tool_interface)
+llm_processor = LLMProcessor(provider_manager=llm_provider_manager)
+
+# 初始化插件管理器
+from .plugin_manager import PluginManager
+from .plugin_base import PluginConfig
+from .plugins.commands import AdvancedCommandPlugin, WebUICommandPlugin
+from .plugins.devices import CameraPlugin, SensorPlugin
+
+plugin_manager = PluginManager()
+
+# 註冊插件
+plugin_manager.register_plugin(AdvancedCommandPlugin, PluginConfig(enabled=True, priority=10))
+plugin_manager.register_plugin(WebUICommandPlugin, PluginConfig(enabled=True, priority=20))
+plugin_manager.register_plugin(CameraPlugin, PluginConfig(enabled=True, priority=30))
+plugin_manager.register_plugin(SensorPlugin, PluginConfig(enabled=True, priority=40))
 
 
 @app.on_event("startup")
@@ -262,6 +285,25 @@ async def startup_event():
         'log_level': MCPConfig.LOG_LEVEL
     })
     robot_router.start()
+    
+    # 初始化插件
+    try:
+        logger.info("開始初始化插件...")
+        plugin_results = await plugin_manager.initialize_all()
+        success_count = sum(1 for success in plugin_results.values() if success)
+        logger.info(f"插件初始化完成: {success_count}/{len(plugin_results)} 成功")
+    except Exception as e:
+        logger.error(f"插件初始化失敗: {e}", exc_info=True)
+    
+    # 自動偵測本地 LLM 提供商
+    try:
+        logger.info("開始偵測本地 LLM 提供商...")
+        health_results = await llm_provider_manager.discover_providers()
+        available_count = len([h for h in health_results.values() if h.status.value == "available"])
+        logger.info(f"LLM 提供商偵測完成: 發現 {available_count} 個可用提供商")
+    except Exception as e:
+        logger.error(f"LLM 提供商偵測失敗: {e}", exc_info=True)
+    
     logger.info("MCP service started successfully")
 
 
@@ -269,6 +311,15 @@ async def startup_event():
 async def shutdown_event():
     """關閉事件"""
     logger.info("MCP service shutting down")
+    
+    # 關閉插件
+    try:
+        logger.info("開始關閉插件...")
+        await plugin_manager.shutdown_all()
+        logger.info("插件關閉完成")
+    except Exception as e:
+        logger.error(f"插件關閉失敗: {e}", exc_info=True)
+    
     await robot_router.stop()
     logger.info("MCP service shutdown complete")
 
@@ -697,6 +748,457 @@ async def process_audio_command(request: AudioCommandRequest):
         
     except Exception as e:
         logger.error(f"處理音訊指令失敗: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ===== LLM 提供商管理 API =====
+
+@v1_router.post("/llm/invoke")
+@app.post("/api/llm/invoke")
+async def invoke_llm_with_tools(
+    prompt: str,
+    robot_id: str,
+    model: Optional[str] = None,
+    provider: Optional[str] = None,
+    use_tools: bool = True,
+    trace_id: Optional[str] = None
+):
+    """
+    使用 LLM 處理指令，並啟用 MCP 工具呼叫
+    
+    Args:
+        prompt: 使用者輸入
+        robot_id: 目標機器人 ID
+        model: 使用的模型（選用）
+        provider: 使用的提供商（選用，預設使用當前選擇的）
+        use_tools: 是否啟用工具呼叫（預設 True）
+        trace_id: 追蹤 ID（選用）
+    """
+    try:
+        trace_id = trace_id or str(uuid.uuid4())
+        
+        # 取得提供商
+        llm_provider = llm_provider_manager.get_provider(provider)
+        
+        if not llm_provider:
+            raise HTTPException(
+                status_code=404,
+                detail=f"提供商不存在或未選擇: {provider or '未指定'}"
+            )
+        
+        # 如果未指定模型，使用第一個可用模型
+        if not model:
+            models = await llm_provider.list_models()
+            if not models:
+                raise HTTPException(
+                    status_code=400,
+                    detail="沒有可用的模型"
+                )
+            model = models[0].id
+            logger.info(f"自動選擇模型: {model}")
+        
+        # 加入機器人上下文到提示
+        enhanced_prompt = f"使用者對機器人 {robot_id} 說: {prompt}"
+        
+        # 呼叫 LLM
+        logger.info(f"呼叫 LLM: provider={llm_provider.provider_name}, model={model}, use_tools={use_tools}")
+        
+        response_text, confidence = await llm_provider.generate(
+            prompt=enhanced_prompt,
+            model=model,
+            temperature=0.3,
+            max_tokens=500,
+            use_tools=use_tools,
+            trace_id=trace_id
+        )
+        
+        return {
+            "trace_id": trace_id,
+            "robot_id": robot_id,
+            "provider": llm_provider.provider_name,
+            "model": model,
+            "prompt": prompt,
+            "response": response_text,
+            "confidence": confidence,
+            "tools_used": use_tools,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"LLM 呼叫失敗: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@v1_router.get("/llm/tools")
+@app.get("/api/llm/tools")
+async def get_mcp_tools():
+    """取得可用的 MCP 工具定義"""
+    try:
+        tools = mcp_tool_interface.get_tool_definitions()
+        
+        return {
+            "tools": tools,
+            "count": len(tools),
+            "formats": {
+                "openai": "標準 OpenAI function calling 格式",
+                "ollama": "Ollama 工具格式"
+            }
+        }
+    except Exception as e:
+        logger.error(f"取得工具定義失敗: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@v1_router.get("/llm/providers")
+@app.get("/api/llm/providers")
+async def list_llm_providers():
+    """列出所有已註冊的 LLM 提供商"""
+    try:
+        providers = llm_provider_manager.list_providers()
+        selected = llm_provider_manager.get_selected_provider_name()
+        
+        return {
+            "providers": providers,
+            "selected": selected,
+            "count": len(providers)
+        }
+    except Exception as e:
+        logger.error(f"列出 LLM 提供商失敗: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@v1_router.get("/llm/providers/health")
+@app.get("/api/llm/providers/health")
+async def get_providers_health():
+    """取得所有提供商的健康狀態"""
+    try:
+        health_results = await llm_provider_manager.get_all_provider_health()
+        
+        # 將 ProviderHealth 物件轉換為字典
+        health_dict = {
+            name: {
+                "status": health.status.value,
+                "version": health.version,
+                "available_models": health.available_models,
+                "error_message": health.error_message,
+                "response_time_ms": health.response_time_ms
+            }
+            for name, health in health_results.items()
+        }
+        
+        return {
+            "providers": health_dict,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    except Exception as e:
+        logger.error(f"取得提供商健康狀態失敗: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@v1_router.post("/llm/providers/discover")
+@app.post("/api/llm/providers/discover")
+async def discover_llm_providers(host: str = "localhost", timeout: int = 5):
+    """手動觸發提供商偵測"""
+    try:
+        logger.info(f"手動觸發 LLM 提供商偵測 (host={host}, timeout={timeout})")
+        
+        health_results = await llm_provider_manager.discover_providers(host, timeout)
+        
+        # 轉換為字典格式
+        health_dict = {
+            name: {
+                "status": health.status.value,
+                "version": health.version,
+                "available_models": health.available_models,
+                "error_message": health.error_message,
+                "response_time_ms": health.response_time_ms
+            }
+            for name, health in health_results.items()
+        }
+        
+        available_count = len([h for h in health_results.values() if h.status.value == "available"])
+        
+        return {
+            "discovered": health_dict,
+            "available_count": available_count,
+            "total_count": len(health_results),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    except Exception as e:
+        logger.error(f"偵測 LLM 提供商失敗: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@v1_router.post("/llm/providers/select")
+@app.post("/api/llm/providers/select")
+async def select_llm_provider(provider_name: str):
+    """選擇要使用的 LLM 提供商"""
+    try:
+        success = llm_provider_manager.select_provider(provider_name)
+        
+        if not success:
+            raise HTTPException(status_code=404, detail=f"提供商 '{provider_name}' 不存在")
+        
+        logger.info(f"已切換到 LLM 提供商: {provider_name}")
+        
+        return {
+            "message": "提供商切換成功",
+            "provider": provider_name
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"選擇 LLM 提供商失敗: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@v1_router.get("/llm/providers/{provider_name}/models")
+@app.get("/api/llm/providers/{provider_name}/models")
+async def list_provider_models(provider_name: str):
+    """列出特定提供商的可用模型"""
+    try:
+        provider = llm_provider_manager.get_provider(provider_name)
+        
+        if not provider:
+            raise HTTPException(status_code=404, detail=f"提供商 '{provider_name}' 不存在")
+        
+        models = await provider.list_models()
+        
+        # 轉換為字典格式
+        models_dict = [
+            {
+                "id": model.id,
+                "name": model.name,
+                "size": model.size,
+                "capabilities": {
+                    "supports_streaming": model.capabilities.supports_streaming,
+                    "supports_vision": model.capabilities.supports_vision,
+                    "supports_function_calling": model.capabilities.supports_function_calling,
+                    "context_length": model.capabilities.context_length,
+                    "max_tokens": model.capabilities.max_tokens
+                },
+                "metadata": model.metadata
+            }
+            for model in models
+        ]
+        
+        return {
+            "provider": provider_name,
+            "models": models_dict,
+            "count": len(models_dict)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"列出提供商模型失敗: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@v1_router.post("/llm/providers/{provider_name}/refresh")
+@app.post("/api/llm/providers/{provider_name}/refresh")
+async def refresh_provider_health(provider_name: str):
+    """重新檢查特定提供商的健康狀態"""
+    try:
+        health = await llm_provider_manager.refresh_provider(provider_name)
+        
+        if not health:
+            raise HTTPException(status_code=404, detail=f"提供商 '{provider_name}' 不存在")
+        
+        return {
+            "provider": provider_name,
+            "status": health.status.value,
+            "version": health.version,
+            "available_models": health.available_models,
+            "error_message": health.error_message,
+            "response_time_ms": health.response_time_ms,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"重新檢查提供商健康狀態失敗: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ===== 插件管理 API =====
+
+@v1_router.get("/plugins")
+@app.get("/api/plugins")
+async def list_plugins(
+    plugin_type: Optional[str] = None,
+    status: Optional[str] = None
+):
+    """列出所有插件"""
+    try:
+        from .plugin_base import PluginType, PluginStatus
+        
+        # 轉換參數
+        ptype = PluginType(plugin_type) if plugin_type else None
+        pstatus = PluginStatus(status) if status else None
+        
+        plugins = plugin_manager.list_plugins(ptype, pstatus)
+        
+        # 取得詳細資訊
+        plugin_details = []
+        for name in plugins:
+            plugin = plugin_manager.get_plugin(name)
+            if plugin:
+                plugin_details.append({
+                    "name": plugin.metadata.name,
+                    "version": plugin.metadata.version,
+                    "type": plugin.metadata.plugin_type.value,
+                    "status": plugin.status.value,
+                    "description": plugin.metadata.description,
+                    "enabled": plugin.config.enabled,
+                    "priority": plugin.config.priority
+                })
+        
+        return {
+            "plugins": plugin_details,
+            "count": len(plugin_details)
+        }
+    
+    except Exception as e:
+        logger.error(f"列出插件失敗: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@v1_router.get("/plugins/health")
+@app.get("/api/plugins/health")
+async def get_plugins_health():
+    """取得所有插件的健康狀態"""
+    try:
+        health_results = await plugin_manager.get_all_plugin_health()
+        
+        return {
+            "plugins": health_results,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    
+    except Exception as e:
+        logger.error(f"取得插件健康狀態失敗: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@v1_router.get("/plugins/{plugin_name}/commands")
+@app.get("/api/plugins/{plugin_name}/commands")
+async def get_plugin_commands(plugin_name: str):
+    """取得插件支援的指令列表"""
+    try:
+        commands = plugin_manager.get_supported_commands(plugin_name)
+        
+        if commands is None:
+            raise HTTPException(status_code=404, detail=f"插件不存在: {plugin_name}")
+        
+        # 取得每個指令的 schema
+        command_details = []
+        for cmd in commands:
+            schema = plugin_manager.get_command_schema(plugin_name, cmd)
+            command_details.append({
+                "name": cmd,
+                "schema": schema
+            })
+        
+        return {
+            "plugin": plugin_name,
+            "commands": command_details,
+            "count": len(commands)
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"取得插件指令失敗: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@v1_router.post("/plugins/{plugin_name}/execute")
+@app.post("/api/plugins/{plugin_name}/execute")
+async def execute_plugin_command(
+    plugin_name: str,
+    command_name: str,
+    parameters: Dict[str, Any],
+    trace_id: Optional[str] = None
+):
+    """透過插件執行指令"""
+    try:
+        trace_id = trace_id or str(uuid.uuid4())
+        
+        context = {
+            "trace_id": trace_id,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        
+        result = await plugin_manager.execute_command(
+            plugin_name=plugin_name,
+            command_name=command_name,
+            parameters=parameters,
+            context=context
+        )
+        
+        return {
+            "trace_id": trace_id,
+            "plugin": plugin_name,
+            "command": command_name,
+            "result": result,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    
+    except Exception as e:
+        logger.error(f"執行插件指令失敗: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@v1_router.get("/devices/{device_name}/info")
+@app.get("/api/devices/{device_name}/info")
+async def get_device_info(device_name: str):
+    """取得裝置資訊"""
+    try:
+        device = plugin_manager.get_device_plugin(device_name)
+        
+        if not device:
+            raise HTTPException(status_code=404, detail=f"裝置不存在: {device_name}")
+        
+        info = await device.get_device_info()
+        
+        return {
+            "device": device_name,
+            "info": info,
+            "status": device.status.value
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"取得裝置資訊失敗: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@v1_router.post("/devices/{device_name}/read")
+@app.post("/api/devices/{device_name}/read")
+async def read_device_data(
+    device_name: str,
+    parameters: Optional[Dict[str, Any]] = None
+):
+    """讀取裝置資料"""
+    try:
+        parameters = parameters or {}
+        
+        data = await plugin_manager.read_device_data(
+            plugin_name=device_name,
+            **parameters
+        )
+        
+        return {
+            "device": device_name,
+            "data": data,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    
+    except Exception as e:
+        logger.error(f"讀取裝置資料失敗: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

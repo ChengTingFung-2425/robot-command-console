@@ -384,3 +384,33 @@ class CommandHandler:
                 details=details
             )
         )
+    
+    async def process_command_spec(
+        self,
+        command_spec,
+        trace_id: Optional[str] = None
+    ) -> CommandResponse:
+        """
+        處理指令規格（用於工具呼叫）
+        
+        Args:
+            command_spec: CommandSpec 物件
+            trace_id: 追蹤 ID（選用）
+            
+        Returns:
+            CommandResponse
+        """
+        from .models import Actor, ActorType, Source
+        
+        # 建立最小化的 CommandRequest
+        request = CommandRequest(
+            trace_id=trace_id or str(uuid4()),
+            timestamp=datetime.utcnow(),
+            actor=Actor(type=ActorType.AI, id="mcp-tool-interface"),
+            source=Source.API,
+            command=command_spec,
+            auth={"token": "internal"}  # 內部呼叫使用特殊 token
+        )
+        
+        # 使用現有的 process_command 處理
+        return await self.process_command(request)

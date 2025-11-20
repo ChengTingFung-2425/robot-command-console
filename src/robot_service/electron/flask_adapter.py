@@ -35,6 +35,7 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
             if hasattr(g, 'correlation_id'):
                 log_record['correlation_id'] = g.correlation_id
         except RuntimeError:
+            # 若不在 Flask request context 下，g 物件不可用，安全忽略此例外
             pass
 
 
@@ -107,6 +108,10 @@ def create_flask_app(
         'Current queue size'
     )
     
+    def run_async(coro):
+        """在 Flask 同步上下文中執行非同步函式的輔助函式"""
+        return asyncio.run(coro)
+    
     # Request ID middleware
     @app.before_request
     def before_request():
@@ -146,8 +151,7 @@ def create_flask_app(
                 'status': response.status_code,
                 'duration_seconds': duration
             })
-        
-        if hasattr(g, 'start_time'):
+            
             ACTIVE_CONNECTIONS.dec()
         
         if hasattr(g, 'correlation_id'):
@@ -215,13 +219,8 @@ def create_flask_app(
         logger.info('Metrics endpoint accessed')
         
         # 更新佇列大小指標
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            size = loop.run_until_complete(service_manager.queue.size())
-            QUEUE_SIZE.set(size)
-        finally:
-            loop.close()
+        size = run_async(service_manager.queue.size())
+        QUEUE_SIZE.set(size)
         
         return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
     
@@ -231,12 +230,7 @@ def create_flask_app(
         """Health check endpoint"""
         logger.info('Health check requested')
         
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            health = loop.run_until_complete(service_manager.health_check())
-        finally:
-            loop.close()
+        health = run_async(service_manager.health_check())
         
         return jsonify({
             'status': 'healthy',
@@ -287,17 +281,12 @@ def create_flask_app(
                 priority = MessagePriority.NORMAL
             
             # 提交到佇列
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                message_id = loop.run_until_complete(service_manager.submit_command(
-                    payload=data,
-                    priority=priority,
-                    trace_id=data.get('trace_id'),
-                    correlation_id=g.correlation_id,
-                ))
-            finally:
-                loop.close()
+            message_id = run_async(service_manager.submit_command(
+                payload=data,
+                priority=priority,
+                trace_id=data.get('trace_id'),
+                correlation_id=g.correlation_id,
+            ))
             
             if message_id:
                 return jsonify({
@@ -325,13 +314,7 @@ def create_flask_app(
     @require_token
     def queue_stats():
         """取得佇列統計"""
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            stats = loop.run_until_complete(service_manager.get_queue_stats())
-        finally:
-            loop.close()
-        
+        stats = run_async(service_manager.get_queue_stats())
         return jsonify(stats)
     
     # 錯誤處理

@@ -126,12 +126,11 @@ class QueueHandler:
         
         while self._running:
             try:
-                # 從佇列取出訊息（無逾時，使用輪詢）
-                message = await self.queue.dequeue(timeout=0)
+                # 從佇列取出訊息（等待最多 poll_interval 秒）
+                message = await self.queue.dequeue(timeout=self.poll_interval)
                 
                 if message is None:
-                    # 佇列為空，短暫休眠
-                    await asyncio.sleep(self.poll_interval)
+                    # 逾時，繼續下一次迴圈
                     continue
                 
                 # 處理訊息

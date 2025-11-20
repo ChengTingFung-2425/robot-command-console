@@ -37,25 +37,27 @@ def main():
         poll_interval=0.1,
     )
     
-    # 啟動服務管理器（在背景執行）
+    # 建立並設定為預設 loop
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    loop.run_until_complete(service_manager.start())
-    
-    # 建立 Flask 應用
-    app = create_flask_app(
-        service_manager=service_manager,
-        app_token=APP_TOKEN,
-    )
-    
-    logger.info('Starting Flask service', extra={
-        'host': '127.0.0.1',
-        'port': PORT,
-        'service': 'flask-service'
-    })
     
     try:
-        # 只監聽 localhost 確保安全
+        # 在 loop 中執行服務啟動
+        loop.run_until_complete(service_manager.start())
+        
+        # 建立 Flask 應用
+        app = create_flask_app(
+            service_manager=service_manager,
+            app_token=APP_TOKEN,
+        )
+        
+        logger.info('Starting Flask service', extra={
+            'host': '127.0.0.1',
+            'port': PORT,
+            'service': 'flask-service'
+        })
+        
+        # 啟動 Flask（阻塞直到停止）
         app.run(host='127.0.0.1', port=PORT, debug=False)
     finally:
         # 清理

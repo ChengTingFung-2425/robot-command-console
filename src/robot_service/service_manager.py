@@ -166,6 +166,12 @@ class ServiceManager:
         })
         
         # TODO: 整合實際的指令處理邏輯
+        # 範例：
+        # from robot_command_processor import process_command
+        # result = await process_command(message.payload)
+        # return result.success
+        #
+        # 或參考文件：docs/custom-processor-guide.md
         # 目前只是 stub，直接返回成功
         await asyncio.sleep(0.1)  # 模擬處理時間
         

@@ -81,7 +81,6 @@ class MemoryQueue(QueueInterface):
             
             # 通知等待的 dequeue
             self._event.set()
-            self._event.clear()
             
             return True
     
@@ -101,6 +100,9 @@ class MemoryQueue(QueueInterface):
                         message = queue.popleft()
                         self._in_flight[message.id] = message
                         self._total_dequeued += 1
+                        
+                        # 清除事件，準備下次等待
+                        self._event.clear()
                         
                         logger.info("Message dequeued", extra={
                             "message_id": message.id,
@@ -125,8 +127,6 @@ class MemoryQueue(QueueInterface):
                     return None
             else:
                 # 無逾時，永久等待
-                if timeout is None:
-                    return None
                 await self._event.wait()
     
     async def peek(self) -> Optional[Message]:

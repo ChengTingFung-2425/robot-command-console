@@ -60,7 +60,7 @@
 - `WebUI/app/*.py`：後端路由、錯誤處理、資料模型、郵件、表單。
 - `WebUI/app/templates/*.j2`：頁面模板（狀態面板、日誌、審批、登入）。
 - `WebUI/migrations/*`：資料庫遷移。
-- `Test/Web/*`：對應測試檔，驗證路由、權限、日誌與 UI 結構。
+- `tests/Web/*`：對應測試檔，驗證路由、權限、日誌與 UI 結構。
 
 ### 7.1 核心頁面與功能
 - **機器人儀表板（Dashboard）**：
@@ -243,7 +243,7 @@
 - 自動使用機器人憑證進行身份驗證
 - 線程安全的實作
 
-**測試覆蓋**：參見 `Test/test_advanced_command_execution.py`
+**測試覆蓋**：參見 `tests/test_advanced_command_execution.py`
 
 **安全性**：
 - 所有錯誤訊息已脫敏處理

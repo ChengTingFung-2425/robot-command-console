@@ -172,7 +172,7 @@ mcp_base_url: http://your-mcp-server:5000  # 可選
 
 ## 測試
 
-已新增完整的測試套件 `Test/test_pubsub_actions_array.py`：
+已新增完整的測試套件 `tests/test_pubsub_actions_array.py`：
 
 - ✅ 測試 actions 陣列處理
 - ✅ 測試向後相容性（toolName）
@@ -255,7 +255,7 @@ A: 參考 `Robot-Console/action_executor.py` 中的 `actions` 字典，或查看
 
 - [Robot-Console/module.md](../Robot-Console/module.md) - 完整模組設計說明
 - [Robot-Console/MIGRATION_GUIDE.md](../Robot-Console/MIGRATION_GUIDE.md) - 詳細遷移指南
-- [Test/test_pubsub_actions_array.py](../Test/test_pubsub_actions_array.py) - 測試範例
+- [tests/test_pubsub_actions_array.py](../tests/test_pubsub_actions_array.py) - 測試範例
 
 ## 變更歷史
 

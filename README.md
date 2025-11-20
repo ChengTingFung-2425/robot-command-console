@@ -2,6 +2,8 @@
 
 本專案（robot-command-console）是一個用於機器人指令管理、路由與執行的整合式控制台與服務平台。目標是提供一套模組化、可測試且可部署的系統，用來接收、驗證、路由並執行來自各種介面（WebUI、API、排程或其他整合服務）的指令，同時保留豐富的日誌、驗證與合約（schema）檢查。
 
+> **📢 Phase 2 重大更新** - 目錄結構已重新組織以提高模組化和清晰度。詳見 [架構說明](docs/architecture.md) 和 [遷移指南](docs/MIGRATION_GUIDE_PHASE2.md)。
+
 ## 核心目的
 
 - 集中管理來自多來源的機器人指令。  
@@ -15,10 +17,12 @@
   - 本地佇列系統（記憶體內，可擴展至 Redis/Kafka）
   - Electron 整合模式與獨立 CLI 模式
   - 清晰的 API 界限與可測試架構
+- **electron-app/** - Electron 應用程序（主程序、預載入腳本、渲染器）
 - **MCP/** - 管理核心後端服務（API、身分驗證、指令處理、上下文管理、日誌監控）
 - **Robot-Console/** - 機器人執行層與相關工具（action executor、decoder、pubsub）
 - **WebUI/** - 提供使用者介面與微服務整合的範例實作（microblog 與 Web UI routes）
-- **Test/** - 專案的自動化測試集合，包含單元測試與整合測試範例
+- **tests/** - 專案的自動化測試集合，包含單元測試與整合測試範例
+- **config/** - 配置文件目錄（集中管理配置策略）
 
 ## 主要功能（摘要）
 
@@ -90,16 +94,16 @@ python microblog.py
 
 ```bash
 # 在專案根目錄執行所有測試
-python3 -m pytest Test/ -v
+python3 -m pytest tests/ -v
 
 # 執行特定測試
-python3 -m pytest Test/test_queue_system.py -v
+python3 -m pytest tests/test_queue_system.py -v
 ```
 
 ## 專案約定與延伸
 
 - JSON schema 檔案放置於 `docs/contract/`，用於請求/回應與錯誤合約驗證。  
-- 日誌檔與測試範例位於 `logs/` 與 `Test/` 資料夾。  
+- 日誌檔與測試範例位於 `logs/` 與 `tests/` 資料夾。  
 - 以模組化設計為主，便於替換不同的執行後端或外部整合。
 
 ## 貢獻
@@ -154,10 +158,21 @@ python3 flask_service.py
 
 ## 參考與文件
 
-- 專案內 `docs/` 與各子模組的 `README.md` 提供更詳細的設計說明與部署指引
+### 核心文檔
+- [架構說明](docs/architecture.md) - 完整的專案架構與目錄結構說明（Phase 2）
+- [Phase 2 遷移指南](docs/MIGRATION_GUIDE_PHASE2.md) - 從 Phase 1 遷移到 Phase 2 的詳細指南
+- [README](README.md) - 本文件，快速啟動與概覽
+
+### 專業領域文檔
 - [可觀測性指南](docs/observability.md) - Prometheus metrics 和結構化日誌的完整文件
 - [Queue Architecture](docs/queue-architecture.md) - 佇列系統架構與訊息合約
 - [Robot Service](src/robot_service/README.md) - 模組化服務說明
+- [MCP Module](MCP/README.md) - MCP 服務模組說明
+- [Robot-Console](Robot-Console/README.md) - 機器人執行層說明
+
+### 配置與測試
+- [配置策略](config/README.md) - 配置管理說明
+- [測試指南](docs/testing-guide.md) - 測試編寫與執行指南
 
 ## CI: 自動將 main 同步到各分支（新增）
 

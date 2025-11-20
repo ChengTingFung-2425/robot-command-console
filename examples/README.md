@@ -181,7 +181,7 @@ async def parse_command(self, transcription, robot_id, context=None):
 執行測試套件：
 
 ```bash
-pytest Test/test_media_streaming.py -v
+pytest tests/test_media_streaming.py -v
 ```
 
 預期結果：11 個測試通過，1 個測試跳過。

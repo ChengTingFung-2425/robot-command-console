@@ -315,7 +315,7 @@ def create_flask_app(
         except Exception as e:
             logger.error('Error submitting command', exc_info=True)
             return jsonify({
-                'error': str(e),
+                'error': 'Internal server error',
                 'code': 'ERR_INTERNAL',
                 'request_id': g.request_id,
             }), 500

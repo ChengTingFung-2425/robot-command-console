@@ -1,0 +1,175 @@
+name: API 驗證
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'openapi.yaml'
+      - 'MCP/api.py'
+      - 'MCP/models.py'
+      - '.github/workflows/api-validation.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'openapi.yaml'
+      - 'MCP/api.py'
+      - 'MCP/models.py'
+      - '.github/workflows/api-validation.yml'
+
+jobs:
+  validate-openapi:
+    name: 驗證 OpenAPI 規範
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout 程式碼
+        uses: actions/checkout@v4
+      
+      - name: 設定 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: 安裝 OpenAPI 驗證工具
+        run: |
+          pip install openapi-spec-validator pyyaml
+      
+      - name: 驗證 OpenAPI 規範語法
+        run: |
+          openapi-spec-validator openapi.yaml
+      
+      - name: 檢查 OpenAPI 規範
+        run: |
+          python3 -c "
+          import yaml
+          import sys
+          
+          with open('openapi.yaml', 'r', encoding='utf-8') as f:
+              spec = yaml.safe_load(f)
+          
+          # 檢查基本欄位
+          required_fields = ['openapi', 'info', 'paths']
+          for field in required_fields:
+              if field not in spec:
+                  print(f'錯誤: 缺少必要欄位 {field}')
+                  sys.exit(1)
+          
+          # 檢查版本號
+          if not spec['openapi'].startswith('3.'):
+              print(f'錯誤: OpenAPI 版本應該是 3.x，當前為 {spec[\"openapi\"]}')
+              sys.exit(1)
+          
+          # 檢查是否定義了安全方案
+          if 'components' not in spec or 'securitySchemes' not in spec['components']:
+              print('錯誤: 缺少 security schemes 定義')
+              sys.exit(1)
+          
+          # 檢查是否有 /health 和 /metrics 端點
+          paths = spec.get('paths', {})
+          if '/health' not in paths:
+              print('錯誤: 缺少 /health 端點')
+              sys.exit(1)
+          if '/metrics' not in paths:
+              print('錯誤: 缺少 /metrics 端點')
+              sys.exit(1)
+          
+          # 檢查 /health 和 /metrics 是否正確標記為無需認證
+          health_get = paths.get('/health', {}).get('get', {})
+          if 'security' not in health_get or health_get['security'] != []:
+              print('錯誤: /health 端點應該設定 security: []')
+              sys.exit(1)
+          
+          metrics_get = paths.get('/metrics', {}).get('get', {})
+          if 'security' not in metrics_get or metrics_get['security'] != []:
+              print('錯誤: /metrics 端點應該設定 security: []')
+              sys.exit(1)
+          
+          # 檢查是否有認證端點
+          auth_paths = ['/auth/login', '/auth/register', '/auth/rotate']
+          for path in auth_paths:
+              full_path = f'/v1{path}' if not path.startswith('/v1') else path
+              # 檢查新路徑或舊路徑
+              if path not in paths and full_path not in paths:
+                  # 檢查舊的 /api 前綴路徑
+                  old_path = f'/api{path}'
+                  if old_path not in paths:
+                      print(f'警告: 缺少認證端點 {path}')
+          
+          print('✓ OpenAPI 規範檢查通過')
+          print(f'✓ 定義了 {len(paths)} 個端點')
+          print(f'✓ OpenAPI 版本: {spec[\"openapi\"]}')
+          print(f'✓ API 版本: {spec[\"info\"][\"version\"]}')
+          "
+  
+  test-security:
+    name: 測試安全功能
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout 程式碼
+        uses: actions/checkout@v4
+      
+      - name: 設定 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: 安裝依賴
+        run: |
+          pip install -r requirements.txt
+          pip install -r MCP/requirements.txt
+          pip install pytest pytest-asyncio
+      
+      - name: 執行安全測試
+        run: |
+          python3 -m pytest tests/test_security_features.py -v
+      
+      - name: 執行認證測試
+        run: |
+          python3 -m pytest tests/test_auth_compliance.py -v
+  
+  check-docs:
+    name: 檢查安全文件
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout 程式碼
+        uses: actions/checkout@v4
+      
+      - name: 檢查威脅模型文件
+        run: |
+          if [ ! -f "docs/threat-model.md" ]; then
+            echo "錯誤: 缺少 docs/threat-model.md"
+            exit 1
+          fi
+          echo "✓ 威脅模型文件存在"
+      
+      - name: 檢查安全檢查清單
+        run: |
+          if [ ! -f "docs/security-checklist.md" ]; then
+            echo "錯誤: 缺少 docs/security-checklist.md"
+            exit 1
+          fi
+          echo "✓ 安全檢查清單存在"
+      
+      - name: 檢查 OpenAPI 規範
+        run: |
+          if [ ! -f "openapi.yaml" ]; then
+            echo "錯誤: 缺少 openapi.yaml"
+            exit 1
+          fi
+          echo "✓ OpenAPI 規範存在"
+      
+      - name: 檢查秘密儲存實作
+        run: |
+          if [ ! -f "MCP/secret_storage.py" ]; then
+            echo "錯誤: 缺少 MCP/secret_storage.py"
+            exit 1
+          fi
+          echo "✓ 秘密儲存實作存在"

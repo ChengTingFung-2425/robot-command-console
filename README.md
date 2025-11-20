@@ -163,6 +163,13 @@ python3 flask_service.py
 - [Phase 2 遷移指南](docs/MIGRATION_GUIDE_PHASE2.md) - 從 Phase 1 遷移到 Phase 2 的詳細指南
 - [README](README.md) - 本文件，快速啟動與概覽
 
+### API 與安全性
+- **[OpenAPI 規範](openapi.yaml)** - 完整的 API 合約定義（OpenAPI 3.1）
+- **[API 與安全性使用指南](docs/api-security-guide.md)** - API 版本控制、認證流程、秘密管理使用說明
+- **[威脅模型](docs/threat-model.md)** - STRIDE 威脅分析與緩解措施
+- **[安全檢查清單](docs/security-checklist.md)** - 開發、測試、部署、維護階段安全檢查項
+- **[API 安全實作摘要](docs/API_SECURITY_IMPLEMENTATION_SUMMARY.md)** - 完整實作細節與驗收標準
+
 ### 專業領域文檔
 - [可觀測性指南](docs/observability.md) - Prometheus metrics 和結構化日誌的完整文件
 - [Queue Architecture](docs/queue-architecture.md) - 佇列系統架構與訊息合約
@@ -173,6 +180,49 @@ python3 flask_service.py
 ### 配置與測試
 - [配置策略](config/README.md) - 配置管理說明
 - [測試指南](docs/testing-guide.md) - 測試編寫與執行指南
+
+## API 版本控制與認證
+
+本專案現在支援標準化的 API 合約和完整的安全功能：
+
+### 快速開始
+
+```bash
+# 1. 設定環境變數（開發環境）
+export MCP_JWT_SECRET="dev-secret-$(date +%s)"
+export APP_TOKEN="dev-token-$(date +%s)"
+export MCP_JWT_EXPIRATION_HOURS=24
+
+# 2. 啟動 MCP 服務
+cd MCP
+python3 start.py
+
+# 3. 註冊使用者
+curl -X POST http://localhost:8000/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"user1","username":"myuser","password":"securepass123","role":"operator"}'
+
+# 4. 登入獲取 token
+TOKEN=$(curl -X POST http://localhost:8000/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"myuser","password":"securepass123"}' | jq -r '.token')
+
+# 5. 使用 token 存取 API
+curl http://localhost:8000/v1/robots \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### 主要功能
+
+- **OpenAPI 3.1 規範**: 完整的 API 文件化，包含 12 個公開端點
+- **版本控制**: `/v1` 路徑前綴，向後相容 `/api` 路徑
+- **JWT 認證**: 所有端點（除了 `/health` 和 `/metrics`）都需要認證
+- **Token 輪替**: `/v1/auth/rotate` 端點支援無縫 token 更新
+- **角色權限**: 三種角色（admin、operator、viewer）與基於角色的存取控制
+- **秘密管理**: 可插拔的秘密儲存後端（環境變數、檔案、keychain、DPAPI）
+- **審計日誌**: 所有認證和授權事件都記錄到審計日誌
+
+詳細說明請參閱 [API 與安全性使用指南](docs/api-security-guide.md)。
 
 ## CI: 自動將 main 同步到各分支（新增）
 

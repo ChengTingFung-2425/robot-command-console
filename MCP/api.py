@@ -104,6 +104,10 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# 建立 v1 API router
+from fastapi import APIRouter
+v1_router = APIRouter(prefix="/v1")
+
 
 # CORS 設定
 app.add_middleware(
@@ -113,6 +117,45 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Auth middleware
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    """
+    認證中介軟體
+    除了 /health、/metrics 和 /v1/auth/login 外，所有端點都需要認證
+    """
+    # 不需要認證的端點
+    public_paths = ['/health', '/metrics', '/v1/auth/login', '/api/auth/login']
+    
+    # 檢查是否是公開端點
+    if request.url.path in public_paths or request.url.path.startswith('/docs') or request.url.path.startswith('/openapi'):
+        return await call_next(request)
+    
+    # 檢查 Authorization header
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return Response(
+            status_code=401,
+            content='{"error": "UNAUTHORIZED", "message": "Missing or invalid Authorization header"}',
+            media_type="application/json"
+        )
+    
+    # 提取 token
+    token = auth_header.split(" ")[1]
+    
+    # 驗證 token
+    trace_id = request.headers.get('X-Trace-ID', str(uuid.uuid4()))
+    if not await auth_manager.verify_token(token, trace_id=trace_id):
+        return Response(
+            status_code=401,
+            content='{"error": "UNAUTHORIZED", "message": "Invalid or expired token"}',
+            media_type="application/json"
+        )
+    
+    # Token 有效，繼續處理請求
+    return await call_next(request)
 
 
 # Request tracking middleware
@@ -255,6 +298,7 @@ async def health_check():
 
 # ===== 指令 API =====
 
+@v1_router.post("/command", response_model=CommandResponse)
 @app.post("/api/command", response_model=CommandResponse)
 async def create_command(request: CommandRequest):
     """建立指令"""
@@ -290,6 +334,7 @@ async def create_command(request: CommandRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@v1_router.get("/command/{command_id}")
 @app.get("/api/command/{command_id}")
 async def get_command_status(command_id: str):
     """查詢指令狀態"""
@@ -299,6 +344,7 @@ async def get_command_status(command_id: str):
     return status
 
 
+@v1_router.delete("/command/{command_id}")
 @app.delete("/api/command/{command_id}")
 async def cancel_command(command_id: str, trace_id: Optional[str] = None):
     """取消指令"""
@@ -314,6 +360,7 @@ async def cancel_command(command_id: str, trace_id: Optional[str] = None):
 
 # ===== 機器人 API =====
 
+@v1_router.post("/robots/register")
 @app.post("/api/robots/register")
 async def register_robot(registration: RobotRegistration):
     """註冊機器人"""
@@ -338,6 +385,7 @@ async def register_robot(registration: RobotRegistration):
     return {"message": "註冊成功", "robot_id": registration.robot_id}
 
 
+@v1_router.delete("/robots/{robot_id}")
 @app.delete("/api/robots/{robot_id}")
 async def unregister_robot(robot_id: str):
     """取消註冊機器人"""
@@ -361,6 +409,7 @@ async def unregister_robot(robot_id: str):
     return {"message": "取消註冊成功", "robot_id": robot_id}
 
 
+@v1_router.post("/robots/heartbeat")
 @app.post("/api/robots/heartbeat")
 async def update_heartbeat(heartbeat: Heartbeat):
     """更新心跳"""
@@ -371,6 +420,7 @@ async def update_heartbeat(heartbeat: Heartbeat):
     return {"message": "心跳已更新"}
 
 
+@v1_router.get("/robots/{robot_id}")
 @app.get("/api/robots/{robot_id}")
 async def get_robot(robot_id: str):
     """取得機器人資訊"""
@@ -381,6 +431,7 @@ async def get_robot(robot_id: str):
     return robot
 
 
+@v1_router.get("/robots")
 @app.get("/api/robots")
 async def list_robots(
     robot_type: Optional[str] = None,
@@ -393,6 +444,7 @@ async def list_robots(
 
 # ===== 事件 API =====
 
+@v1_router.get("/events")
 @app.get("/api/events")
 async def get_events(
     trace_id: Optional[str] = None,
@@ -403,6 +455,7 @@ async def get_events(
     return {"events": events, "count": len(events)}
 
 
+@v1_router.websocket("/events/subscribe")
 @app.websocket("/api/events/subscribe")
 async def subscribe_events(websocket: WebSocket):
     """訂閱事件（WebSocket）"""
@@ -440,6 +493,7 @@ async def subscribe_events(websocket: WebSocket):
 
 # ===== 指標 API =====
 
+@v1_router.get("/metrics")
 @app.get("/api/metrics")
 async def get_metrics():
     """取得指標"""
@@ -449,6 +503,7 @@ async def get_metrics():
 
 # ===== 認證 API =====
 
+@v1_router.post("/auth/register")
 @app.post("/api/auth/register")
 async def register_user(
     user_id: str,
@@ -464,6 +519,7 @@ async def register_user(
     return {"message": "註冊成功", "user_id": user_id}
 
 
+@v1_router.post("/auth/login")
 @app.post("/api/auth/login")
 async def login(username: str, password: str):
     """登入"""
@@ -478,11 +534,62 @@ async def login(username: str, password: str):
     # 建立 Token
     token = await auth_manager.create_token(user_id, role)
     
-    return {"token": token, "user_id": user_id, "role": role}
+    # 計算過期時間
+    from datetime import timedelta
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=MCPConfig.JWT_EXPIRATION_HOURS)
+    
+    return {
+        "token": token,
+        "user_id": user_id,
+        "role": role,
+        "expires_at": expires_at.isoformat()
+    }
+
+
+@v1_router.post("/auth/rotate")
+@app.post("/api/auth/rotate")
+async def rotate_token(request: Request):
+    """Token 輪替"""
+    # 從 Authorization header 獲取當前 token
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="缺少或無效的 Authorization header")
+    
+    current_token = auth_header.split(" ")[1]
+    
+    # 驗證當前 token
+    if not await auth_manager.verify_token(current_token):
+        raise HTTPException(status_code=401, detail="Token 無效或已過期")
+    
+    # 解碼 token 以獲取使用者資訊
+    payload = await auth_manager.decode_token(current_token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="無法解碼 token")
+    
+    user_id = payload.get("user_id")
+    role = payload.get("role", "viewer")
+    
+    # 建立新 token
+    new_token = await auth_manager.create_token(user_id, role)
+    
+    # 計算過期時間
+    from datetime import timedelta
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=MCPConfig.JWT_EXPIRATION_HOURS)
+    
+    logger.info("Token rotated successfully", extra={
+        'user_id': user_id,
+        'role': role
+    })
+    
+    return {
+        "token": new_token,
+        "expires_at": expires_at.isoformat()
+    }
 
 
 # ===== 媒體串流 API =====
 
+@v1_router.websocket("/media/stream/{robot_id}")
 @app.websocket("/api/media/stream/{robot_id}")
 async def stream_media(websocket: WebSocket, robot_id: str):
     """媒體串流（WebSocket）"""
@@ -544,6 +651,7 @@ async def stream_media(websocket: WebSocket, robot_id: str):
         ACTIVE_WEBSOCKETS.dec()
 
 
+@v1_router.post("/media/audio/command", response_model=AudioCommandResponse)
 @app.post("/api/media/audio/command", response_model=AudioCommandResponse)
 async def process_audio_command(request: AudioCommandRequest):
     """處理音訊指令"""
@@ -590,6 +698,10 @@ async def process_audio_command(request: AudioCommandRequest):
     except Exception as e:
         logger.error(f"處理音訊指令失敗: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# 註冊 v1 router
+app.include_router(v1_router)
 
 
 if __name__ == "__main__":

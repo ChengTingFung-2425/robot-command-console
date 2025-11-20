@@ -1,0 +1,814 @@
+openapi: 3.1.0
+info:
+  title: Robot Command Console API
+  description: |
+    機器人指令管理、路由與執行的整合式控制台與服務平台 API。
+    
+    ## 版本控制
+    API 使用路徑前綴進行版本控制（例如 `/v1/`）。目前版本為 v1。
+    
+    ## 認證
+    除了 `/health` 和 `/metrics` 端點外，所有端點都需要 Bearer token 認證。
+    Token 通過 `Authorization: Bearer <token>` header 提供。
+    
+    ## 安全性
+    - 所有 Token 都有過期時間，預設為 24 小時
+    - Token 可以通過 rotation 端點更新
+    - 使用 HTTPS 進行生產環境部署
+  version: 1.0.0
+  contact:
+    name: Robot Command Console Team
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8000/v1
+    description: MCP 服務開發環境
+  - url: http://127.0.0.1:5000/v1
+    description: Flask 服務開發環境
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token 用於身份驗證
+
+  schemas:
+    # 通用模型
+    TraceId:
+      type: string
+      description: 追蹤 ID，用於關聯請求和事件
+      example: "trace-123e4567-e89b-12d3-a456-426614174000"
+    
+    Timestamp:
+      type: string
+      format: date-time
+      description: ISO 8601 格式的時間戳記
+      example: "2025-11-20T03:31:20.213Z"
+    
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - trace_id
+        - timestamp
+      properties:
+        error:
+          type: string
+          description: 錯誤代碼
+          example: "UNAUTHORIZED"
+        message:
+          type: string
+          description: 錯誤訊息
+          example: "Invalid or expired token"
+        trace_id:
+          $ref: '#/components/schemas/TraceId'
+        timestamp:
+          $ref: '#/components/schemas/Timestamp'
+        details:
+          type: object
+          description: 額外的錯誤詳情
+          additionalProperties: true
+    
+    # 健康檢查
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+        - service
+        - version
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+          description: 服務健康狀態
+        timestamp:
+          $ref: '#/components/schemas/Timestamp'
+        service:
+          type: string
+          description: 服務名稱
+          example: "mcp-api"
+        version:
+          type: string
+          description: 服務版本
+          example: "1.0.0"
+    
+    # 認證模型
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          description: 使用者名稱
+          minLength: 3
+          maxLength: 50
+        password:
+          type: string
+          description: 密碼
+          minLength: 8
+          format: password
+    
+    LoginResponse:
+      type: object
+      required:
+        - token
+        - user_id
+        - role
+        - expires_at
+      properties:
+        token:
+          type: string
+          description: JWT token
+        user_id:
+          type: string
+          description: 使用者 ID
+        role:
+          type: string
+          description: 使用者角色
+          enum: [admin, operator, viewer]
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
+    
+    RegisterUserRequest:
+      type: object
+      required:
+        - user_id
+        - username
+        - password
+      properties:
+        user_id:
+          type: string
+          description: 使用者 ID
+        username:
+          type: string
+          description: 使用者名稱
+          minLength: 3
+          maxLength: 50
+        password:
+          type: string
+          description: 密碼
+          minLength: 8
+          format: password
+        role:
+          type: string
+          description: 使用者角色
+          enum: [admin, operator, viewer]
+          default: viewer
+    
+    TokenRotationResponse:
+      type: object
+      required:
+        - token
+        - expires_at
+      properties:
+        token:
+          type: string
+          description: 新的 JWT token
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
+    
+    # 指令模型
+    CommandRequest:
+      type: object
+      required:
+        - trace_id
+        - robot_id
+        - action
+        - params
+      properties:
+        trace_id:
+          $ref: '#/components/schemas/TraceId'
+        robot_id:
+          type: string
+          description: 機器人 ID
+          example: "robot_001"
+        action:
+          type: string
+          description: 動作名稱
+          example: "move_forward"
+        params:
+          type: object
+          description: 動作參數
+          additionalProperties: true
+          example:
+            distance: 100
+            speed: 50
+        timeout_ms:
+          type: integer
+          description: 超時時間（毫秒）
+          minimum: 100
+          maximum: 300000
+          default: 10000
+        priority:
+          type: string
+          description: 優先級
+          enum: [URGENT, HIGH, NORMAL, LOW]
+          default: NORMAL
+    
+    CommandResponse:
+      type: object
+      required:
+        - trace_id
+        - command_id
+        - status
+        - timestamp
+      properties:
+        trace_id:
+          $ref: '#/components/schemas/TraceId'
+        command_id:
+          type: string
+          description: 指令 ID
+          example: "cmd-123e4567"
+        status:
+          type: string
+          description: 指令狀態
+          enum: [pending, executing, completed, failed, cancelled]
+        timestamp:
+          $ref: '#/components/schemas/Timestamp'
+        result:
+          type: object
+          description: 執行結果
+          additionalProperties: true
+        error:
+          type: string
+          description: 錯誤訊息（如果失敗）
+    
+    # 機器人模型
+    RobotRegistration:
+      type: object
+      required:
+        - robot_id
+        - robot_type
+        - capabilities
+      properties:
+        robot_id:
+          type: string
+          description: 機器人 ID
+          example: "robot_001"
+        robot_type:
+          type: string
+          description: 機器人類型
+          example: "mobile_robot"
+        capabilities:
+          type: array
+          description: 機器人能力列表
+          items:
+            type: string
+          example: ["move", "rotate", "stop"]
+        metadata:
+          type: object
+          description: 額外的元數據
+          additionalProperties: true
+    
+    RobotStatus:
+      type: string
+      enum: [online, offline, busy, error]
+      description: 機器人狀態
+    
+    RobotInfo:
+      type: object
+      required:
+        - robot_id
+        - robot_type
+        - status
+        - last_heartbeat
+      properties:
+        robot_id:
+          type: string
+          description: 機器人 ID
+        robot_type:
+          type: string
+          description: 機器人類型
+        status:
+          $ref: '#/components/schemas/RobotStatus'
+        capabilities:
+          type: array
+          items:
+            type: string
+        last_heartbeat:
+          $ref: '#/components/schemas/Timestamp'
+        metadata:
+          type: object
+          additionalProperties: true
+    
+    Heartbeat:
+      type: object
+      required:
+        - robot_id
+        - status
+      properties:
+        robot_id:
+          type: string
+          description: 機器人 ID
+        status:
+          $ref: '#/components/schemas/RobotStatus'
+        battery_level:
+          type: number
+          description: 電池電量（百分比）
+          minimum: 0
+          maximum: 100
+        location:
+          type: object
+          description: 位置資訊
+          properties:
+            x:
+              type: number
+            y:
+              type: number
+            z:
+              type: number
+    
+    # 事件模型
+    Event:
+      type: object
+      required:
+        - trace_id
+        - timestamp
+        - severity
+        - category
+        - message
+      properties:
+        trace_id:
+          $ref: '#/components/schemas/TraceId'
+        timestamp:
+          $ref: '#/components/schemas/Timestamp'
+        severity:
+          type: string
+          enum: [DEBUG, INFO, WARNING, ERROR, CRITICAL]
+        category:
+          type: string
+          enum: [command, robot, auth, system, audit]
+        message:
+          type: string
+          description: 事件訊息
+        context:
+          type: object
+          description: 事件上下文
+          additionalProperties: true
+
+  responses:
+    Unauthorized:
+      description: 未授權 - Token 無效或已過期
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "UNAUTHORIZED"
+            message: "Invalid or expired token"
+            trace_id: "trace-123"
+            timestamp: "2025-11-20T03:31:20.213Z"
+    
+    Forbidden:
+      description: 禁止訪問 - 權限不足
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "FORBIDDEN"
+            message: "Insufficient permissions"
+            trace_id: "trace-456"
+            timestamp: "2025-11-20T03:31:20.213Z"
+    
+    NotFound:
+      description: 資源不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    
+    ValidationError:
+      description: 驗證錯誤 - 請求資料格式不正確
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "VALIDATION_ERROR"
+            message: "Invalid request data"
+            trace_id: "trace-789"
+            timestamp: "2025-11-20T03:31:20.213Z"
+            details:
+              field: "action"
+              reason: "Field is required"
+
+paths:
+  # 健康檢查端點（無需認證）
+  /health:
+    get:
+      summary: 健康檢查
+      description: 檢查服務健康狀態，此端點不需要認證
+      operationId: healthCheck
+      security: []  # 覆蓋全域安全要求
+      tags:
+        - Health
+      responses:
+        '200':
+          description: 服務健康
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  
+  # Metrics 端點（無需認證）
+  /metrics:
+    get:
+      summary: Prometheus Metrics
+      description: 獲取 Prometheus 格式的指標，此端點不需要認證
+      operationId: getMetrics
+      security: []  # 覆蓋全域安全要求
+      tags:
+        - Monitoring
+      responses:
+        '200':
+          description: Metrics 資料
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: |
+                  # HELP mcp_request_count_total Total number of requests
+                  # TYPE mcp_request_count_total counter
+                  mcp_request_count_total{method="GET",endpoint="/health",status="200"} 42.0
+  
+  # 認證端點
+  /auth/register:
+    post:
+      summary: 註冊新使用者
+      description: 註冊新使用者帳號
+      operationId: registerUser
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterUserRequest'
+      responses:
+        '200':
+          description: 註冊成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  user_id:
+                    type: string
+        '400':
+          description: 使用者已存在或資料無效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  
+  /auth/login:
+    post:
+      summary: 使用者登入
+      description: 驗證使用者並獲取 JWT token
+      operationId: login
+      security: []  # 登入不需要認證
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登入成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  
+  /auth/rotate:
+    post:
+      summary: Token 輪替
+      description: 使用當前有效的 token 獲取新的 token
+      operationId: rotateToken
+      tags:
+        - Authentication
+      responses:
+        '200':
+          description: Token 輪替成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRotationResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  
+  # 指令端點
+  /command:
+    post:
+      summary: 建立指令
+      description: 發送新的機器人指令
+      operationId: createCommand
+      tags:
+        - Commands
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommandRequest'
+      responses:
+        '200':
+          description: 指令已建立
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  
+  /command/{command_id}:
+    get:
+      summary: 查詢指令狀態
+      description: 獲取指定指令的當前狀態
+      operationId: getCommandStatus
+      tags:
+        - Commands
+      parameters:
+        - name: command_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 指令 ID
+      responses:
+        '200':
+          description: 指令狀態
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    
+    delete:
+      summary: 取消指令
+      description: 取消正在執行的指令
+      operationId: cancelCommand
+      tags:
+        - Commands
+      parameters:
+        - name: command_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 指令 ID
+        - name: trace_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 追蹤 ID
+      responses:
+        '200':
+          description: 指令已取消
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  command_id:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  
+  # 機器人端點
+  /robots/register:
+    post:
+      summary: 註冊機器人
+      description: 註冊新的機器人到系統
+      operationId: registerRobot
+      tags:
+        - Robots
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RobotRegistration'
+      responses:
+        '200':
+          description: 註冊成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  robot_id:
+                    type: string
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  
+  /robots/{robot_id}:
+    get:
+      summary: 獲取機器人資訊
+      description: 獲取指定機器人的詳細資訊
+      operationId: getRobot
+      tags:
+        - Robots
+      parameters:
+        - name: robot_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 機器人 ID
+      responses:
+        '200':
+          description: 機器人資訊
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RobotInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    
+    delete:
+      summary: 取消註冊機器人
+      description: 從系統移除機器人
+      operationId: unregisterRobot
+      tags:
+        - Robots
+      parameters:
+        - name: robot_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 機器人 ID
+      responses:
+        '200':
+          description: 取消註冊成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  robot_id:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  
+  /robots:
+    get:
+      summary: 列出機器人
+      description: 獲取系統中所有機器人的列表
+      operationId: listRobots
+      tags:
+        - Robots
+      parameters:
+        - name: robot_type
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 按類型篩選
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/RobotStatus'
+          description: 按狀態篩選
+      responses:
+        '200':
+          description: 機器人列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  robots:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RobotInfo'
+                  count:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  
+  /robots/heartbeat:
+    post:
+      summary: 更新心跳
+      description: 機器人發送心跳以保持連線狀態
+      operationId: updateHeartbeat
+      tags:
+        - Robots
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Heartbeat'
+      responses:
+        '200':
+          description: 心跳已更新
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  
+  # 事件端點
+  /events:
+    get:
+      summary: 查詢事件
+      description: 獲取系統事件記錄
+      operationId: getEvents
+      tags:
+        - Events
+      parameters:
+        - name: trace_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 按 trace_id 篩選
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+          description: 返回事件數量限制
+      responses:
+        '200':
+          description: 事件列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+                  count:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+tags:
+  - name: Health
+    description: 健康檢查和狀態監控
+  - name: Monitoring
+    description: 系統指標和可觀測性
+  - name: Authentication
+    description: 使用者認證和授權
+  - name: Commands
+    description: 機器人指令管理
+  - name: Robots
+    description: 機器人註冊和管理
+  - name: Events
+    description: 系統事件記錄

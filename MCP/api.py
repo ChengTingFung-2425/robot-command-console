@@ -79,11 +79,6 @@ COMMAND_COUNT = Counter(
     ['status']
 )
 
-COMMAND_QUEUE_DEPTH = Gauge(
-    'mcp_command_queue_depth',
-    'Current depth of the command queue'
-)
-
 ROBOT_COUNT = Gauge(
     'mcp_robot_count',
     'Number of registered robots',
@@ -492,6 +487,16 @@ async def login(username: str, password: str):
 async def stream_media(websocket: WebSocket, robot_id: str):
     """媒體串流（WebSocket）"""
     await websocket.accept()
+    
+    # 檢查機器人是否存在（在增加計數前檢查）
+    robot = await robot_router.get_robot(robot_id)
+    if not robot:
+        logger.warning("Media stream request for non-existent robot", extra={
+            'robot_id': robot_id
+        })
+        await websocket.close(code=1008, reason="機器人不存在")
+        return
+    
     ACTIVE_WEBSOCKETS.inc()
     
     logger.info("Media stream connection established", extra={
@@ -500,11 +505,6 @@ async def stream_media(websocket: WebSocket, robot_id: str):
     })
     
     try:
-        # 從機器人獲取媒體串流
-        robot = await robot_router.get_robot(robot_id)
-        if not robot:
-            await websocket.close(code=1008, reason="機器人不存在")
-            return
         
         # 持續推送媒體資料
         while True:

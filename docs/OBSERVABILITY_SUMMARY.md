@@ -23,7 +23,6 @@
 flask_request_count_total{method, endpoint, status}
 flask_request_latency_seconds{method, endpoint}
 flask_error_count_total{endpoint, error_type}
-flask_queue_depth
 flask_active_connections
 ```
 
@@ -56,7 +55,6 @@ flask_active_connections
 mcp_request_count_total{method, endpoint, status}
 mcp_request_latency_seconds{method, endpoint}
 mcp_command_count_total{status}
-mcp_command_queue_depth
 mcp_robot_count{status}
 mcp_error_count_total{endpoint, error_type}
 mcp_active_websockets

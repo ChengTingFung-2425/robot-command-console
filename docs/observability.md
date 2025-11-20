@@ -35,7 +35,6 @@ http://127.0.0.1:5000/metrics
 | `flask_request_count_total` | Counter | 總請求數 | `method`, `endpoint`, `status` |
 | `flask_request_latency_seconds` | Histogram | 請求延遲時間（秒） | `method`, `endpoint` |
 | `flask_error_count_total` | Counter | 總錯誤數 | `endpoint`, `error_type` |
-| `flask_queue_depth` | Gauge | 目前佇列深度 | - |
 | `flask_active_connections` | Gauge | 活躍連線數 | - |
 
 #### 範例查詢
@@ -70,7 +69,6 @@ http://localhost:8000/metrics
 | `mcp_request_count_total` | Counter | 總請求數 | `method`, `endpoint`, `status` |
 | `mcp_request_latency_seconds` | Histogram | 請求延遲時間（秒） | `method`, `endpoint` |
 | `mcp_command_count_total` | Counter | 已處理的指令總數 | `status` |
-| `mcp_command_queue_depth` | Gauge | 指令佇列深度 | - |
 | `mcp_robot_count` | Gauge | 已註冊的機器人數量 | `status` |
 | `mcp_error_count_total` | Counter | 總錯誤數 | `endpoint`, `error_type` |
 | `mcp_active_websockets` | Gauge | 活躍的 WebSocket 連線數 | - |
@@ -398,16 +396,6 @@ groups:
         annotations:
           summary: "High request latency"
           description: "95th percentile latency is {{ $value }}s"
-
-      # 指令佇列深度告警
-      - alert: CommandQueueBacklog
-        expr: mcp_command_queue_depth > 100
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Command queue backlog"
-          description: "Queue depth is {{ $value }}"
 ```
 
 ### 2. 儀表板

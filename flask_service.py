@@ -77,11 +77,6 @@ ERROR_COUNT = Counter(
     ['endpoint', 'error_type']
 )
 
-QUEUE_DEPTH = Gauge(
-    'flask_queue_depth',
-    'Current depth of the processing queue'
-)
-
 ACTIVE_CONNECTIONS = Gauge(
     'flask_active_connections',
     'Number of active connections'

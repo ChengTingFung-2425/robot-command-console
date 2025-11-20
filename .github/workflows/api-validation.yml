@@ -20,6 +20,8 @@ jobs:
   validate-openapi:
     name: 驗證 OpenAPI 規範
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     
     steps:
       - name: Checkout 程式碼
@@ -104,6 +106,8 @@ jobs:
   test-security:
     name: 測試安全功能
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     
     steps:
       - name: Checkout 程式碼
@@ -131,6 +135,8 @@ jobs:
   check-docs:
     name: 檢查安全文件
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     
     steps:
       - name: Checkout 程式碼

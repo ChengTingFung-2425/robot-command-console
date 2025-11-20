@@ -11,10 +11,14 @@
 
 ## 主要元件概覽
 
-- MCP/: 管理核心後端服務（API、身分驗證、指令處理、上下文管理、日誌監控）。
-- Robot-Console/: 機器人執行層與相關工具（action executor、decoder、pubsub）。
-- WebUI/: 提供使用者介面與微服務整合的範例實作（microblog 與 Web UI routes）。
-- Test/: 專案的自動化測試集合，包含單元測試與整合測試範例。
+- **src/robot_service/** - 模組化機器人服務（新增）
+  - 本地佇列系統（記憶體內，可擴展至 Redis/Kafka）
+  - Electron 整合模式與獨立 CLI 模式
+  - 清晰的 API 界限與可測試架構
+- **MCP/** - 管理核心後端服務（API、身分驗證、指令處理、上下文管理、日誌監控）
+- **Robot-Console/** - 機器人執行層與相關工具（action executor、decoder、pubsub）
+- **WebUI/** - 提供使用者介面與微服務整合的範例實作（microblog 與 Web UI routes）
+- **Test/** - 專案的自動化測試集合，包含單元測試與整合測試範例
 
 ## 主要功能（摘要）
 
@@ -38,30 +42,58 @@
 
 ## 快速啟動（開發者）
 
-1. 建立虛擬環境並安裝依賴（請根據不同子專案執行相應 requirements.txt）：
+### 1. 安裝依賴
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+pip install -r MCP/requirements.txt
 ```
 
-1. 依需求啟動單一元件：例如啟動 WebUI 開發伺服器或 MCP 服務（詳見各子資料夾 `README.md`）：
+### 2. 啟動服務
+
+#### Electron 整合模式（預設）
 
 ```bash
-# 例如：啟動主應用（若有 app.py）
-python app.py
+# 由 Electron 自動啟動 Python 服務
+npm start
+```
 
-# 或在 WebUI 資料夾中啟動 microblog
+#### 獨立 CLI 模式
+
+```bash
+# 執行 Robot Service（不依賴 Electron）
+python3 run_service_cli.py --queue-size 1000 --workers 5
+```
+
+#### 手動啟動 Flask 服務
+
+```bash
+# 設定環境變數並啟動
+APP_TOKEN=your-token-here PORT=5000 python3 flask_service.py
+```
+
+### 3. 啟動其他元件
+
+```bash
+# 啟動 MCP 服務
+cd MCP
+python3 start.py
+
+# 啟動 WebUI
 cd WebUI
 python microblog.py
 ```
 
-1. 執行測試：
+### 4. 執行測試
 
 ```bash
-# 在專案根目錄
-pytest -q
+# 在專案根目錄執行所有測試
+python3 -m pytest Test/ -v
+
+# 執行特定測試
+python3 -m pytest Test/test_queue_system.py -v
 ```
 
 ## 專案約定與延伸
@@ -105,10 +137,27 @@ python3 flask_service.py
 
 詳細說明請參閱 [可觀測性指南](docs/observability.md)。
 
+## Robot Service 模組化架構
+
+專案已將 Python 背景服務重構為 `src/robot_service/` 模組，提供：
+
+- ✅ **清晰的 API 界限** - 模組化設計，職責分離
+- ✅ **本地佇列系統** - 記憶體內實作，可擴展至 Redis/Kafka
+- ✅ **雙模式運行** - Electron 整合與獨立 CLI 模式
+- ✅ **優先權佇列** - 4 個等級的訊息優先權（URGENT/HIGH/NORMAL/LOW）
+- ✅ **非同步處理** - 多工作協程並行處理
+- ✅ **可測試性** - 完整的單元測試與整合測試
+
+詳細文件：
+- [Robot Service README](src/robot_service/README.md) - 模組使用說明
+- [Queue Architecture](docs/queue-architecture.md) - 佇列架構與設計
+
 ## 參考與文件
 
 - 專案內 `docs/` 與各子模組的 `README.md` 提供更詳細的設計說明與部署指引
 - [可觀測性指南](docs/observability.md) - Prometheus metrics 和結構化日誌的完整文件
+- [Queue Architecture](docs/queue-architecture.md) - 佇列系統架構與訊息合約
+- [Robot Service](src/robot_service/README.md) - 模組化服務說明
 
 ## CI: 自動將 main 同步到各分支（新增）
 

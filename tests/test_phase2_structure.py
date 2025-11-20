@@ -2,7 +2,6 @@
 Phase 2 結構驗證測試
 驗證 Phase 2 重構後的目錄結構是否正確
 """
-import os
 import sys
 from pathlib import Path
 

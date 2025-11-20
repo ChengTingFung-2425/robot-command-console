@@ -74,9 +74,41 @@ pytest -q
 
 歡迎開發者提交 issue 與 PR。請遵守現有測試與程式碼風格，並在新增功能時補上對應的測試。
 
+## 可觀測性（Observability）
+
+本專案已整合完整的可觀測性功能，包括：
+
+- **Prometheus Metrics** - 所有服務都提供 `/metrics` 端點，可監控 API 調用計數、錯誤率、佇列深度、機器人狀態等即時指標
+- **結構化 JSON 日誌** - 統一使用 JSON 格式記錄日誌，包含 timestamp、level、event、correlation ID 和 trace ID
+- **健康檢查** - Electron 主程序定期監控 Python 服務健康狀態並記錄狀態轉換
+
+### Metrics 端點
+
+- Flask Service: `http://127.0.0.1:5000/metrics`
+- MCP Service: `http://localhost:8000/metrics`
+
+### 快速開始
+
+1. 啟動服務後訪問 metrics 端點：
+```bash
+curl http://127.0.0.1:5000/metrics
+```
+
+2. 查看結構化日誌（所有服務輸出 JSON 格式）：
+```bash
+# Electron 日誌會顯示在主控台
+npm start
+
+# Python 服務日誌也是 JSON 格式
+python3 flask_service.py
+```
+
+詳細說明請參閱 [可觀測性指南](docs/observability.md)。
+
 ## 參考與文件
 
-- 專案內 `docs/` 與各子模組的 `README.md` 提供更詳細的設計說明與部署指引。  
+- 專案內 `docs/` 與各子模組的 `README.md` 提供更詳細的設計說明與部署指引
+- [可觀測性指南](docs/observability.md) - Prometheus metrics 和結構化日誌的完整文件
 
 ## CI: 自動將 main 同步到各分支（新增）
 

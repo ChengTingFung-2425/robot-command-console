@@ -4,14 +4,34 @@ MCP 日誌監控模組
 """
 
 import logging
+import sys
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+from pythonjsonlogger import jsonlogger
 
 from .models import Event, EventCategory, EventSeverity
 
 
+# 設定 JSON 結構化日誌
+class CustomJsonFormatter(jsonlogger.JsonFormatter):
+    """自定義 JSON 日誌格式器"""
+    def add_fields(self, log_record, record, message_dict):
+        super().add_fields(log_record, record, message_dict)
+        log_record['timestamp'] = datetime.now(timezone.utc).isoformat()
+        log_record['level'] = record.levelname
+        log_record['event'] = record.name
+        log_record['service'] = 'mcp'
+
+# 配置日誌處理器
+log_handler = logging.StreamHandler(sys.stdout)
+formatter = CustomJsonFormatter('%(timestamp)s %(level)s %(event)s %(message)s')
+log_handler.setFormatter(formatter)
+
 logger = logging.getLogger(__name__)
+logger.handlers.clear()
+logger.addHandler(log_handler)
+logger.setLevel(logging.INFO)
 
 
 class LoggingMonitor:
@@ -28,9 +48,15 @@ class LoggingMonitor:
         # 記錄事件
         self.events.append(event)
         
-        # 記錄日誌
+        # 記錄結構化日誌
         log_method = self._get_log_method(event.severity)
-        log_method(f"[{event.category.value}] {event.message} (trace_id={event.trace_id})")
+        log_method(event.message, extra={
+            'trace_id': event.trace_id,
+            'category': event.category.value,
+            'severity': event.severity.value,
+            'timestamp': event.timestamp.isoformat(),
+            'context': event.context
+        })
         
         # 更新指標
         self.metrics[f"event_{event.category.value}_{event.severity.value}"] += 1
@@ -40,7 +66,10 @@ class LoggingMonitor:
             try:
                 await subscriber(event)
             except Exception as e:
-                logger.error(f"事件訂閱者錯誤: {e}")
+                logger.error("事件訂閱者錯誤", extra={
+                    'error': str(e),
+                    'trace_id': event.trace_id
+                })
     
     def _get_log_method(self, severity: EventSeverity):
         """取得日誌方法"""
@@ -89,7 +118,29 @@ class LoggingMonitor:
     async def record_metric(self, name: str, value: Any):
         """記錄指標"""
         self.metrics[name] = value
+        logger.debug("Metric recorded", extra={
+            'metric_name': name,
+            'metric_value': value
+        })
     
     async def increment_metric(self, name: str, delta: int = 1):
         """增加指標計數"""
         self.metrics[name] += delta
+        logger.debug("Metric incremented", extra={
+            'metric_name': name,
+            'delta': delta,
+            'new_value': self.metrics[name]
+        })
+    
+    async def log_event(self, trace_id: str, severity: str, category: str, 
+                       message: str, context: Optional[Dict[str, Any]] = None):
+        """記錄事件的便利方法"""
+        event = Event(
+            trace_id=trace_id,
+            timestamp=datetime.now(timezone.utc),
+            severity=EventSeverity(severity.upper()),
+            category=EventCategory(category),
+            message=message,
+            context=context or {}
+        )
+        await self.emit_event(event)

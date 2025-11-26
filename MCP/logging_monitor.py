@@ -4,34 +4,16 @@ MCP 日誌監控模組
 """
 
 import logging
-import sys
 from collections import defaultdict
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-from pythonjsonlogger import jsonlogger
 
 from .models import Event, EventCategory, EventSeverity
+from .utils.datetime_utils import utc_now
+from .utils.logging_utils import CustomJsonFormatter, setup_json_logging
 
 
-# 設定 JSON 結構化日誌
-class CustomJsonFormatter(jsonlogger.JsonFormatter):
-    """自定義 JSON 日誌格式器"""
-    def add_fields(self, log_record, record, message_dict):
-        super().add_fields(log_record, record, message_dict)
-        log_record['timestamp'] = datetime.now(timezone.utc).isoformat()
-        log_record['level'] = record.levelname
-        log_record['event'] = record.name
-        log_record['service'] = 'mcp'
-
-# 配置日誌處理器
-log_handler = logging.StreamHandler(sys.stdout)
-formatter = CustomJsonFormatter('%(timestamp)s %(level)s %(event)s %(message)s')
-log_handler.setFormatter(formatter)
-
-logger = logging.getLogger(__name__)
-logger.handlers.clear()
-logger.addHandler(log_handler)
-logger.setLevel(logging.INFO)
+# 配置日誌
+logger = setup_json_logging(__name__, service_name='mcp')
 
 
 class LoggingMonitor:
@@ -137,7 +119,7 @@ class LoggingMonitor:
         """記錄事件的便利方法"""
         event = Event(
             trace_id=trace_id,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=utc_now(),
             severity=EventSeverity(severity.upper()),
             category=EventCategory(category),
             message=message,

@@ -14,13 +14,15 @@ def test_project_root_structure():
     required_dirs = [
         "electron-app",
         "src/robot_service",
+        "src/common",           # 新增：共用模組
         "MCP",
         "Robot-Console",
         "WebUI",
         "tests",
         "config",
         "docs",
-        "plans",
+        "docs/plans",           # 已從根目錄移動到 docs/plans
+        "docs/phase1",          # 新增：Phase 1 文檔
         "examples",
     ]
     
@@ -152,6 +154,34 @@ def test_python_imports_work():
         assert AuthManager is not None
     except ImportError as e:
         assert False, f"無法導入 MCP: {e}"
+
+
+def test_common_module_imports():
+    """驗證共用模組可以導入"""
+    project_root = Path(__file__).parent.parent
+    
+    # 確保 src 在 Python 路徑中
+    src_path = str(project_root / "src")
+    if src_path not in sys.path:
+        sys.path.insert(0, src_path)
+    
+    # 測試 common 模組
+    try:
+        from common import utc_now, utc_now_iso, get_logger
+        assert utc_now is not None
+        assert utc_now_iso is not None
+        assert get_logger is not None
+    except ImportError as e:
+        assert False, f"無法導入 common 模組: {e}"
+    
+    # 測試配置類別
+    try:
+        from common.config import EdgeConfig, ServerConfig, Environment
+        assert EdgeConfig is not None
+        assert ServerConfig is not None
+        assert Environment is not None
+    except ImportError as e:
+        assert False, f"無法導入 common.config: {e}"
 
 
 def test_no_old_references_in_root():

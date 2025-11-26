@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const crypto = require('crypto');
@@ -8,6 +8,11 @@ let pythonProcess = null;
 let appToken = null;
 let healthCheckInterval = null;
 let healthStatus = 'unknown';
+let restartAttempts = 0;
+const MAX_RESTART_ATTEMPTS = 3;
+const RESTART_DELAY_MS = 2000;
+let consecutiveFailures = 0;
+const ALERT_THRESHOLD = 3;  // 連續失敗次數閾值，超過則發送告警
 
 // JSON 結構化日誌函數
 function logJSON(level, event, message, extra = {}) {
@@ -20,6 +25,28 @@ function logJSON(level, event, message, extra = {}) {
     ...extra
   };
   console.log(JSON.stringify(logEntry));
+}
+
+// 發送系統通知告警
+function sendHealthAlert(title, body) {
+  if (Notification.isSupported()) {
+    const notification = new Notification({
+      title: `Robot Console: ${title}`,
+      body: body,
+      urgency: 'critical'
+    });
+    notification.show();
+    
+    logJSON('warn', 'health_alert_sent', 'Health alert notification sent', {
+      title: title,
+      body: body
+    });
+  } else {
+    logJSON('warn', 'health_alert_unsupported', 'System notifications not supported', {
+      title: title,
+      body: body
+    });
+  }
 }
 
 // 生成應用生命週期內有效的 token
@@ -77,6 +104,37 @@ function startPythonService() {
         signal: signal
       });
       pythonProcess = null;
+      
+      // 自動重啟邏輯（僅在非正常退出且未超過重試次數時）
+      if (code !== 0 && restartAttempts < MAX_RESTART_ATTEMPTS) {
+        restartAttempts++;
+        logJSON('info', 'python_service_restart', 'Attempting to restart Python service', {
+          attempt: restartAttempts,
+          max_attempts: MAX_RESTART_ATTEMPTS,
+          delay_ms: RESTART_DELAY_MS
+        });
+        
+        setTimeout(async () => {
+          try {
+            await startPythonService();
+            const healthy = await checkHealth();
+            if (healthy) {
+              logJSON('info', 'python_service_restart_success', 'Python service restarted successfully');
+              restartAttempts = 0;  // 重置重啟計數
+            }
+          } catch (error) {
+            logJSON('error', 'python_service_restart_failed', 'Failed to restart Python service', {
+              error: error.message
+            });
+            sendHealthAlert('Python 服務重啟失敗', `嘗試 ${restartAttempts}/${MAX_RESTART_ATTEMPTS} 次後仍無法重啟`);
+          }
+        }, RESTART_DELAY_MS);
+      } else if (restartAttempts >= MAX_RESTART_ATTEMPTS) {
+        logJSON('error', 'python_service_restart_exhausted', 'Max restart attempts reached', {
+          attempts: restartAttempts
+        });
+        sendHealthAlert('Python 服務故障', '已達最大重啟次數，服務無法恢復');
+      }
     });
     
     // 設定超時
@@ -105,6 +163,14 @@ async function checkHealth() {
       if (response.ok) {
         const data = await response.json();
         const newStatus = 'healthy';
+        
+        // 重置連續失敗計數
+        if (consecutiveFailures > 0) {
+          logJSON('info', 'health_recovered', 'Health check recovered after failures', {
+            previous_failures: consecutiveFailures
+          });
+          consecutiveFailures = 0;
+        }
         
         if (healthStatus !== newStatus) {
           logJSON('info', 'health_status_transition', 'Health status changed', {
@@ -135,17 +201,45 @@ async function checkHealth() {
   }
   
   const newStatus = 'unhealthy';
+  consecutiveFailures++;
+  
   if (healthStatus !== newStatus) {
     logJSON('error', 'health_status_transition', 'Health status changed', {
       previous_status: healthStatus,
-      new_status: newStatus
+      new_status: newStatus,
+      consecutive_failures: consecutiveFailures
     });
     healthStatus = newStatus;
   }
   
   logJSON('error', 'health_check_failed', 'All health check attempts failed', {
-    total_attempts: maxRetries
+    total_attempts: maxRetries,
+    consecutive_failures: consecutiveFailures
   });
+  
+  // 連續失敗達到閾值時發送告警
+  if (consecutiveFailures >= ALERT_THRESHOLD) {
+    sendHealthAlert('服務健康狀態異常', `Python 服務已連續 ${consecutiveFailures} 次健康檢查失敗`);
+    
+    // 嘗試自動重啟
+    if (!pythonProcess && restartAttempts < MAX_RESTART_ATTEMPTS) {
+      logJSON('info', 'health_triggered_restart', 'Health check triggered automatic restart');
+      restartAttempts++;
+      try {
+        await startPythonService();
+        const healthy = await checkHealth();
+        if (healthy) {
+          logJSON('info', 'health_restart_success', 'Automatic restart successful');
+          restartAttempts = 0;
+          consecutiveFailures = 0;
+        }
+      } catch (error) {
+        logJSON('error', 'health_restart_failed', 'Automatic restart failed', {
+          error: error.message
+        });
+      }
+    }
+  }
   
   return false;
 }
@@ -201,6 +295,38 @@ function createWindow() {
 // IPC 處理：獲取 token
 ipcMain.handle('get-token', () => {
   return appToken;
+});
+
+// IPC 處理：獲取健康狀態
+ipcMain.handle('get-health-status', () => {
+  return {
+    status: healthStatus,
+    consecutiveFailures: consecutiveFailures,
+    restartAttempts: restartAttempts,
+    pythonRunning: pythonProcess !== null
+  };
+});
+
+// IPC 處理：手動重啟 Python 服務
+ipcMain.handle('restart-python-service', async () => {
+  logJSON('info', 'manual_restart_requested', 'Manual Python service restart requested');
+  
+  if (pythonProcess) {
+    pythonProcess.kill('SIGTERM');
+    pythonProcess = null;
+  }
+  
+  // 重置計數器
+  restartAttempts = 0;
+  consecutiveFailures = 0;
+  
+  try {
+    await startPythonService();
+    const healthy = await checkHealth();
+    return { success: healthy, message: healthy ? 'Service restarted successfully' : 'Service started but health check failed' };
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
 });
 
 // 應用啟動

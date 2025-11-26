@@ -225,6 +225,11 @@ class ServiceCoordinator:
            - 若服務正在運行，會拋出 ValueError 拒絕替換
            - 調用方應確保在註冊新服務前先停止並取消註冊舊服務
         
+        3. **未來改進 (Phase 3.2)**：
+           - 在 Linux 環境下，可實作基於檔案鎖定 (file lock) 搭配進程雜湊 (process hash) 的機制
+           - 此機制可解決跨應用程式重啟時的服務狀態同步問題
+           - 實作路徑：使用 fcntl.flock() 或 fcntl.lockf() 配合 PID 檔案
+        
         Args:
             service: 服務實例
             config: 服務配置（可選）

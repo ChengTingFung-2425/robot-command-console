@@ -134,7 +134,9 @@ class MyCustomService(ServiceBase):
         """健康檢查"""
         return {
             "status": "healthy" if self._running else "stopped",
-            "details": {...}
+            "details": {
+                # 可根據實際需求填入更多健康資訊
+            }
         }
     
     @property

@@ -7,9 +7,7 @@ import asyncio
 import sys
 import os
 import unittest
-from datetime import datetime, timezone
 from typing import Any, Dict, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
 
 # 添加 src 目錄到路徑
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -19,7 +17,6 @@ from robot_service.service_coordinator import (
     ServiceBase,
     ServiceStatus,
     ServiceConfig,
-    ServiceState,
     QueueService,
 )
 
@@ -137,6 +134,25 @@ class TestServiceCoordinator(unittest.TestCase):
         state = coordinator._states["test_service"]
         self.assertFalse(state.config.enabled)
         self.assertFalse(state.config.auto_restart)
+    
+    def test_register_running_service_raises_error(self):
+        """測試替換正在運行的服務時拋出錯誤"""
+        async def test():
+            coordinator = ServiceCoordinator()
+            service1 = MockService("test_service")
+            service2 = MockService("test_service")
+            
+            coordinator.register_service(service1)
+            await coordinator.start_service("test_service")
+            
+            with self.assertRaises(ValueError) as context:
+                coordinator.register_service(service2)
+            
+            self.assertIn("Cannot replace running service", str(context.exception))
+            
+            await coordinator.stop_service("test_service")
+        
+        self.loop.run_until_complete(test())
     
     def test_unregister_service(self):
         """測試取消註冊服務"""
@@ -265,10 +281,13 @@ class TestServiceCoordinator(unittest.TestCase):
             
             results = await coordinator.start_all_services()
             
+            # 啟用的服務應該啟動成功
             self.assertTrue(results["service1"])
+            # 禁用的服務返回 True 表示"跳過成功"，而非實際啟動
             self.assertTrue(results["service2"])
             self.assertTrue(service1.is_running)
-            self.assertFalse(service2.is_running)  # 禁用的服務不應該運行
+            # 禁用的服務確實未運行
+            self.assertFalse(service2.is_running)
         
         self.loop.run_until_complete(test())
     

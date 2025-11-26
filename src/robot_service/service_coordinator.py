@@ -64,28 +64,65 @@ class ServiceBase(ABC):
     @property
     @abstractmethod
     def name(self) -> str:
-        """服務名稱"""
+        """
+        服務名稱
+
+        Returns:
+            str: 服務的唯一名稱
+        """
         pass
     
     @abstractmethod
     async def start(self) -> bool:
-        """啟動服務"""
+        """
+        啟動服務
+
+        Returns:
+            bool: True 表示啟動成功，False 表示啟動失敗
+
+        Raises:
+            Exception: 啟動過程中發生的任何異常，應由實作類別處理
+        """
         pass
     
     @abstractmethod
     async def stop(self, timeout: Optional[float] = None) -> bool:
-        """停止服務"""
+        """
+        停止服務
+
+        Args:
+            timeout (Optional[float]): 停止操作的超時秒數，若為 None 則不限時
+
+        Returns:
+            bool: True 表示停止成功，False 表示停止失敗或超時
+
+        Raises:
+            Exception: 停止過程中發生的任何異常，應由實作類別處理
+        """
         pass
     
     @abstractmethod
     async def health_check(self) -> Dict[str, Any]:
-        """健康檢查"""
+        """
+        健康檢查
+
+        Returns:
+            Dict[str, Any]: 健康檢查結果，應包含 "status" 鍵與相關訊息
+
+        Raises:
+            Exception: 健康檢查過程中發生的任何異常，應由實作類別處理
+        """
         pass
     
     @property
     @abstractmethod
     def is_running(self) -> bool:
-        """服務是否運行中"""
+        """
+        服務是否運行中
+
+        Returns:
+            bool: True 表示服務正在運行，False 表示未運行
+        """
         pass
 
 
@@ -213,8 +250,14 @@ class ServiceCoordinator:
         Args:
             service: 服務實例
             config: 服務配置（可選）
+            
+        Raises:
+            ValueError: 如果嘗試替換正在運行的服務
         """
         if service.name in self._services:
+            old_service = self._services[service.name]
+            if old_service.is_running:
+                raise ValueError(f"Cannot replace running service: {service.name}")
             logger.warning("Service already registered, replacing", extra={
                 "service_name": service.name,
                 "service": "service_coordinator"
@@ -486,11 +529,10 @@ class ServiceCoordinator:
         all_success = all(results.values())
         
         if all_success:
-            await self._send_alert(
-                "所有服務已啟動",
-                "服務協調器已成功啟動所有服務",
-                {"alert_type": "all_started"}
-            )
+            logger.info("All services started successfully", extra={
+                "service_count": len(self._services),
+                "service": "service_coordinator"
+            })
         
         return results
     
@@ -523,11 +565,10 @@ class ServiceCoordinator:
         all_success = all(results.values())
         
         if all_success:
-            await self._send_alert(
-                "所有服務已停止",
-                "服務協調器已停止所有服務",
-                {"alert_type": "all_stopped"}
-            )
+            logger.info("All services stopped successfully", extra={
+                "service_count": len(self._services),
+                "service": "service_coordinator"
+            })
         
         return results
     
@@ -639,9 +680,10 @@ class ServiceCoordinator:
                 {"alert_type": "health_failure", "service": service_name}
             )
             
-            # 嘗試自動重啟
+            # 嘗試自動重啟（避免重複重啟：檢查是否正在啟動中）
             if state.config.auto_restart and state.restart_attempts < state.config.max_restart_attempts:
-                await self._attempt_restart(service_name)
+                if state.status != ServiceStatus.STARTING:
+                    await self._attempt_restart(service_name)
     
     async def _attempt_restart(self, service_name: str) -> None:
         """嘗試重啟服務"""
@@ -662,6 +704,8 @@ class ServiceCoordinator:
         success = await self.start_service(service_name)
         
         if success:
+            # 給服務預熱時間再進行健康檢查
+            await asyncio.sleep(2.0)
             healthy = await self.check_service_health(service_name)
             if healthy:
                 state.restart_attempts = 0
@@ -731,26 +775,30 @@ class ServiceCoordinator:
             "service": "service_coordinator"
         })
         
-        self._running = True
-        self._shutdown_event.clear()
-        
-        # 啟動所有服務
-        results = await self.start_all_services()
-        
-        # 執行初始健康檢查
-        await self.check_all_services_health()
-        
-        # 啟動定期健康檢查
-        self._health_check_task = asyncio.create_task(
-            self._periodic_health_check()
-        )
-        
-        logger.info("ServiceCoordinator started", extra={
-            "service_results": results,
-            "service": "service_coordinator"
-        })
-        
-        return all(results.values())
+        try:
+            self._running = True
+            self._shutdown_event.clear()
+            
+            # 啟動所有服務
+            results = await self.start_all_services()
+            
+            # 執行初始健康檢查
+            await self.check_all_services_health()
+            
+            # 啟動定期健康檢查
+            self._health_check_task = asyncio.create_task(
+                self._periodic_health_check()
+            )
+            
+            logger.info("ServiceCoordinator started", extra={
+                "service_results": results,
+                "service": "service_coordinator"
+            })
+            
+            return all(results.values())
+        except Exception:
+            self._running = False
+            raise
     
     async def stop(self, timeout: Optional[float] = None) -> bool:
         """
@@ -778,6 +826,7 @@ class ServiceCoordinator:
             try:
                 await self._health_check_task
             except asyncio.CancelledError:
+                # 健康檢查任務被取消是正常流程，安全忽略
                 pass
             self._health_check_task = None
         
@@ -834,7 +883,7 @@ class ServiceCoordinator:
                 "healthy": state.status in [ServiceStatus.HEALTHY, ServiceStatus.RUNNING],
             }
         
-        all_healthy = all(
+        all_healthy = len(service_healths) > 0 and all(
             h["healthy"] for h in service_healths.values()
         )
         

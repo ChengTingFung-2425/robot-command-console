@@ -120,7 +120,10 @@ class CLIRunner:
         self.coordinator.register_service(queue_service, queue_config)
         
         # 啟動服務協調器
-        await self.coordinator.start()
+        success = await self.coordinator.start()
+        if not success:
+            logger.error("Failed to start service coordinator")
+            raise RuntimeError("Service coordinator startup failed")
         
         logger.info("Robot Service started successfully")
         logger.info("Press Ctrl+C to stop")

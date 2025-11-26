@@ -39,6 +39,7 @@ class ServiceConfig:
     restart_delay_seconds: float = 2.0
     health_check_interval_seconds: float = 30.0
     startup_timeout_seconds: float = 5.0
+    warmup_seconds: float = 2.0
     extra_config: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -680,7 +681,9 @@ class ServiceCoordinator:
                 {"alert_type": "health_failure", "service": service_name}
             )
             
-            # 嘗試自動重啟（避免重複重啟：檢查是否正在啟動中）
+            # 嘗試自動重啟
+            # 避免重複重啟：當服務處於 STARTING 狀態時表示重啟操作正在進行中，
+            # 此時不應觸發新的重啟操作以防止並發重啟導致資源競爭
             if state.config.auto_restart and state.restart_attempts < state.config.max_restart_attempts:
                 if state.status != ServiceStatus.STARTING:
                     await self._attempt_restart(service_name)
@@ -704,8 +707,9 @@ class ServiceCoordinator:
         success = await self.start_service(service_name)
         
         if success:
-            # 給服務預熱時間再進行健康檢查
-            await asyncio.sleep(2.0)
+            # 給服務預熱時間再進行健康檢查（使用配置的預熱時間）
+            if state.config.warmup_seconds > 0:
+                await asyncio.sleep(state.config.warmup_seconds)
             healthy = await self.check_service_health(service_name)
             if healthy:
                 state.restart_attempts = 0

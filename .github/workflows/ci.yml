@@ -1,0 +1,257 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  # Python 程式碼品質檢查
+  python-lint:
+    name: Python Lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout 程式碼
+        uses: actions/checkout@v4
+      
+      - name: 設定 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: 安裝 Lint 工具
+        run: |
+          pip install flake8 black isort
+      
+      - name: 執行 flake8 檢查
+        run: |
+          # 檢查主要 Python 檔案
+          flake8 flask_service.py run_service_cli.py \
+            --max-line-length=120 \
+            --ignore=W503,E203 \
+            --statistics
+      
+      - name: 檢查 src/ 目錄
+        run: |
+          flake8 src/ \
+            --max-line-length=120 \
+            --ignore=W503,E203 \
+            --statistics
+      
+      - name: 檢查 MCP/ 目錄
+        run: |
+          flake8 MCP/ \
+            --max-line-length=120 \
+            --ignore=W503,E203 \
+            --exclude=MCP/__pycache__ \
+            --statistics
+  
+  # Node.js 程式碼品質檢查
+  node-lint:
+    name: Node.js Lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout 程式碼
+        uses: actions/checkout@v4
+      
+      - name: 設定 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: electron-app/package-lock.json
+      
+      - name: 安裝依賴
+        run: |
+          cd electron-app
+          npm ci || npm install
+      
+      - name: 檢查 JavaScript 語法
+        run: |
+          cd electron-app
+          # 使用 Node.js 內建語法檢查
+          node --check main.js
+          node --check preload.js
+  
+  # Python 測試
+  python-test:
+    name: Python Tests
+    runs-on: ubuntu-latest
+    needs: python-lint
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout 程式碼
+        uses: actions/checkout@v4
+      
+      - name: 設定 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: 安裝依賴
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio aiohttp pydantic httpx
+      
+      - name: 執行所有測試
+        run: |
+          python3 -m pytest tests/ -v --tb=short
+  
+  # OpenAPI 驗證
+  openapi-validation:
+    name: OpenAPI 驗證
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout 程式碼
+        uses: actions/checkout@v4
+      
+      - name: 設定 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: 安裝 OpenAPI 驗證工具
+        run: |
+          pip install openapi-spec-validator pyyaml
+      
+      - name: 驗證 OpenAPI 規範
+        run: |
+          openapi-spec-validator openapi.yaml
+          echo "✓ OpenAPI 規範驗證通過"
+  
+  # 文檔檢查
+  docs-check:
+    name: 文檔完整性檢查
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout 程式碼
+        uses: actions/checkout@v4
+      
+      - name: 檢查必要文檔
+        run: |
+          required_docs=(
+            "docs/threat-model.md"
+            "docs/security-checklist.md"
+            "docs/observability.md"
+            "docs/architecture.md"
+            "docs/proposal.md"
+            "openapi.yaml"
+          )
+          
+          missing=0
+          for doc in "${required_docs[@]}"; do
+            if [ ! -f "$doc" ]; then
+              echo "❌ 缺少: $doc"
+              missing=1
+            else
+              echo "✓ 存在: $doc"
+            fi
+          done
+          
+          if [ $missing -eq 1 ]; then
+            exit 1
+          fi
+          
+          echo "✓ 所有必要文檔都存在"
+  
+  # Linux 打包測試（僅在 main 分支）
+  linux-build:
+    name: Linux 打包測試
+    runs-on: ubuntu-latest
+    needs: [python-test, node-lint]
+    if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout 程式碼
+        uses: actions/checkout@v4
+      
+      - name: 設定 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: electron-app/package-lock.json
+      
+      - name: 安裝 Electron 依賴
+        run: |
+          cd electron-app
+          npm ci || npm install
+      
+      - name: 測試 Electron 打包配置
+        run: |
+          cd electron-app
+          # 驗證 package.json 配置
+          node -e "
+          const pkg = require('./package.json');
+          
+          // 檢查必要欄位
+          const required = ['name', 'version', 'main'];
+          for (const field of required) {
+            if (!pkg[field]) {
+              console.error('缺少欄位:', field);
+              process.exit(1);
+            }
+          }
+          
+          console.log('✓ package.json 配置有效');
+          console.log('  名稱:', pkg.name);
+          console.log('  版本:', pkg.version);
+          console.log('  主程序:', pkg.main);
+          "
+      
+      - name: 驗證主程序
+        run: |
+          cd electron-app
+          node --check main.js
+          node --check preload.js
+          echo "✓ 主程序語法驗證通過"
+  
+  # 安全測試
+  security-test:
+    name: 安全測試
+    runs-on: ubuntu-latest
+    needs: python-lint
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout 程式碼
+        uses: actions/checkout@v4
+      
+      - name: 設定 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: 安裝依賴
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio aiohttp pydantic httpx
+      
+      - name: 執行安全測試
+        run: |
+          python3 -m pytest tests/test_security_features.py -v
+      
+      - name: 執行認證測試
+        run: |
+          python3 -m pytest tests/test_auth_compliance.py -v

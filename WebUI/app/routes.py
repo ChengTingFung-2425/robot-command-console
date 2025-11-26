@@ -859,6 +859,14 @@ def check_internet():
         }), 500
 
 
+# LLM 設定頁面
+@bp.route('/llm_settings', methods=['GET'])
+@login_required
+def llm_settings():
+    """LLM 設定頁面 - 管理本地 LLM 提供商"""
+    return render_template('llm_settings.html.j2')
+
+
 @bp.route('/api/llm/providers', methods=['GET'])
 def get_llm_providers():
     """取得可用的 LLM 提供商列表"""
@@ -881,5 +889,129 @@ def get_llm_providers():
         logging.error(f'取得 LLM 提供商失敗: {str(e)}', exc_info=True)
         return jsonify({
             'providers': [],
+            'error': '伺服器發生錯誤'
+        }), 500
+
+
+@bp.route('/api/llm/providers/health', methods=['GET'])
+def get_llm_providers_health():
+    """取得所有 LLM 提供商的健康狀態"""
+    try:
+        response = requests.get(f'{MCP_API_URL}/llm/providers/health', timeout=10)
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify({
+                'providers': {},
+                'error': '無法取得提供商健康狀態'
+            }), response.status_code
+    except requests.exceptions.ConnectionError:
+        return jsonify({
+            'providers': {},
+            'mcp_available': False,
+            'error': '無法連線到 MCP API 伺服器'
+        }), 503
+    except Exception as e:
+        logging.error(f'取得 LLM 提供商健康狀態失敗: {str(e)}', exc_info=True)
+        return jsonify({
+            'providers': {},
+            'error': '伺服器發生錯誤'
+        }), 500
+
+
+@bp.route('/api/llm/providers/select', methods=['POST'])
+@login_required
+def select_llm_provider():
+    """選擇要使用的 LLM 提供商"""
+    try:
+        provider_name = request.args.get('provider_name')
+        if not provider_name:
+            return jsonify({
+                'success': False,
+                'error': '缺少 provider_name 參數'
+            }), 400
+        
+        response = requests.post(
+            f'{MCP_API_URL}/llm/providers/select',
+            params={'provider_name': provider_name},
+            timeout=5
+        )
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify({
+                'success': False,
+                'error': '選擇提供商失敗'
+            }), response.status_code
+    except requests.exceptions.ConnectionError:
+        return jsonify({
+            'success': False,
+            'mcp_available': False,
+            'error': '無法連線到 MCP API 伺服器'
+        }), 503
+    except Exception as e:
+        logging.error(f'選擇 LLM 提供商失敗: {str(e)}', exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': '伺服器發生錯誤'
+        }), 500
+
+
+@bp.route('/api/llm/providers/discover', methods=['POST'])
+@login_required
+def discover_llm_providers():
+    """觸發 LLM 提供商偵測"""
+    try:
+        response = requests.post(f'{MCP_API_URL}/llm/providers/discover', timeout=15)
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify({
+                'discovered': {},
+                'available_count': 0,
+                'error': '偵測提供商失敗'
+            }), response.status_code
+    except requests.exceptions.ConnectionError:
+        return jsonify({
+            'discovered': {},
+            'available_count': 0,
+            'mcp_available': False,
+            'error': '無法連線到 MCP API 伺服器'
+        }), 503
+    except Exception as e:
+        logging.error(f'偵測 LLM 提供商失敗: {str(e)}', exc_info=True)
+        return jsonify({
+            'discovered': {},
+            'available_count': 0,
+            'error': '伺服器發生錯誤'
+        }), 500
+
+
+@bp.route('/api/llm/providers/<provider_name>/refresh', methods=['POST'])
+@login_required
+def refresh_llm_provider(provider_name):
+    """重新檢查特定 LLM 提供商的健康狀態"""
+    try:
+        response = requests.post(
+            f'{MCP_API_URL}/llm/providers/{provider_name}/refresh',
+            timeout=10
+        )
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify({
+                'success': False,
+                'error': '重新檢查提供商失敗'
+            }), response.status_code
+    except requests.exceptions.ConnectionError:
+        return jsonify({
+            'success': False,
+            'mcp_available': False,
+            'error': '無法連線到 MCP API 伺服器'
+        }), 503
+    except Exception as e:
+        logging.error(f'重新檢查 LLM 提供商失敗: {str(e)}', exc_info=True)
+        return jsonify({
+            'success': False,
             'error': '伺服器發生錯誤'
         }), 500

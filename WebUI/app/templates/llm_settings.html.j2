@@ -1,0 +1,474 @@
+{% extends "base.html.j2" %}
+{% block app_content %}
+<div class="page-header">
+    <h1>LLM 設定 <small>管理本地 LLM 提供商</small></h1>
+</div>
+
+<!-- 連線狀態卡片 -->
+<div class="panel panel-default">
+    <div class="panel-heading">
+        <h3 class="panel-title">
+            <i class="glyphicon glyphicon-signal"></i> 連線狀態
+        </h3>
+    </div>
+    <div class="panel-body">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="well text-center" id="internet-status-card">
+                    <span class="glyphicon glyphicon-globe" style="font-size: 24px;"></span>
+                    <h4>網路連線</h4>
+                    <p id="internet-status-text">檢查中...</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="well text-center" id="mcp-status-card">
+                    <span class="glyphicon glyphicon-cloud" style="font-size: 24px;"></span>
+                    <h4>MCP 伺服器</h4>
+                    <p id="mcp-status-text">檢查中...</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="well text-center" id="llm-status-card">
+                    <span class="glyphicon glyphicon-cog" style="font-size: 24px;"></span>
+                    <h4>本地 LLM</h4>
+                    <p id="llm-status-text">檢查中...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 提供商列表 -->
+<div class="panel panel-default">
+    <div class="panel-heading">
+        <h3 class="panel-title">
+            <i class="glyphicon glyphicon-list"></i> LLM 提供商
+            <button class="btn btn-sm btn-primary pull-right" id="discover-btn" onclick="discoverProviders()">
+                <span class="glyphicon glyphicon-refresh"></span> 重新掃描
+            </button>
+        </h3>
+    </div>
+    <div class="panel-body">
+        <div id="providers-loading" class="text-center" style="padding: 20px;">
+            <span class="glyphicon glyphicon-refresh glyphicon-spin" style="font-size: 24px;"></span>
+            <p>載入中...</p>
+        </div>
+        <div id="providers-container" style="display: none;">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>提供商</th>
+                        <th>狀態</th>
+                        <th>回應時間</th>
+                        <th>可用模型</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="providers-tbody">
+                    <!-- 動態填充 -->
+                </tbody>
+            </table>
+            <div id="no-providers-message" style="display: none;" class="alert alert-warning">
+                <span class="glyphicon glyphicon-warning-sign"></span>
+                沒有找到可用的 LLM 提供商。請確保 Ollama 或 LM Studio 正在運行，然後點擊「重新掃描」。
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 當前選擇的提供商詳情 -->
+<div class="panel panel-info" id="selected-provider-panel" style="display: none;">
+    <div class="panel-heading">
+        <h3 class="panel-title">
+            <i class="glyphicon glyphicon-star"></i> 當前選擇：<span id="selected-provider-name"></span>
+        </h3>
+    </div>
+    <div class="panel-body">
+        <div class="row">
+            <div class="col-md-6">
+                <h4>模型列表</h4>
+                <ul id="selected-provider-models" class="list-group">
+                    <!-- 動態填充 -->
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h4>提供商資訊</h4>
+                <dl class="dl-horizontal">
+                    <dt>狀態</dt>
+                    <dd id="selected-provider-status">-</dd>
+                    <dt>版本</dt>
+                    <dd id="selected-provider-version">-</dd>
+                    <dt>回應時間</dt>
+                    <dd id="selected-provider-response-time">-</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 使用說明 -->
+<div class="panel panel-default">
+    <div class="panel-heading">
+        <h3 class="panel-title">
+            <i class="glyphicon glyphicon-info-sign"></i> 使用說明
+        </h3>
+    </div>
+    <div class="panel-body">
+        <h4>支援的本地 LLM 提供商</h4>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="media">
+                    <div class="media-left">
+                        <span class="glyphicon glyphicon-record" style="font-size: 36px; color: #5cb85c;"></span>
+                    </div>
+                    <div class="media-body">
+                        <h4 class="media-heading">Ollama</h4>
+                        <p>預設端口：11434</p>
+                        <p>安裝：<code>curl -fsSL https://ollama.ai/install.sh | sh</code></p>
+                        <a href="https://ollama.ai" target="_blank" class="btn btn-xs btn-default">
+                            <span class="glyphicon glyphicon-new-window"></span> 官方網站
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="media">
+                    <div class="media-left">
+                        <span class="glyphicon glyphicon-record" style="font-size: 36px; color: #337ab7;"></span>
+                    </div>
+                    <div class="media-body">
+                        <h4 class="media-heading">LM Studio</h4>
+                        <p>預設端口：1234</p>
+                        <p>下載後啟動本地伺服器功能。</p>
+                        <a href="https://lmstudio.ai" target="_blank" class="btn btn-xs btn-default">
+                            <span class="glyphicon glyphicon-new-window"></span> 官方網站
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .status-available {
+        background-color: #dff0d8;
+        color: #3c763d;
+    }
+    .status-unavailable {
+        background-color: #f2dede;
+        color: #a94442;
+    }
+    .status-error {
+        background-color: #fcf8e3;
+        color: #8a6d3b;
+    }
+    .provider-row.selected {
+        background-color: #d9edf7;
+    }
+    .glyphicon-spin {
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+</style>
+
+<script>
+(function() {
+    var currentSelectedProvider = null;
+    var providersData = {};
+
+    // 初始化
+    document.addEventListener('DOMContentLoaded', function() {
+        loadConnectionStatus();
+        loadProviders();
+    });
+
+    // 載入連線狀態
+    function loadConnectionStatus() {
+        fetch('/api/llm/status')
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                updateConnectionCards(data);
+            })
+            .catch(function(err) {
+                updateConnectionCards({
+                    internet_available: null,
+                    local_llm_available: false,
+                    mcp_available: false,
+                    error: '無法連線'
+                });
+            });
+    }
+
+    // 更新連線狀態卡片
+    function updateConnectionCards(data) {
+        // 網路狀態
+        var internetCard = document.getElementById('internet-status-card');
+        var internetText = document.getElementById('internet-status-text');
+        if (data.internet_available === true) {
+            internetCard.className = 'well text-center status-available';
+            internetText.textContent = '正常連線';
+        } else if (data.internet_available === false) {
+            internetCard.className = 'well text-center status-unavailable';
+            internetText.textContent = '無法連線';
+        } else {
+            internetCard.className = 'well text-center status-error';
+            internetText.textContent = '未知';
+        }
+
+        // MCP 狀態
+        var mcpCard = document.getElementById('mcp-status-card');
+        var mcpText = document.getElementById('mcp-status-text');
+        if (data.mcp_available === false) {
+            mcpCard.className = 'well text-center status-unavailable';
+            mcpText.textContent = '離線';
+        } else if (!data.error) {
+            mcpCard.className = 'well text-center status-available';
+            mcpText.textContent = '正常運行';
+        } else {
+            mcpCard.className = 'well text-center status-error';
+            mcpText.textContent = '異常';
+        }
+
+        // 本地 LLM 狀態
+        var llmCard = document.getElementById('llm-status-card');
+        var llmText = document.getElementById('llm-status-text');
+        if (data.local_llm_available) {
+            llmCard.className = 'well text-center status-available';
+            llmText.textContent = data.local_llm_provider || '可用';
+        } else {
+            llmCard.className = 'well text-center status-unavailable';
+            llmText.textContent = '不可用';
+        }
+    }
+
+    // 載入提供商列表
+    function loadProviders() {
+        document.getElementById('providers-loading').style.display = 'block';
+        document.getElementById('providers-container').style.display = 'none';
+
+        Promise.all([
+            fetch('/api/llm/providers').then(function(r) { return r.json(); }),
+            fetch('/api/llm/providers/health').then(function(r) { return r.json(); })
+        ])
+        .then(function(results) {
+            var providersInfo = results[0];
+            var healthInfo = results[1];
+
+            document.getElementById('providers-loading').style.display = 'none';
+            document.getElementById('providers-container').style.display = 'block';
+
+            currentSelectedProvider = providersInfo.selected;
+            providersData = healthInfo.providers || {};
+
+            renderProviders(providersInfo, healthInfo);
+            updateSelectedProviderPanel();
+        })
+        .catch(function(err) {
+            document.getElementById('providers-loading').style.display = 'none';
+            document.getElementById('providers-container').style.display = 'block';
+            document.getElementById('no-providers-message').style.display = 'block';
+            console.error('載入提供商失敗:', err);
+        });
+    }
+
+    // 渲染提供商表格
+    function renderProviders(providersInfo, healthInfo) {
+        var tbody = document.getElementById('providers-tbody');
+        var noProvidersMsg = document.getElementById('no-providers-message');
+        
+        tbody.innerHTML = '';
+
+        var providers = healthInfo.providers || {};
+        var providerNames = Object.keys(providers);
+
+        if (providerNames.length === 0) {
+            noProvidersMsg.style.display = 'block';
+            return;
+        }
+
+        noProvidersMsg.style.display = 'none';
+
+        providerNames.forEach(function(name) {
+            var health = providers[name];
+            var isSelected = name === providersInfo.selected;
+            
+            var row = document.createElement('tr');
+            row.className = 'provider-row' + (isSelected ? ' selected' : '');
+            row.id = 'provider-row-' + name;
+
+            // 狀態樣式
+            var statusClass = '';
+            var statusText = '';
+            switch (health.status) {
+                case 'available':
+                    statusClass = 'label label-success';
+                    statusText = '可用';
+                    break;
+                case 'unavailable':
+                    statusClass = 'label label-danger';
+                    statusText = '不可用';
+                    break;
+                default:
+                    statusClass = 'label label-warning';
+                    statusText = health.status || '未知';
+            }
+
+            row.innerHTML = 
+                '<td>' +
+                    '<strong>' + name + '</strong>' +
+                    (isSelected ? ' <span class="label label-primary">當前選擇</span>' : '') +
+                '</td>' +
+                '<td><span class="' + statusClass + '">' + statusText + '</span></td>' +
+                '<td>' + (health.response_time_ms ? health.response_time_ms.toFixed(1) + ' ms' : '-') + '</td>' +
+                '<td>' + (health.available_models ? health.available_models.length + ' 個模型' : '0 個模型') + '</td>' +
+                '<td>' +
+                    '<button class="btn btn-sm ' + (isSelected ? 'btn-default disabled' : 'btn-primary') + '" ' +
+                    'onclick="selectProvider(\'' + name + '\')" ' +
+                    (isSelected ? 'disabled' : '') + '>' +
+                        (isSelected ? '已選擇' : '選擇') +
+                    '</button> ' +
+                    '<button class="btn btn-sm btn-default" onclick="refreshProvider(\'' + name + '\')">' +
+                        '<span class="glyphicon glyphicon-refresh"></span>' +
+                    '</button>' +
+                '</td>';
+
+            tbody.appendChild(row);
+        });
+    }
+
+    // 選擇提供商
+    window.selectProvider = function(providerName) {
+        fetch('/api/llm/providers/select?provider_name=' + encodeURIComponent(providerName), {
+            method: 'POST'
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.provider) {
+                currentSelectedProvider = data.provider;
+                loadProviders();
+                showAlert('success', '已切換到提供商：' + providerName);
+            } else {
+                showAlert('danger', '切換提供商失敗');
+            }
+        })
+        .catch(function(err) {
+            showAlert('danger', '切換提供商時發生錯誤');
+            console.error(err);
+        });
+    };
+
+    // 重新整理提供商狀態
+    window.refreshProvider = function(providerName) {
+        var btn = event.target.closest('button');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="glyphicon glyphicon-refresh glyphicon-spin"></span>';
+
+        fetch('/api/llm/providers/' + encodeURIComponent(providerName) + '/refresh', {
+            method: 'POST'
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            loadProviders();
+            showAlert('info', '已重新檢查提供商：' + providerName);
+        })
+        .catch(function(err) {
+            showAlert('danger', '重新檢查提供商時發生錯誤');
+            console.error(err);
+        })
+        .finally(function() {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="glyphicon glyphicon-refresh"></span>';
+        });
+    };
+
+    // 重新掃描提供商
+    window.discoverProviders = function() {
+        var btn = document.getElementById('discover-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="glyphicon glyphicon-refresh glyphicon-spin"></span> 掃描中...';
+
+        fetch('/api/llm/providers/discover', {
+            method: 'POST'
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            loadProviders();
+            loadConnectionStatus();
+            showAlert('success', '掃描完成，發現 ' + data.available_count + ' 個可用提供商');
+        })
+        .catch(function(err) {
+            showAlert('danger', '掃描提供商時發生錯誤');
+            console.error(err);
+        })
+        .finally(function() {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="glyphicon glyphicon-refresh"></span> 重新掃描';
+        });
+    };
+
+    // 更新選擇的提供商面板
+    function updateSelectedProviderPanel() {
+        var panel = document.getElementById('selected-provider-panel');
+        
+        if (!currentSelectedProvider || !providersData[currentSelectedProvider]) {
+            panel.style.display = 'none';
+            return;
+        }
+
+        var health = providersData[currentSelectedProvider];
+        panel.style.display = 'block';
+
+        document.getElementById('selected-provider-name').textContent = currentSelectedProvider;
+        document.getElementById('selected-provider-status').textContent = 
+            health.status === 'available' ? '可用' : health.status;
+        document.getElementById('selected-provider-version').textContent = 
+            health.version || '-';
+        document.getElementById('selected-provider-response-time').textContent = 
+            health.response_time_ms ? health.response_time_ms.toFixed(1) + ' ms' : '-';
+
+        // 模型列表
+        var modelsList = document.getElementById('selected-provider-models');
+        modelsList.innerHTML = '';
+
+        if (health.available_models && health.available_models.length > 0) {
+            health.available_models.forEach(function(model) {
+                var li = document.createElement('li');
+                li.className = 'list-group-item';
+                li.innerHTML = '<span class="glyphicon glyphicon-cog"></span> ' + model;
+                modelsList.appendChild(li);
+            });
+        } else {
+            var li = document.createElement('li');
+            li.className = 'list-group-item text-muted';
+            li.textContent = '沒有可用的模型';
+            modelsList.appendChild(li);
+        }
+    }
+
+    // 顯示提示訊息
+    function showAlert(type, message) {
+        var alertHtml = '<div class="alert alert-' + type + ' alert-dismissible" role="alert">' +
+            '<button type="button" class="close" data-dismiss="alert" aria-label="Close">' +
+                '<span aria-hidden="true">&times;</span>' +
+            '</button>' +
+            message +
+        '</div>';
+
+        var container = document.querySelector('.container');
+        container.insertAdjacentHTML('afterbegin', alertHtml);
+
+        // 5 秒後自動關閉
+        setTimeout(function() {
+            var alert = container.querySelector('.alert');
+            if (alert) {
+                alert.remove();
+            }
+        }, 5000);
+    }
+})();
+</script>
+{% endblock %}

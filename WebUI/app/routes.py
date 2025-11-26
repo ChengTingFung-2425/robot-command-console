@@ -768,7 +768,11 @@ def get_llm_status():
     except Exception as e:
         logging.error(f'取得 LLM 狀態失敗: {str(e)}')
         return jsonify({
-            'error': str(e)
+            'internet_available': None,
+            'local_llm_available': False,
+            'local_llm_provider': None,
+            'using_fallback': None,
+            'error': '無法取得連線狀態'
         }), 500
 
 

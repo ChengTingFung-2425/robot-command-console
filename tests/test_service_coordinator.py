@@ -154,6 +154,59 @@ class TestServiceCoordinator(unittest.TestCase):
 
         self.loop.run_until_complete(test())
 
+    def test_register_duplicate_service_raises_error(self):
+        """測試重複註冊服務時拋出錯誤"""
+        coordinator = ServiceCoordinator()
+        service1 = MockService("test_service")
+        service2 = MockService("test_service")
+
+        coordinator.register_service(service1)
+
+        with self.assertRaises(ValueError) as context:
+            coordinator.register_service(service2)
+
+        self.assertIn("already registered", str(context.exception))
+        self.assertIn("replace_service()", str(context.exception))
+
+    def test_replace_service(self):
+        """測試替換服務"""
+        coordinator = ServiceCoordinator()
+        service1 = MockService("test_service")
+        service2 = MockService("test_service")
+
+        coordinator.register_service(service1)
+        coordinator.replace_service(service2)
+
+        self.assertIs(coordinator._services["test_service"], service2)
+
+    def test_replace_running_service_raises_error(self):
+        """測試替換正在運行的服務時拋出錯誤"""
+        async def test():
+            coordinator = ServiceCoordinator()
+            service1 = MockService("test_service")
+            service2 = MockService("test_service")
+
+            coordinator.register_service(service1)
+            await coordinator.start_service("test_service")
+
+            with self.assertRaises(ValueError) as context:
+                coordinator.replace_service(service2)
+
+            self.assertIn("Cannot replace running service", str(context.exception))
+
+            await coordinator.stop_service("test_service")
+
+        self.loop.run_until_complete(test())
+
+    def test_replace_nonexistent_service(self):
+        """測試替換不存在的服務（等同於 register）"""
+        coordinator = ServiceCoordinator()
+        service = MockService("test_service")
+
+        coordinator.replace_service(service)
+
+        self.assertIn("test_service", coordinator._services)
+
     def test_unregister_service(self):
         """測試取消註冊服務"""
         coordinator = ServiceCoordinator()

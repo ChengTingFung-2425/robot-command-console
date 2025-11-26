@@ -258,10 +258,12 @@ class ServiceCoordinator:
             old_service = self._services[service.name]
             if old_service.is_running:
                 raise ValueError(f"Cannot replace running service: {service.name}")
-            logger.warning("Service already registered, replacing", extra={
-                "service_name": service.name,
-                "service": "service_coordinator"
-            })
+            # 建議使用 replace_service() 或先調用 unregister_service()
+            raise ValueError(
+                f"Service '{service.name}' already registered. "
+                "Use replace_service() to replace an existing service, "
+                "or call unregister_service() first."
+            )
 
         self._services[service.name] = service
 
@@ -275,6 +277,55 @@ class ServiceCoordinator:
         self._states[service.name] = ServiceState(config=config)
 
         logger.info("Service registered", extra={
+            "service_name": service.name,
+            "service_type": config.service_type,
+            "enabled": config.enabled,
+            "service": "service_coordinator"
+        })
+
+    def replace_service(
+        self,
+        service: ServiceBase,
+        config: Optional[ServiceConfig] = None,
+    ) -> None:
+        """
+        替換已註冊的服務
+
+        此方法明確用於替換現有服務。如果服務不存在，則等同於 register_service()。
+        如果服務正在運行，將拋出 ValueError。
+
+        Args:
+            service: 新的服務實例
+            config: 服務配置（可選）
+
+        Raises:
+            ValueError: 如果嘗試替換正在運行的服務
+        """
+        if service.name in self._services:
+            old_service = self._services[service.name]
+            if old_service.is_running:
+                raise ValueError(f"Cannot replace running service: {service.name}")
+            logger.warning("Replacing existing service", extra={
+                "service_name": service.name,
+                "old_service_type": type(old_service).__name__,
+                "new_service_type": type(service).__name__,
+                "service": "service_coordinator"
+            })
+            # 清理舊狀態
+            del self._states[service.name]
+
+        self._services[service.name] = service
+
+        # 建立或更新狀態
+        if config is None:
+            config = ServiceConfig(
+                name=service.name,
+                service_type=type(service).__name__,
+            )
+
+        self._states[service.name] = ServiceState(config=config)
+
+        logger.info("Service replaced/registered", extra={
             "service_name": service.name,
             "service_type": config.service_type,
             "enabled": config.enabled,
@@ -818,6 +869,7 @@ class ServiceCoordinator:
 
         while self._running:
             try:
+                # 等待 shutdown event 或超時
                 await asyncio.wait_for(
                     self._shutdown_event.wait(),
                     timeout=self._health_check_interval,
@@ -825,9 +877,54 @@ class ServiceCoordinator:
                 # 收到關閉信號
                 break
             except asyncio.TimeoutError:
-                # 正常的超時，執行健康檢查
-                await self.check_all_services_health()
+                # 正常的超時，檢查是否仍在運行後再執行健康檢查
+                if not self._running or self._shutdown_event.is_set():
+                    break
+
+                # 建立可取消的健康檢查任務
+                health_check_task = asyncio.create_task(
+                    self.check_all_services_health()
+                )
+                shutdown_wait_task = asyncio.create_task(
+                    self._shutdown_event.wait()
+                )
+
+                try:
+                    done, pending = await asyncio.wait(
+                        [health_check_task, shutdown_wait_task],
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
+
+                    # 取消未完成的任務
+                    for task in pending:
+                        task.cancel()
+                        try:
+                            await task
+                        except asyncio.CancelledError:
+                            pass
+
+                    # 如果收到 shutdown 信號，退出循環
+                    if self._shutdown_event.is_set():
+                        break
+
+                except asyncio.CancelledError:
+                    # 取消健康檢查任務
+                    if not health_check_task.done():
+                        health_check_task.cancel()
+                        try:
+                            await health_check_task
+                        except asyncio.CancelledError:
+                            pass
+                    if not shutdown_wait_task.done():
+                        shutdown_wait_task.cancel()
+                        try:
+                            await shutdown_wait_task
+                        except asyncio.CancelledError:
+                            pass
+                    raise
+
             except asyncio.CancelledError:
+                # 健康檢查任務被取消是正常流程，安全忽略
                 break
             except Exception as e:
                 logger.error("Error in periodic health check", extra={

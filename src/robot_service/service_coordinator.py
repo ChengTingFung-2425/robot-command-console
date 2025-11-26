@@ -181,6 +181,7 @@ class ServiceCoordinator:
     - 定期健康檢查
     - 自動重啟失敗的服務
     - 提供統一的狀態查詢介面
+    - 非同步狀態變更通知
     """
     
     def __init__(
@@ -209,6 +210,10 @@ class ServiceCoordinator:
         self._running = False
         self._shutdown_event = asyncio.Event()
         self._alert_callback: Optional[Callable[[str, str, Dict], Coroutine]] = None
+        # 非同步狀態變更回呼
+        self._state_change_callback: Optional[
+            Callable[[str, ServiceStatus, ServiceStatus, ServiceState], Coroutine]
+        ] = None
         
         logger.info("ServiceCoordinator initialized", extra={
             "health_check_interval": health_check_interval,
@@ -311,6 +316,60 @@ class ServiceCoordinator:
         """
         self._alert_callback = callback
     
+    def set_state_change_callback(
+        self,
+        callback: Callable[[str, ServiceStatus, ServiceStatus, ServiceState], Coroutine],
+    ) -> None:
+        """
+        設定非同步狀態變更回呼函式
+        
+        當服務狀態發生變更時，會非同步呼叫此回呼函式。
+        
+        Args:
+            callback: 非同步回呼函式，接收 (service_name, old_status, new_status, state)
+        """
+        self._state_change_callback = callback
+    
+    async def _notify_state_change(
+        self,
+        service_name: str,
+        old_status: ServiceStatus,
+        new_status: ServiceStatus,
+    ) -> None:
+        """
+        非同步通知狀態變更
+        
+        Args:
+            service_name: 服務名稱
+            old_status: 舊狀態
+            new_status: 新狀態
+        """
+        if old_status == new_status:
+            return
+        
+        state = self._states.get(service_name)
+        if not state:
+            return
+        
+        logger.debug("Service state changed", extra={
+            "service_name": service_name,
+            "old_status": old_status.value,
+            "new_status": new_status.value,
+            "service": "service_coordinator"
+        })
+        
+        if self._state_change_callback:
+            try:
+                await self._state_change_callback(
+                    service_name, old_status, new_status, state
+                )
+            except Exception as e:
+                logger.error("Failed to notify state change", extra={
+                    "service_name": service_name,
+                    "error": str(e),
+                    "service": "service_coordinator"
+                })
+    
     async def _send_alert(self, title: str, body: str, context: Dict = None) -> None:
         """發送告警"""
         if context is None:
@@ -359,7 +418,9 @@ class ServiceCoordinator:
             })
             return True
         
+        old_status = state.status
         state.status = ServiceStatus.STARTING
+        await self._notify_state_change(service_name, old_status, ServiceStatus.STARTING)
         
         logger.info("Starting service", extra={
             "service_name": service_name,
@@ -373,10 +434,12 @@ class ServiceCoordinator:
             )
             
             if success:
+                old_status = state.status
                 state.status = ServiceStatus.RUNNING
                 state.started_at = datetime.now(timezone.utc)
                 state.restart_attempts = 0
                 state.last_error = None
+                await self._notify_state_change(service_name, old_status, ServiceStatus.RUNNING)
                 
                 logger.info("Service started successfully", extra={
                     "service_name": service_name,
@@ -385,8 +448,10 @@ class ServiceCoordinator:
                 
                 return True
             else:
+                old_status = state.status
                 state.status = ServiceStatus.ERROR
                 state.last_error = "Start returned False"
+                await self._notify_state_change(service_name, old_status, ServiceStatus.ERROR)
                 
                 logger.error("Service failed to start", extra={
                     "service_name": service_name,
@@ -396,8 +461,10 @@ class ServiceCoordinator:
                 return False
         
         except asyncio.TimeoutError:
+            old_status = state.status
             state.status = ServiceStatus.ERROR
             state.last_error = "Startup timeout"
+            await self._notify_state_change(service_name, old_status, ServiceStatus.ERROR)
             
             logger.error("Service startup timeout", extra={
                 "service_name": service_name,
@@ -408,8 +475,10 @@ class ServiceCoordinator:
             return False
         
         except Exception as e:
+            old_status = state.status
             state.status = ServiceStatus.ERROR
             state.last_error = str(e)
+            await self._notify_state_change(service_name, old_status, ServiceStatus.ERROR)
             
             logger.error("Service startup error", extra={
                 "service_name": service_name,
@@ -451,7 +520,9 @@ class ServiceCoordinator:
             })
             return True
         
+        old_status = state.status
         state.status = ServiceStatus.STOPPING
+        await self._notify_state_change(service_name, old_status, ServiceStatus.STOPPING)
         
         logger.info("Stopping service", extra={
             "service_name": service_name,
@@ -462,10 +533,12 @@ class ServiceCoordinator:
             success = await service.stop(timeout=timeout)
             
             if success:
+                old_status = state.status
                 state.status = ServiceStatus.STOPPED
                 state.restart_attempts = 0
                 state.consecutive_failures = 0
                 state.started_at = None
+                await self._notify_state_change(service_name, old_status, ServiceStatus.STOPPED)
                 
                 logger.info("Service stopped successfully", extra={
                     "service_name": service_name,
@@ -474,8 +547,10 @@ class ServiceCoordinator:
                 
                 return True
             else:
+                old_status = state.status
                 state.status = ServiceStatus.ERROR
                 state.last_error = "Stop returned False"
+                await self._notify_state_change(service_name, old_status, ServiceStatus.ERROR)
                 
                 logger.error("Service failed to stop", extra={
                     "service_name": service_name,
@@ -485,8 +560,10 @@ class ServiceCoordinator:
                 return False
         
         except Exception as e:
+            old_status = state.status
             state.status = ServiceStatus.ERROR
             state.last_error = str(e)
+            await self._notify_state_change(service_name, old_status, ServiceStatus.ERROR)
             
             logger.error("Service stop error", extra={
                 "service_name": service_name,
@@ -608,8 +685,10 @@ class ServiceCoordinator:
                         "service": "service_coordinator"
                     })
                 
+                old_status = state.status
                 state.status = ServiceStatus.HEALTHY
                 state.consecutive_failures = 0
+                await self._notify_state_change(service_name, old_status, ServiceStatus.HEALTHY)
                 
                 logger.info("Service health check passed", extra={
                     "service_name": service_name,
@@ -619,8 +698,10 @@ class ServiceCoordinator:
                 
                 return True
             else:
+                old_status = state.status
                 state.consecutive_failures += 1
                 state.status = ServiceStatus.UNHEALTHY
+                await self._notify_state_change(service_name, old_status, ServiceStatus.UNHEALTHY)
                 
                 logger.warning("Service health check failed", extra={
                     "service_name": service_name,
@@ -634,10 +715,12 @@ class ServiceCoordinator:
                 return False
         
         except Exception as e:
+            old_status = state.status
             state.consecutive_failures += 1
             state.status = ServiceStatus.UNHEALTHY
             state.last_error = str(e)
             state.last_health_check = datetime.now(timezone.utc)
+            await self._notify_state_change(service_name, old_status, ServiceStatus.UNHEALTHY)
             
             logger.error("Service health check error", extra={
                 "service_name": service_name,

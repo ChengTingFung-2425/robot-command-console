@@ -10,7 +10,8 @@ import signal
 import sys
 from typing import Optional
 
-from ..service_coordinator import ServiceCoordinator, ServiceConfig, QueueService
+from ..service_coordinator import ServiceCoordinator, QueueService
+from common.service_types import ServiceConfig
 
 
 logger = logging.getLogger(__name__)

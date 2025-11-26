@@ -15,10 +15,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 from robot_service.service_coordinator import (
     ServiceCoordinator,
     ServiceBase,
-    ServiceStatus,
-    ServiceConfig,
     QueueService,
 )
+from common.service_types import ServiceStatus, ServiceConfig
 
 
 class MockService(ServiceBase):

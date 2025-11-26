@@ -285,9 +285,9 @@ class TestPythonServiceCoordinator:
             pytest.fail(f"無法導入 QueueService: {e}")
     
     def test_service_status_can_import(self):
-        """確認 ServiceStatus 可以導入"""
+        """確認 ServiceStatus 可以導入（從 common 模組）"""
         try:
-            from robot_service.service_coordinator import ServiceStatus
+            from common.service_types import ServiceStatus
             assert ServiceStatus.STOPPED is not None
             assert ServiceStatus.RUNNING is not None
             assert ServiceStatus.HEALTHY is not None
@@ -295,9 +295,9 @@ class TestPythonServiceCoordinator:
             pytest.fail(f"無法導入 ServiceStatus: {e}")
     
     def test_service_config_can_import(self):
-        """確認 ServiceConfig 可以導入"""
+        """確認 ServiceConfig 可以導入（從 common 模組）"""
         try:
-            from robot_service.service_coordinator import ServiceConfig
+            from common.service_types import ServiceConfig
             config = ServiceConfig(name="test", service_type="test")
             assert config.name == "test"
             assert config.enabled is True

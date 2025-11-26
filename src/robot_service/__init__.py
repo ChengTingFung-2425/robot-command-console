@@ -21,11 +21,10 @@ from .service_manager import ServiceManager
 from .service_coordinator import (
     ServiceCoordinator,
     ServiceBase,
-    ServiceStatus,
-    ServiceConfig,
-    ServiceState,
     QueueService,
 )
+# 從 common 模組導入共用服務類型
+from common.service_types import ServiceStatus, ServiceConfig, ServiceState
 
 try:
     from .cli.runner import CLIRunner

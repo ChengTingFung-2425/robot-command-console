@@ -6,6 +6,89 @@
         {{ _('Welcome to Microblog') }}
     {% endif %}
 {% endblock %}
+{% block styles %}
+    {{ super() }}
+    <style>
+        /* LLM 連線狀態指示器樣式 */
+        .llm-status-indicator {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .llm-status-indicator .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+        .llm-status-indicator.online .status-dot {
+            background-color: #5cb85c;
+            box-shadow: 0 0 4px #5cb85c;
+        }
+        .llm-status-indicator.offline .status-dot {
+            background-color: #d9534f;
+            box-shadow: 0 0 4px #d9534f;
+        }
+        .llm-status-indicator.fallback .status-dot {
+            background-color: #f0ad4e;
+            box-shadow: 0 0 4px #f0ad4e;
+        }
+        .llm-status-indicator.unknown .status-dot {
+            background-color: #999;
+        }
+        
+        /* 警告通知樣式 */
+        .llm-warning-container {
+            position: fixed;
+            top: 60px;
+            right: 20px;
+            z-index: 9999;
+            max-width: 400px;
+        }
+        .llm-warning-toast {
+            background-color: #fcf8e3;
+            border: 1px solid #faebcc;
+            border-radius: 4px;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            animation: slideIn 0.3s ease-out;
+        }
+        .llm-warning-toast.error {
+            background-color: #f2dede;
+            border-color: #ebccd1;
+        }
+        .llm-warning-toast .warning-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .llm-warning-toast .warning-message {
+            font-size: 13px;
+            color: #666;
+        }
+        .llm-warning-toast .close-btn {
+            float: right;
+            cursor: pointer;
+            opacity: 0.6;
+        }
+        .llm-warning-toast .close-btn:hover {
+            opacity: 1;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
+{% endblock %}
 {% block navbar %}
     <nav class="navbar navbar-default">
         <div class="container">
@@ -21,6 +104,11 @@
                     <span class="icon-bar"></span>
                 </button>
                 <a class="navbar-brand" href="{{ url_for('webui.home') }}">機器人指令中介層</a>
+                <!-- LLM 連線狀態指示器 -->
+                <div id="llm-status-indicator" class="llm-status-indicator unknown" title="檢查 LLM 連線狀態...">
+                    <span class="status-dot"></span>
+                    <span class="status-text">檢查中...</span>
+                </div>
             </div>
                         <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
                 <ul class="nav navbar-nav">
@@ -85,6 +173,9 @@
     </nav>
 {% endblock %}
 {% block content %}
+    <!-- LLM 警告通知容器 -->
+    <div id="llm-warning-container" class="llm-warning-container"></div>
+    
     <div class="container">
         {% with messages = get_flashed_messages() %}
             {% if messages %}
@@ -99,4 +190,123 @@
     {{ super() }}
     {{ moment.include_moment() }}
     {{ moment.lang(g.locale) }}
+    
+    <!-- LLM 連線狀態與警告腳本 -->
+    <script>
+    (function() {
+        // 警告類型對應的標題
+        var warningTitles = {
+            'internet_unavailable': '⚠️ 網路連線問題',
+            'local_llm_error': '⚠️ 本地 LLM 錯誤',
+            'no_local_llm': '⚠️ 沒有可用的本地 LLM',
+            'mcp_unavailable': '⚠️ MCP 伺服器離線',
+            'parse_error': '⚠️ 指令解析錯誤'
+        };
+        
+        // 更新連線狀態指示器
+        function updateLLMStatus() {
+            fetch('/api/llm/status')
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    var indicator = document.getElementById('llm-status-indicator');
+                    if (!indicator) return;
+                    
+                    indicator.classList.remove('online', 'offline', 'fallback', 'unknown');
+                    
+                    if (data.error && data.mcp_available === false) {
+                        indicator.classList.add('offline');
+                        indicator.querySelector('.status-text').textContent = 'MCP 離線';
+                        indicator.title = '無法連線到 MCP 伺服器';
+                    } else if (data.using_fallback) {
+                        indicator.classList.add('fallback');
+                        indicator.querySelector('.status-text').textContent = '使用本地 LLM';
+                        indicator.title = '網路不可用，已切換到本地 LLM: ' + (data.local_llm_provider || '未知');
+                    } else if (data.internet_available && data.local_llm_available) {
+                        indicator.classList.add('online');
+                        indicator.querySelector('.status-text').textContent = 'LLM 正常';
+                        indicator.title = '網路和本地 LLM 均可用 (' + (data.local_llm_provider || '') + ')';
+                    } else if (data.local_llm_available) {
+                        indicator.classList.add('online');
+                        indicator.querySelector('.status-text').textContent = '本地 LLM';
+                        indicator.title = '本地 LLM 可用: ' + (data.local_llm_provider || '未知');
+                    } else {
+                        indicator.classList.add('offline');
+                        indicator.querySelector('.status-text').textContent = 'LLM 離線';
+                        indicator.title = '沒有可用的 LLM 提供商';
+                    }
+                })
+                .catch(function(err) {
+                    var indicator = document.getElementById('llm-status-indicator');
+                    if (indicator) {
+                        indicator.classList.remove('online', 'offline', 'fallback', 'unknown');
+                        indicator.classList.add('offline');
+                        indicator.querySelector('.status-text').textContent = 'MCP 離線';
+                        indicator.title = '無法連線到 MCP 伺服器';
+                    }
+                });
+        }
+        
+        // 顯示警告通知
+        function showWarning(warning) {
+            var container = document.getElementById('llm-warning-container');
+            if (!container) return;
+            
+            var toast = document.createElement('div');
+            toast.className = 'llm-warning-toast' + (warning.type.includes('error') ? ' error' : '');
+            
+            var title = warningTitles[warning.type] || '⚠️ 警告';
+            
+            toast.innerHTML = 
+                '<span class="close-btn" onclick="this.parentElement.remove()">×</span>' +
+                '<div class="warning-title">' + title + '</div>' +
+                '<div class="warning-message">' + warning.message + '</div>';
+            
+            container.appendChild(toast);
+            
+            // 10 秒後自動移除
+            setTimeout(function() {
+                if (toast.parentElement) {
+                    toast.remove();
+                }
+            }, 10000);
+        }
+        
+        // 檢查並顯示警告
+        function checkWarnings() {
+            fetch('/api/llm/warnings')
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    if (data.warnings && data.warnings.length > 0) {
+                        data.warnings.forEach(function(warning) {
+                            showWarning(warning);
+                        });
+                        // 清除已顯示的警告
+                        fetch('/api/llm/warnings?clear=true');
+                    }
+                })
+                .catch(function(err) {
+                    // 如果無法連線到 MCP，顯示警告
+                    if (!document.querySelector('.llm-warning-toast')) {
+                        showWarning({
+                            type: 'mcp_unavailable',
+                            message: '無法連線到 MCP 伺服器，部分功能可能無法使用'
+                        });
+                    }
+                });
+        }
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 立即執行一次
+            updateLLMStatus();
+            checkWarnings();
+            
+            // 每 30 秒更新一次狀態
+            setInterval(updateLLMStatus, 30000);
+            
+            // 每 60 秒檢查一次警告
+            setInterval(checkWarnings, 60000);
+        });
+    })();
+    </script>
 {% endblock %}

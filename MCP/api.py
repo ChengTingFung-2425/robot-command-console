@@ -1022,6 +1022,99 @@ async def refresh_provider_health(provider_name: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ===== 連線狀態與警告 API =====
+
+@v1_router.get("/llm/connection/status")
+@app.get("/api/llm/connection/status")
+async def get_connection_status():
+    """
+    取得 LLM 連線狀態
+    
+    Returns:
+        包含網路狀態、本地 LLM 狀態和回退狀態的資訊
+    """
+    try:
+        # 檢查網路連線
+        internet_available = await llm_processor.check_internet_connection_async()
+        
+        # 取得連線狀態摘要
+        status = llm_processor.get_connection_status()
+        
+        return {
+            "internet_available": internet_available,
+            "local_llm_available": status["local_llm_available"],
+            "local_llm_provider": status["local_llm_provider"],
+            "using_fallback": status["using_fallback"],
+            "warnings_count": status["warnings_count"],
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    except Exception as e:
+        logger.error(f"取得連線狀態失敗: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@v1_router.get("/llm/warnings")
+@app.get("/api/llm/warnings")
+async def get_llm_warnings(clear: bool = False):
+    """
+    取得 LLM 相關警告訊息
+    
+    Args:
+        clear: 是否在取得後清除警告
+        
+    Returns:
+        警告列表
+    """
+    try:
+        warnings = llm_processor.get_warnings(clear=clear)
+        
+        return {
+            "warnings": warnings,
+            "count": len(warnings),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    except Exception as e:
+        logger.error(f"取得警告訊息失敗: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@v1_router.delete("/llm/warnings")
+@app.delete("/api/llm/warnings")
+async def clear_llm_warnings():
+    """清除所有 LLM 相關警告"""
+    try:
+        llm_processor.clear_warnings()
+        
+        return {
+            "message": "警告已清除",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    except Exception as e:
+        logger.error(f"清除警告失敗: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@v1_router.get("/llm/check-internet")
+@app.get("/api/llm/check-internet")
+async def check_internet_connection():
+    """
+    檢查網路連線狀態
+    
+    Returns:
+        網路連線狀態
+    """
+    try:
+        is_available = await llm_processor.check_internet_connection_async()
+        
+        return {
+            "internet_available": is_available,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    except Exception as e:
+        logger.error(f"檢查網路連線失敗: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ===== 插件管理 API =====
 
 @v1_router.get("/plugins")

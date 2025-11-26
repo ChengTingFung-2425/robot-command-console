@@ -17,30 +17,30 @@
 
 ## 🏗️ 架構演進
 
-### Server-Edge-Runner 三層架構
+### Cloud-Edge-Runner 三層架構（與 proposal.md 一致）
 
-本專案將演進為 **Server-Edge-Runner** 三層架構：
+本專案演進為 **Cloud-Edge-Runner** 三層架構：
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│     Server      │────▶│      Edge       │────▶│     Runner      │
-│  (MCP/WebUI)    │     │ (robot_service) │     │ (Robot-Console) │
-│  集中管理/API   │     │ 本地處理/佇列   │     │ 機器人執行     │
+│  Cloud/Server   │────▶│      Edge       │────▶│     Runner      │
+│  (雲端服務)     │     │ (ALL-in-One)    │     │ (Robot-Console) │
+│  共享/授權/分析  │     │ 本地處理/佇列   │     │ 機器人執行     │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
 ```
 
-| 層級 | 目前目錄 | 未來目錄（規劃） | 職責 |
-|------|----------|------------------|------|
-| Server | `MCP/`, `WebUI/` | `src/server/` | API Gateway、認證授權、數據持久化 |
-| Edge | `src/robot_service/`, `electron-app/` | `src/edge/` | 本地佇列、離線支援、低延遲處理 |
-| Runner | `Robot-Console/` | `src/runner/` | 機器人控制、感測器整合、安全機制 |
-| 共用 | `src/common/` | `src/common/` | 日誌、時間工具、配置 |
+| 層級 | 目錄 | 職責 |
+|------|------|------|
+| **Cloud/Server** | 雲端服務 | 進階指令共享、討論區、授權、LLM 分析 |
+| **Edge** | `src/robot_service/`, `electron-app/`, `MCP/`, `WebUI/` | 本地處理、佇列、LLM、監控 |
+| **Runner** | `Robot-Console/` | 動作執行、硬體控制、安全機制 |
+| **共用** | `src/common/` | 日誌、時間工具、配置 |
 
-### 基於 Microblog 的 Server-Client 架構
+### 資料流向
 
-WebUI 基於 Flask Microblog 的 Server-Client 架構設計，未來將拆分為：
-- **Server 端**：API 後端、認證授權、資料庫管理、業務邏輯
-- **Edge 端**：前端 UI、本地快取、離線支援
+1. **指令下達**：用戶 → Edge WebUI → MCP（LLM 解析）→ Robot Service（佇列）→ Robot-Console → 機器人
+2. **狀態回報**：機器人 → Robot-Console → Robot Service → Edge WebUI（即時顯示）
+3. **雲端同步**：Edge ↔ Cloud（進階指令、用戶設定、分析資料）
 
 ## 📁 目錄結構決策
 

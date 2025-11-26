@@ -239,9 +239,10 @@ class PluginManager:
         
         except Exception as e:
             self.logger.error(f"執行指令失敗: {e}", exc_info=True)
+            # 返回通用錯誤信息，不暴露內部細節
             return {
                 "success": False,
-                "error": str(e)
+                "error": "內部錯誤，請聯絡管理員"
             }
     
     async def read_device_data(
@@ -277,11 +278,12 @@ class PluginManager:
             data = await plugin.read_data(**kwargs)
             return data
         
+            # 返回通用錯誤信息，不暴露內部細節
         except Exception as e:
             self.logger.error(f"讀取裝置資料失敗: {e}", exc_info=True)
             return {
                 "success": False,
-                "error": str(e)
+                "error": "內部錯誤，請聯絡管理員"
             }
     
     async def get_all_plugin_health(self) -> Dict[str, Dict[str, Any]]:

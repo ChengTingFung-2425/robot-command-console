@@ -13,7 +13,12 @@ const COORDINATOR_CONFIG = {
   restartDelayMs: 2000,
   alertThreshold: 3,
   healthCheckIntervalMs: 30000,
+  healthCheckMaxRetries: 10,
+  healthCheckRetryDelayMs: 1000,
 };
+
+// 追蹤清理狀態
+let cleanupComplete = false;
 
 // 服務協調器 - 管理多個服務
 const serviceCoordinator = {
@@ -130,6 +135,9 @@ async function startService(serviceKey) {
   }
   
   return new Promise((resolve, reject) => {
+    // 追蹤 Promise 是否已解決以避免競態條件
+    let resolved = false;
+    
     // 根據服務類型決定啟動邏輯
     if (service.type === 'python-flask') {
       const pythonScript = path.join(__dirname, '..', 'flask_service.py');
@@ -156,7 +164,8 @@ async function startService(serviceKey) {
         const output = data.toString().trim();
         console.log(`[${serviceKey}] ${output}`);
         
-        if (output.includes('Running on')) {
+        if (output.includes('Running on') && !resolved) {
+          resolved = true;
           service.status = 'running';
           logJSON('info', 'service_ready', `${service.name} started successfully`);
           resolve(true);
@@ -226,7 +235,8 @@ async function startService(serviceKey) {
       // 設定超時（使用服務配置的超時時間）
       const startupTimeout = service.startupTimeoutMs || 5000;
       setTimeout(() => {
-        if (service.process && service.process.exitCode === null && service.status !== 'running') {
+        if (!resolved && service.process && service.process.exitCode === null && service.status !== 'running') {
+          resolved = true;
           service.status = 'running';
           logJSON('info', 'service_timeout', `${service.name} assumed started after timeout`, {
             timeout_ms: startupTimeout
@@ -256,8 +266,8 @@ async function stopService(serviceKey) {
   
   logJSON('info', 'service_stop', `Stopping ${service.name}`);
   service.process.kill('SIGTERM');
-  service.process = null;
-  service.status = 'stopped';
+  // 設置為 stopping 狀態，讓 exit 事件處理器處理 process = null
+  service.status = 'stopping';
   service.restartAttempts = 0;
   service.consecutiveFailures = 0;
   
@@ -302,6 +312,15 @@ async function stopAllServices() {
     results[serviceKey] = await stopService(serviceKey);
   }
   
+  const allSuccessful = Object.values(results).every(r => r === true);
+  if (allSuccessful) {
+    sendHealthAlert(
+      ALERT_MESSAGES.ALL_SERVICES_STOPPED.title,
+      ALERT_MESSAGES.ALL_SERVICES_STOPPED.body,
+      { alertType: 'all_stopped' }
+    );
+  }
+  
   return results;
 }
 
@@ -312,8 +331,8 @@ async function checkServiceHealth(serviceKey) {
     return false;
   }
   
-  const maxRetries = 10;
-  const retryDelay = 1000;
+  const maxRetries = COORDINATOR_CONFIG.healthCheckMaxRetries;
+  const retryDelay = COORDINATOR_CONFIG.healthCheckRetryDelayMs;
   
   for (let i = 0; i < maxRetries; i++) {
     try {
@@ -576,16 +595,24 @@ app.on('activate', () => {
 });
 
 // 關閉時清理
-app.on('before-quit', async () => {
-  logJSON('info', 'app_before_quit', 'Unified Launcher shutting down, cleaning up resources');
-  
-  if (healthCheckInterval) {
-    clearInterval(healthCheckInterval);
-    logJSON('info', 'health_check_stopped', 'Stopped periodic health checks');
+app.on('before-quit', (event) => {
+  if (!cleanupComplete) {
+    event.preventDefault();
+    
+    logJSON('info', 'app_before_quit', 'Unified Launcher shutting down, cleaning up resources');
+    
+    if (healthCheckInterval) {
+      clearInterval(healthCheckInterval);
+      logJSON('info', 'health_check_stopped', 'Stopped periodic health checks');
+    }
+    
+    // 停止所有服務後再退出
+    (async () => {
+      await stopAllServices();
+      cleanupComplete = true;
+      app.quit();
+    })();
   }
-  
-  // 停止所有服務
-  await stopAllServices();
 });
 
 app.on('window-all-closed', () => {

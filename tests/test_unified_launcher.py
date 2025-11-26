@@ -3,12 +3,12 @@
 測試 Electron 統一啟動器的服務協調功能
 """
 
-import os
 import sys
+from pathlib import Path
 import pytest
 
 # 添加 src 到路徑
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 
 class TestServiceCoordinatorDesign:
@@ -16,43 +16,28 @@ class TestServiceCoordinatorDesign:
     
     def test_electron_main_js_exists(self):
         """確認 main.js 存在"""
-        main_js_path = os.path.join(
-            os.path.dirname(__file__), 
-            '..', 'electron-app', 'main.js'
-        )
-        assert os.path.exists(main_js_path), "electron-app/main.js 不存在"
+        main_js_path = Path(__file__).parent.parent / 'electron-app' / 'main.js'
+        assert main_js_path.exists(), "electron-app/main.js 不存在"
     
     def test_electron_preload_js_exists(self):
         """確認 preload.js 存在"""
-        preload_path = os.path.join(
-            os.path.dirname(__file__), 
-            '..', 'electron-app', 'preload.js'
-        )
-        assert os.path.exists(preload_path), "electron-app/preload.js 不存在"
+        preload_path = Path(__file__).parent.parent / 'electron-app' / 'preload.js'
+        assert preload_path.exists(), "electron-app/preload.js 不存在"
     
     def test_electron_renderer_exists(self):
         """確認 renderer 目錄存在"""
-        renderer_path = os.path.join(
-            os.path.dirname(__file__), 
-            '..', 'electron-app', 'renderer'
-        )
-        assert os.path.isdir(renderer_path), "electron-app/renderer/ 目錄不存在"
+        renderer_path = Path(__file__).parent.parent / 'electron-app' / 'renderer'
+        assert renderer_path.is_dir(), "electron-app/renderer/ 目錄不存在"
     
     def test_renderer_index_html_exists(self):
         """確認 index.html 存在"""
-        index_path = os.path.join(
-            os.path.dirname(__file__), 
-            '..', 'electron-app', 'renderer', 'index.html'
-        )
-        assert os.path.exists(index_path), "electron-app/renderer/index.html 不存在"
+        index_path = Path(__file__).parent.parent / 'electron-app' / 'renderer' / 'index.html'
+        assert index_path.exists(), "electron-app/renderer/index.html 不存在"
     
     def test_renderer_js_exists(self):
         """確認 renderer.js 存在"""
-        renderer_js_path = os.path.join(
-            os.path.dirname(__file__), 
-            '..', 'electron-app', 'renderer', 'renderer.js'
-        )
-        assert os.path.exists(renderer_js_path), "electron-app/renderer/renderer.js 不存在"
+        renderer_js_path = Path(__file__).parent.parent / 'electron-app' / 'renderer' / 'renderer.js'
+        assert renderer_js_path.exists(), "electron-app/renderer/renderer.js 不存在"
 
 
 class TestMainJsStructure:
@@ -61,12 +46,8 @@ class TestMainJsStructure:
     @pytest.fixture
     def main_js_content(self):
         """讀取 main.js 內容"""
-        main_js_path = os.path.join(
-            os.path.dirname(__file__), 
-            '..', 'electron-app', 'main.js'
-        )
-        with open(main_js_path, 'r', encoding='utf-8') as f:
-            return f.read()
+        main_js_path = Path(__file__).parent.parent / 'electron-app' / 'main.js'
+        return main_js_path.read_text(encoding='utf-8')
     
     def test_service_coordinator_defined(self, main_js_content):
         """確認服務協調器已定義"""
@@ -118,10 +99,16 @@ class TestMainJsStructure:
         assert 'COORDINATOR_CONFIG' in main_js_content, "COORDINATOR_CONFIG 常數未定義"
         assert 'maxRestartAttempts' in main_js_content, "maxRestartAttempts 未配置"
         assert 'healthCheckIntervalMs' in main_js_content, "healthCheckIntervalMs 未配置"
+        assert 'healthCheckMaxRetries' in main_js_content, "healthCheckMaxRetries 未配置"
+        assert 'healthCheckRetryDelayMs' in main_js_content, "healthCheckRetryDelayMs 未配置"
     
     def test_service_type_defined(self, main_js_content):
         """確認服務類型已定義"""
         assert "type: 'python-flask'" in main_js_content, "Flask 服務類型未定義"
+    
+    def test_cleanup_complete_flag(self, main_js_content):
+        """確認清理完成標誌已定義"""
+        assert 'cleanupComplete' in main_js_content, "cleanupComplete 標誌未定義"
 
 
 class TestPreloadJsStructure:
@@ -130,12 +117,8 @@ class TestPreloadJsStructure:
     @pytest.fixture
     def preload_content(self):
         """讀取 preload.js 內容"""
-        preload_path = os.path.join(
-            os.path.dirname(__file__), 
-            '..', 'electron-app', 'preload.js'
-        )
-        with open(preload_path, 'r', encoding='utf-8') as f:
-            return f.read()
+        preload_path = Path(__file__).parent.parent / 'electron-app' / 'preload.js'
+        return preload_path.read_text(encoding='utf-8')
     
     def test_electron_api_exposed(self, preload_content):
         """確認 electronAPI 已暴露"""
@@ -168,12 +151,8 @@ class TestRendererHtmlStructure:
     @pytest.fixture
     def html_content(self):
         """讀取 index.html 內容"""
-        html_path = os.path.join(
-            os.path.dirname(__file__), 
-            '..', 'electron-app', 'renderer', 'index.html'
-        )
-        with open(html_path, 'r', encoding='utf-8') as f:
-            return f.read()
+        html_path = Path(__file__).parent.parent / 'electron-app' / 'renderer' / 'index.html'
+        return html_path.read_text(encoding='utf-8')
     
     def test_unified_launcher_title(self, html_content):
         """確認頁面標題包含統一啟動器"""
@@ -210,12 +189,8 @@ class TestRendererJsStructure:
     @pytest.fixture
     def renderer_content(self):
         """讀取 renderer.js 內容"""
-        renderer_path = os.path.join(
-            os.path.dirname(__file__), 
-            '..', 'electron-app', 'renderer', 'renderer.js'
-        )
-        with open(renderer_path, 'r', encoding='utf-8') as f:
-            return f.read()
+        renderer_path = Path(__file__).parent.parent / 'electron-app' / 'renderer' / 'renderer.js'
+        return renderer_path.read_text(encoding='utf-8')
     
     def test_unified_launcher_comment(self, renderer_content):
         """確認統一啟動器註解存在"""
@@ -250,6 +225,11 @@ class TestRendererJsStructure:
     def test_auto_refresh_interval(self, renderer_content):
         """確認自動刷新間隔已設置"""
         assert 'refreshInterval' in renderer_content, "自動刷新間隔未設置"
+        assert 'REFRESH_INTERVAL_MS' in renderer_content, "REFRESH_INTERVAL_MS 常數未定義"
+    
+    def test_beforeunload_cleanup(self, renderer_content):
+        """確認 beforeunload 清理已設置"""
+        assert 'beforeunload' in renderer_content, "beforeunload 事件監聽器未設置"
 
 
 class TestFlaskServiceIntegration:
@@ -257,11 +237,8 @@ class TestFlaskServiceIntegration:
     
     def test_flask_service_py_exists(self):
         """確認 flask_service.py 存在"""
-        flask_service_path = os.path.join(
-            os.path.dirname(__file__), 
-            '..', 'flask_service.py'
-        )
-        assert os.path.exists(flask_service_path), "flask_service.py 不存在"
+        flask_service_path = Path(__file__).parent.parent / 'flask_service.py'
+        assert flask_service_path.exists(), "flask_service.py 不存在"
     
     def test_flask_adapter_can_import(self):
         """確認 Flask adapter 可以導入"""

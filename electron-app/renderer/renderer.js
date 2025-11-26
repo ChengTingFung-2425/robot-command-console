@@ -1,6 +1,8 @@
 // Renderer process JavaScript - 統一啟動器
 
 const API_BASE_URL = 'http://127.0.0.1:5000';
+const REFRESH_INTERVAL_MS = 10000;
+
 let appToken = null;
 let servicesStatus = {};
 let refreshInterval = null;
@@ -47,14 +49,21 @@ async function initialize() {
     // 獲取服務狀態
     await refreshServicesStatus();
     
-    // 設置自動刷新（每 10 秒）
-    refreshInterval = setInterval(refreshServicesStatus, 10000);
+    // 設置自動刷新
+    refreshInterval = setInterval(refreshServicesStatus, REFRESH_INTERVAL_MS);
+
+    // 清理 interval 以避免記憶體洩漏
+    window.addEventListener('beforeunload', () => {
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+        }
+    });
     
     // 綁定事件
     bindEventListeners();
 }
 
-// 綁定事件監聽器
+// 綁定事件監聯器
 function bindEventListeners() {
     // 啟動所有服務
     document.getElementById('start-all-btn').addEventListener('click', async () => {
@@ -68,6 +77,7 @@ function bindEventListeners() {
             await refreshServicesStatus();
         } catch (error) {
             console.error('Failed to start services:', error);
+            alert(`啟動服務失敗: ${error && error.message ? error.message : error}`);
         } finally {
             btn.disabled = false;
             btn.textContent = '▶️ 啟動所有服務';
@@ -86,6 +96,7 @@ function bindEventListeners() {
             await refreshServicesStatus();
         } catch (error) {
             console.error('Failed to stop services:', error);
+            alert(`停止服務失敗: ${error && error.message ? error.message : error}`);
         } finally {
             btn.disabled = false;
             btn.textContent = '⏹️ 停止所有服務';
@@ -139,29 +150,54 @@ function renderServicesDashboard(services) {
         
         const card = document.createElement('div');
         card.className = `service-card ${statusClass}`;
-        card.innerHTML = `
-            <h3>
-                ${displayInfo.icon} ${displayInfo.name}
-                <span class="service-status ${statusClass}">${statusLabel}</span>
-            </h3>
-            <div class="service-info">
-                <p>📍 端口: ${service.port}</p>
-                <p>🔄 重啟次數: ${service.restartAttempts}</p>
-                <p>❌ 連續失敗: ${service.consecutiveFailures}</p>
-                <p>⏰ 最後檢查: ${service.lastHealthCheck ? new Date(service.lastHealthCheck).toLocaleTimeString() : '-'}</p>
-            </div>
-            <div class="service-actions">
-                <button class="btn-sm btn-success" onclick="LauncherServices.startService('${key}')" ${service.isRunning ? 'disabled' : ''}>
-                    ▶️ 啟動
-                </button>
-                <button class="btn-sm btn-danger" onclick="LauncherServices.stopService('${key}')" ${!service.isRunning ? 'disabled' : ''}>
-                    ⏹️ 停止
-                </button>
-                <button class="btn-sm" onclick="LauncherServices.checkServiceHealth('${key}')">
-                    🔍 檢查
-                </button>
-            </div>
+        
+        // Header
+        const header = document.createElement('h3');
+        header.innerHTML = `
+            ${displayInfo.icon} ${displayInfo.name}
+            <span class="service-status ${statusClass}">${statusLabel}</span>
         `;
+        card.appendChild(header);
+
+        // Service info
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'service-info';
+        infoDiv.innerHTML = `
+            <p>📍 端口: ${service.port}</p>
+            <p>🔄 重啟次數: ${service.restartAttempts}</p>
+            <p>❌ 連續失敗: ${service.consecutiveFailures}</p>
+            <p>⏰ 最後檢查: ${service.lastHealthCheck ? new Date(service.lastHealthCheck).toLocaleTimeString() : '-'}</p>
+        `;
+        card.appendChild(infoDiv);
+
+        // Service actions
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'service-actions';
+
+        // Start button
+        const startBtn = document.createElement('button');
+        startBtn.className = 'btn-sm btn-success';
+        startBtn.disabled = service.isRunning;
+        startBtn.textContent = '▶️ 啟動';
+        startBtn.addEventListener('click', () => LauncherServices.startService(key));
+        actionsDiv.appendChild(startBtn);
+
+        // Stop button
+        const stopBtn = document.createElement('button');
+        stopBtn.className = 'btn-sm btn-danger';
+        stopBtn.disabled = !service.isRunning;
+        stopBtn.textContent = '⏹️ 停止';
+        stopBtn.addEventListener('click', () => LauncherServices.stopService(key));
+        actionsDiv.appendChild(stopBtn);
+
+        // Check button
+        const checkBtn = document.createElement('button');
+        checkBtn.className = 'btn-sm';
+        checkBtn.textContent = '🔍 檢查';
+        checkBtn.addEventListener('click', () => LauncherServices.checkServiceHealth(key));
+        actionsDiv.appendChild(checkBtn);
+
+        card.appendChild(actionsDiv);
         dashboard.appendChild(card);
     }
 }

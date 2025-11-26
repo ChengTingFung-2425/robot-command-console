@@ -728,3 +728,158 @@ def audit_advanced_command(cmd_id):
         flash(f'進階指令「{cmd.name}」已拒絕。')
     db.session.commit()
     return redirect(url_for('webui.advanced_commands'))
+
+
+# ===== LLM 連線狀態與警告 API =====
+
+# MCP API 基礎 URL
+import os
+MCP_API_URL = os.environ.get('MCP_API_URL', 'http://localhost:8000/api')
+
+
+@bp.route('/api/llm/status', methods=['GET'])
+def get_llm_status():
+    """
+    取得 LLM 連線狀態
+    用於前端顯示連線狀態指示器
+    """
+    try:
+        response = requests.get(f'{MCP_API_URL}/llm/connection/status', timeout=5)
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify({
+                'internet_available': None,
+                'local_llm_available': False,
+                'local_llm_provider': None,
+                'using_fallback': None,
+                'error': '無法取得連線狀態'
+            }), response.status_code
+    except requests.exceptions.ConnectionError:
+        logging.warning('無法連線到 MCP API 伺服器')
+        return jsonify({
+            'internet_available': None,
+            'local_llm_available': False,
+            'local_llm_provider': None,
+            'using_fallback': None,
+            'mcp_available': False,
+            'error': '無法連線到 MCP API 伺服器'
+        }), 503
+    except Exception as e:
+        logging.error(f'取得 LLM 狀態失敗: {str(e)}')
+        return jsonify({
+            'internet_available': None,
+            'local_llm_available': False,
+            'local_llm_provider': None,
+            'using_fallback': None,
+            'error': '無法取得連線狀態'
+        }), 500
+
+
+@bp.route('/api/llm/warnings', methods=['GET'])
+def get_llm_warnings():
+    """
+    取得 LLM 相關警告訊息
+    用於前端顯示警告通知
+    """
+    try:
+        clear = request.args.get('clear', 'false').lower() == 'true'
+        response = requests.get(f'{MCP_API_URL}/llm/warnings', params={'clear': clear}, timeout=5)
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify({
+                'warnings': [],
+                'count': 0,
+                'error': '無法取得警告訊息'
+            }), response.status_code
+    except requests.exceptions.ConnectionError:
+        logging.warning('無法連線到 MCP API 伺服器取得警告')
+        return jsonify({
+            'warnings': [{
+                'type': 'mcp_unavailable',
+                'message': '無法連線到 MCP 伺服器',
+                'timestamp': None
+            }],
+            'count': 1,
+            'mcp_available': False
+        }), 503
+    except Exception as e:
+        logging.error(f'取得 LLM 警告失敗: {str(e)}')
+        return jsonify({
+            'warnings': [],
+            'error': '無法取得警告訊息'
+        }), 500
+
+
+@bp.route('/api/llm/warnings', methods=['DELETE'])
+@login_required
+def clear_llm_warnings():
+    """清除 LLM 警告訊息"""
+    try:
+        response = requests.delete(f'{MCP_API_URL}/llm/warnings', timeout=5)
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify({
+                'success': False,
+                'error': '無法清除警告'
+            }), response.status_code
+    except Exception as e:
+        logging.error(f'清除 LLM 警告失敗: {str(e)}')
+        return jsonify({
+            'success': False,
+            'error': '伺服器發生錯誤'
+        }), 500
+
+
+@bp.route('/api/llm/check-internet', methods=['GET'])
+def check_internet():
+    """檢查網路連線狀態"""
+    try:
+        response = requests.get(f'{MCP_API_URL}/llm/check-internet', timeout=5)
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify({
+                'internet_available': None,
+                'error': '無法檢查網路連線'
+            }), response.status_code
+    except requests.exceptions.ConnectionError:
+        return jsonify({
+            'internet_available': False,
+            'mcp_available': False,
+            'error': '無法連線到 MCP API 伺服器'
+        }), 503
+    except Exception as e:
+        logging.error(f'檢查網路連線失敗: {str(e)}')
+        return jsonify({
+            'internet_available': None,
+            'error': '伺服器發生錯誤'
+        }), 500
+
+
+@bp.route('/api/llm/providers', methods=['GET'])
+def get_llm_providers():
+    """取得可用的 LLM 提供商列表"""
+    try:
+        response = requests.get(f'{MCP_API_URL}/llm/providers', timeout=5)
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify({
+                'providers': [],
+                'error': '無法取得提供商列表'
+            }), response.status_code
+    except requests.exceptions.ConnectionError:
+        return jsonify({
+            'providers': [],
+            'mcp_available': False,
+            'error': '無法連線到 MCP API 伺服器'
+        }), 503
+    except Exception as e:
+        logging.error(f'取得 LLM 提供商失敗: {str(e)}', exc_info=True)
+        return jsonify({
+            'providers': [],
+            'error': '伺服器發生錯誤'
+        }), 500

@@ -31,6 +31,9 @@ def create_app(config_name='default'):
     
     flask_app = Flask(__name__)
     
+    # Ensure proper UTF-8 encoding for JSON responses
+    flask_app.config['JSON_AS_ASCII'] = False
+    
     # Apply configuration
     if config_name == 'testing':
         flask_app.config['TESTING'] = True

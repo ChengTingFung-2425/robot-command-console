@@ -112,6 +112,16 @@ class TestMainJsStructure:
         """確認 Flask 服務已添加到協調器"""
         assert "flask:" in main_js_content, "Flask 服務未添加到 serviceCoordinator"
         assert "'Flask API 服務'" in main_js_content, "Flask 服務名稱未定義"
+    
+    def test_coordinator_config_defined(self, main_js_content):
+        """確認協調器配置常數已定義"""
+        assert 'COORDINATOR_CONFIG' in main_js_content, "COORDINATOR_CONFIG 常數未定義"
+        assert 'maxRestartAttempts' in main_js_content, "maxRestartAttempts 未配置"
+        assert 'healthCheckIntervalMs' in main_js_content, "healthCheckIntervalMs 未配置"
+    
+    def test_service_type_defined(self, main_js_content):
+        """確認服務類型已定義"""
+        assert "type: 'python-flask'" in main_js_content, "Flask 服務類型未定義"
 
 
 class TestPreloadJsStructure:
@@ -232,9 +242,10 @@ class TestRendererJsStructure:
         assert 'async function checkServiceHealth' in renderer_content, "checkServiceHealth 函數未定義"
     
     def test_global_functions_exposed(self, renderer_content):
-        """確認全域函數已暴露"""
-        assert 'window.startService = startService' in renderer_content, "startService 未暴露到全域"
-        assert 'window.stopService = stopService' in renderer_content, "stopService 未暴露到全域"
+        """確認全域函數已暴露到命名空間"""
+        assert 'window.LauncherServices' in renderer_content, "LauncherServices 命名空間未定義"
+        assert 'LauncherServices.startService' in renderer_content, "startService 未使用命名空間"
+        assert 'LauncherServices.stopService' in renderer_content, "stopService 未使用命名空間"
     
     def test_auto_refresh_interval(self, renderer_content):
         """確認自動刷新間隔已設置"""

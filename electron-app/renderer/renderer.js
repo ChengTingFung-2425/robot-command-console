@@ -151,13 +151,13 @@ function renderServicesDashboard(services) {
                 <p>⏰ 最後檢查: ${service.lastHealthCheck ? new Date(service.lastHealthCheck).toLocaleTimeString() : '-'}</p>
             </div>
             <div class="service-actions">
-                <button class="btn-sm btn-success" onclick="startService('${key}')" ${service.isRunning ? 'disabled' : ''}>
+                <button class="btn-sm btn-success" onclick="LauncherServices.startService('${key}')" ${service.isRunning ? 'disabled' : ''}>
                     ▶️ 啟動
                 </button>
-                <button class="btn-sm btn-danger" onclick="stopService('${key}')" ${!service.isRunning ? 'disabled' : ''}>
+                <button class="btn-sm btn-danger" onclick="LauncherServices.stopService('${key}')" ${!service.isRunning ? 'disabled' : ''}>
                     ⏹️ 停止
                 </button>
-                <button class="btn-sm" onclick="checkServiceHealth('${key}')">
+                <button class="btn-sm" onclick="LauncherServices.checkServiceHealth('${key}')">
                     🔍 檢查
                 </button>
             </div>
@@ -303,10 +303,12 @@ async function testPing() {
     }
 }
 
-// 全域函數供 HTML onclick 使用
-window.startService = startService;
-window.stopService = stopService;
-window.checkServiceHealth = checkServiceHealth;
+// 全域命名空間供 HTML onclick 使用
+window.LauncherServices = {
+    startService: startService,
+    stopService: stopService,
+    checkServiceHealth: checkServiceHealth
+};
 
 // 啟動時初始化
 initialize();

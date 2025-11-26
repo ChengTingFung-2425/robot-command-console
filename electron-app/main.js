@@ -7,23 +7,31 @@ let mainWindow = null;
 let appToken = null;
 let healthCheckInterval = null;
 
+// 服務協調器配置常數
+const COORDINATOR_CONFIG = {
+  maxRestartAttempts: 3,
+  restartDelayMs: 2000,
+  alertThreshold: 3,
+  healthCheckIntervalMs: 30000,
+};
+
 // 服務協調器 - 管理多個服務
 const serviceCoordinator = {
   services: {
     flask: {
       name: 'Flask API 服務',
+      type: 'python-flask',  // 服務類型，用於決定啟動邏輯
       process: null,
       status: 'stopped',
       port: 5000,
       healthUrl: 'http://127.0.0.1:5000/health',
+      startupTimeoutMs: 5000,  // 可配置的啟動超時
       restartAttempts: 0,
       consecutiveFailures: 0,
       lastHealthCheck: null,
+      script: null,  // 將在 startService 中設置
     }
   },
-  maxRestartAttempts: 3,
-  restartDelayMs: 2000,
-  alertThreshold: 3,
   restartInProgress: false,
 };
 
@@ -122,8 +130,10 @@ async function startService(serviceKey) {
   }
   
   return new Promise((resolve, reject) => {
-    if (serviceKey === 'flask') {
+    // 根據服務類型決定啟動邏輯
+    if (service.type === 'python-flask') {
       const pythonScript = path.join(__dirname, '..', 'flask_service.py');
+      service.script = pythonScript;
       
       // 生成 token
       if (!appToken) {
@@ -133,7 +143,8 @@ async function startService(serviceKey) {
       logJSON('info', 'service_start', `Starting ${service.name}`, {
         script: pythonScript,
         port: service.port,
-        token_prefix: appToken.substring(0, 8)
+        token_prefix: appToken.substring(0, 8),
+        service_type: service.type
       });
       
       service.process = spawn('python3', [pythonScript], {
@@ -177,11 +188,11 @@ async function startService(serviceKey) {
         service.status = code === 0 ? 'stopped' : 'error';
         
         // 自動重啟邏輯
-        if (code !== 0 && service.restartAttempts < serviceCoordinator.maxRestartAttempts && !serviceCoordinator.restartInProgress) {
+        if (code !== 0 && service.restartAttempts < COORDINATOR_CONFIG.maxRestartAttempts && !serviceCoordinator.restartInProgress) {
           service.restartAttempts++;
           logJSON('info', 'service_restart', `Attempting to restart ${service.name}`, {
             attempt: service.restartAttempts,
-            max_attempts: serviceCoordinator.maxRestartAttempts
+            max_attempts: COORDINATOR_CONFIG.maxRestartAttempts
           });
           
           setTimeout(async () => {
@@ -196,14 +207,14 @@ async function startService(serviceKey) {
             } catch (error) {
               sendHealthAlert(
                 ALERT_MESSAGES.SERVICE_RESTART_FAILED.title,
-                ALERT_MESSAGES.SERVICE_RESTART_FAILED.bodyTemplate(service.name, service.restartAttempts, serviceCoordinator.maxRestartAttempts),
+                ALERT_MESSAGES.SERVICE_RESTART_FAILED.bodyTemplate(service.name, service.restartAttempts, COORDINATOR_CONFIG.maxRestartAttempts),
                 { alertType: 'restart_failed', service: serviceKey }
               );
             } finally {
               serviceCoordinator.restartInProgress = false;
             }
-          }, serviceCoordinator.restartDelayMs);
-        } else if (service.restartAttempts >= serviceCoordinator.maxRestartAttempts) {
+          }, COORDINATOR_CONFIG.restartDelayMs);
+        } else if (service.restartAttempts >= COORDINATOR_CONFIG.maxRestartAttempts) {
           sendHealthAlert(
             ALERT_MESSAGES.SERVICE_FAILURE.title,
             ALERT_MESSAGES.SERVICE_FAILURE.bodyTemplate(service.name),
@@ -212,14 +223,20 @@ async function startService(serviceKey) {
         }
       });
       
-      // 設定超時
+      // 設定超時（使用服務配置的超時時間）
+      const startupTimeout = service.startupTimeoutMs || 5000;
       setTimeout(() => {
         if (service.process && service.process.exitCode === null && service.status !== 'running') {
           service.status = 'running';
-          logJSON('info', 'service_timeout', `${service.name} assumed started after timeout`);
+          logJSON('info', 'service_timeout', `${service.name} assumed started after timeout`, {
+            timeout_ms: startupTimeout
+          });
           resolve(true);
         }
-      }, 5000);
+      }, startupTimeout);
+    } else {
+      logJSON('error', 'unknown_service_type', `Unknown service type: ${service.type}`);
+      reject(new Error(`Unknown service type: ${service.type}`));
     }
   });
 }
@@ -342,7 +359,7 @@ async function checkServiceHealth(serviceKey) {
   });
   
   // 連續失敗達到閾值時發送告警並嘗試重啟
-  if (service.consecutiveFailures >= serviceCoordinator.alertThreshold) {
+  if (service.consecutiveFailures >= COORDINATOR_CONFIG.alertThreshold) {
     sendHealthAlert(
       ALERT_MESSAGES.HEALTH_ABNORMAL.title,
       ALERT_MESSAGES.HEALTH_ABNORMAL.bodyTemplate(service.name, service.consecutiveFailures),
@@ -350,7 +367,7 @@ async function checkServiceHealth(serviceKey) {
     );
     
     // 嘗試自動重啟
-    if (!service.process && service.restartAttempts < serviceCoordinator.maxRestartAttempts && !serviceCoordinator.restartInProgress) {
+    if (!service.process && service.restartAttempts < COORDINATOR_CONFIG.maxRestartAttempts && !serviceCoordinator.restartInProgress) {
       serviceCoordinator.restartInProgress = true;
       service.restartAttempts++;
       try {
@@ -389,12 +406,12 @@ function startPeriodicHealthCheck() {
   }
   
   logJSON('info', 'periodic_health_check_start', 'Starting periodic health checks', {
-    interval_ms: 30000
+    interval_ms: COORDINATOR_CONFIG.healthCheckIntervalMs
   });
   
   healthCheckInterval = setInterval(async () => {
     await checkAllServicesHealth();
-  }, 30000); // 每 30 秒檢查一次
+  }, COORDINATOR_CONFIG.healthCheckIntervalMs);
 }
 
 // 創建主視窗

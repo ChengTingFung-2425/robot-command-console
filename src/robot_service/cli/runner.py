@@ -10,7 +10,7 @@ import signal
 import sys
 from typing import Optional
 
-from ..service_manager import ServiceManager
+from ..service_coordinator import ServiceCoordinator, ServiceConfig, QueueService
 
 
 logger = logging.getLogger(__name__)
@@ -24,10 +24,11 @@ class CLIRunner:
     - 不依賴 Electron
     - 可作為系統服務執行
     - 支援命令列參數配置
+    - 使用 ServiceCoordinator 管理服務
     """
     
     def __init__(self):
-        self.service_manager: Optional[ServiceManager] = None
+        self.coordinator: Optional[ServiceCoordinator] = None
         self._shutdown_event = asyncio.Event()
     
     def parse_args(self) -> argparse.Namespace:
@@ -55,6 +56,13 @@ class CLIRunner:
             type=float,
             default=0.1,
             help='Queue poll interval in seconds (default: 0.1)'
+        )
+        
+        parser.add_argument(
+            '--health-check-interval',
+            type=float,
+            default=30.0,
+            help='Health check interval in seconds (default: 30.0)'
         )
         
         parser.add_argument(
@@ -87,17 +95,32 @@ class CLIRunner:
         """非同步執行"""
         logger.info("Starting Robot Service in CLI mode")
         logger.info(f"Configuration: queue_size={args.queue_size}, "
-                   f"workers={args.workers}, poll_interval={args.poll_interval}")
+                   f"workers={args.workers}, poll_interval={args.poll_interval}, "
+                   f"health_check_interval={args.health_check_interval}")
         
-        # 建立服務管理器
-        self.service_manager = ServiceManager(
+        # 建立服務協調器
+        self.coordinator = ServiceCoordinator(
+            health_check_interval=args.health_check_interval,
+        )
+        
+        # 建立並註冊佇列服務
+        queue_service = QueueService(
             queue_max_size=args.queue_size,
             max_workers=args.workers,
             poll_interval=args.poll_interval,
         )
         
-        # 啟動服務
-        await self.service_manager.start()
+        queue_config = ServiceConfig(
+            name="queue_service",
+            service_type="QueueService",
+            enabled=True,
+            auto_restart=True,
+        )
+        
+        self.coordinator.register_service(queue_service, queue_config)
+        
+        # 啟動服務協調器
+        await self.coordinator.start()
         
         logger.info("Robot Service started successfully")
         logger.info("Press Ctrl+C to stop")
@@ -107,8 +130,8 @@ class CLIRunner:
         
         logger.info("Shutting down Robot Service...")
         
-        # 停止服務
-        await self.service_manager.stop(timeout=30.0)
+        # 停止服務協調器
+        await self.coordinator.stop(timeout=30.0)
         
         logger.info("Robot Service stopped")
     

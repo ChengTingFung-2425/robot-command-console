@@ -4,10 +4,26 @@ Robot Service 模組
 """
 
 __version__ = "1.0.0"
-__all__ = ["QueueHandler", "ServiceManager", "CLIRunner"]
+__all__ = [
+    "QueueHandler",
+    "ServiceManager",
+    "ServiceCoordinator",
+    "ServiceBase",
+    "ServiceStatus",
+    "ServiceConfig",
+    "QueueService",
+    "CLIRunner",
+]
 
 from .queue.handler import QueueHandler
 from .service_manager import ServiceManager
+from .service_coordinator import (
+    ServiceCoordinator,
+    ServiceBase,
+    ServiceStatus,
+    ServiceConfig,
+    QueueService,
+)
 
 try:
     from .cli.runner import CLIRunner

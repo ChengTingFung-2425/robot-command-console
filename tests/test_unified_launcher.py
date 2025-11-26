@@ -255,3 +255,63 @@ class TestFlaskServiceIntegration:
             assert callable(ServiceManager), "ServiceManager 不是可呼叫的類別"
         except ImportError as e:
             pytest.fail(f"無法導入 ServiceManager: {e}")
+
+
+class TestPythonServiceCoordinator:
+    """測試 Python 服務協調器"""
+    
+    def test_service_coordinator_can_import(self):
+        """確認 ServiceCoordinator 可以導入"""
+        try:
+            from robot_service.service_coordinator import ServiceCoordinator
+            assert callable(ServiceCoordinator), "ServiceCoordinator 不是可呼叫的類別"
+        except ImportError as e:
+            pytest.fail(f"無法導入 ServiceCoordinator: {e}")
+    
+    def test_service_base_can_import(self):
+        """確認 ServiceBase 可以導入"""
+        try:
+            from robot_service.service_coordinator import ServiceBase
+            assert ServiceBase is not None, "ServiceBase 為 None"
+        except ImportError as e:
+            pytest.fail(f"無法導入 ServiceBase: {e}")
+    
+    def test_queue_service_can_import(self):
+        """確認 QueueService 可以導入"""
+        try:
+            from robot_service.service_coordinator import QueueService
+            assert callable(QueueService), "QueueService 不是可呼叫的類別"
+        except ImportError as e:
+            pytest.fail(f"無法導入 QueueService: {e}")
+    
+    def test_service_status_can_import(self):
+        """確認 ServiceStatus 可以導入"""
+        try:
+            from robot_service.service_coordinator import ServiceStatus
+            assert ServiceStatus.STOPPED is not None
+            assert ServiceStatus.RUNNING is not None
+            assert ServiceStatus.HEALTHY is not None
+        except ImportError as e:
+            pytest.fail(f"無法導入 ServiceStatus: {e}")
+    
+    def test_service_config_can_import(self):
+        """確認 ServiceConfig 可以導入"""
+        try:
+            from robot_service.service_coordinator import ServiceConfig
+            config = ServiceConfig(name="test", service_type="test")
+            assert config.name == "test"
+            assert config.enabled is True
+        except ImportError as e:
+            pytest.fail(f"無法導入 ServiceConfig: {e}")
+    
+    def test_service_coordinator_file_exists(self):
+        """確認 service_coordinator.py 存在"""
+        coordinator_path = Path(__file__).parent.parent / 'src' / 'robot_service' / 'service_coordinator.py'
+        assert coordinator_path.exists(), "service_coordinator.py 不存在"
+    
+    def test_cli_runner_uses_coordinator(self):
+        """確認 CLI runner 使用 ServiceCoordinator"""
+        runner_path = Path(__file__).parent.parent / 'src' / 'robot_service' / 'cli' / 'runner.py'
+        content = runner_path.read_text(encoding='utf-8')
+        assert 'ServiceCoordinator' in content, "CLI runner 未使用 ServiceCoordinator"
+        assert 'QueueService' in content, "CLI runner 未使用 QueueService"

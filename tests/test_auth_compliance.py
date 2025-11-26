@@ -21,20 +21,20 @@ from MCP.models import (
 
 class TestAuthManager(unittest.TestCase):
     """測試 AuthManager 功能"""
-    
+
     def setUp(self):
         """設定測試環境"""
         self.logging_monitor = LoggingMonitor()
         self.auth_manager = AuthManager(logging_monitor=self.logging_monitor)
-        
+
         # 建立事件迴圈
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
-    
+
     def tearDown(self):
         """清理測試環境"""
         self.loop.close()
-    
+
     def test_register_user(self):
         """測試用戶註冊"""
         result = self.loop.run_until_complete(
@@ -45,15 +45,15 @@ class TestAuthManager(unittest.TestCase):
                 role="operator"
             )
         )
-        
+
         self.assertTrue(result)
         self.assertIn("user-123", self.auth_manager.users)
-        
+
         user = self.auth_manager.users["user-123"]
         self.assertEqual(user["username"], "testuser")
         self.assertEqual(user["role"], "operator")
         self.assertIsNotNone(user["password_hash"])
-    
+
     def test_register_duplicate_user(self):
         """測試重複註冊用戶"""
         self.loop.run_until_complete(
@@ -64,7 +64,7 @@ class TestAuthManager(unittest.TestCase):
                 role="viewer"
             )
         )
-        
+
         # 嘗試重複註冊
         result = self.loop.run_until_complete(
             self.auth_manager.register_user(
@@ -74,9 +74,9 @@ class TestAuthManager(unittest.TestCase):
                 role="operator"
             )
         )
-        
+
         self.assertFalse(result)
-    
+
     def test_authenticate_user(self):
         """測試用戶認證"""
         self.loop.run_until_complete(
@@ -87,25 +87,25 @@ class TestAuthManager(unittest.TestCase):
                 role="admin"
             )
         )
-        
+
         # 正確密碼
         user_id = self.loop.run_until_complete(
             self.auth_manager.authenticate_user("authuser", "correctpass")
         )
         self.assertEqual(user_id, "user-789")
-        
+
         # 錯誤密碼
         user_id = self.loop.run_until_complete(
             self.auth_manager.authenticate_user("authuser", "wrongpass")
         )
         self.assertIsNone(user_id)
-        
+
         # 不存在的用戶
         user_id = self.loop.run_until_complete(
             self.auth_manager.authenticate_user("nonexistent", "anypass")
         )
         self.assertIsNone(user_id)
-    
+
     def test_create_token(self):
         """測試創建 Token"""
         token = self.loop.run_until_complete(
@@ -115,11 +115,11 @@ class TestAuthManager(unittest.TestCase):
                 expires_in_hours=1
             )
         )
-        
+
         self.assertIsNotNone(token)
         self.assertIsInstance(token, str)
         self.assertGreater(len(token), 0)
-    
+
     def test_verify_valid_token(self):
         """測試驗證有效 Token"""
         # 創建 token
@@ -130,15 +130,15 @@ class TestAuthManager(unittest.TestCase):
                 expires_in_hours=1
             )
         )
-        
+
         # 驗證 token
         trace_id = str(uuid4())
         is_valid = self.loop.run_until_complete(
             self.auth_manager.verify_token(token, trace_id=trace_id)
         )
-        
+
         self.assertTrue(is_valid)
-    
+
     def test_verify_expired_token(self):
         """測試驗證過期 Token"""
         # 創建過期 token（已過期）
@@ -149,38 +149,38 @@ class TestAuthManager(unittest.TestCase):
                 expires_in_hours=-1  # 負數小時 = 已過期
             )
         )
-        
+
         # 驗證 token
         trace_id = str(uuid4())
         is_valid = self.loop.run_until_complete(
             self.auth_manager.verify_token(token, trace_id=trace_id)
         )
-        
+
         self.assertFalse(is_valid)
-        
+
         # 檢查是否記錄了審計事件
         events = self.loop.run_until_complete(
             self.logging_monitor.get_events(trace_id=trace_id)
         )
         self.assertGreater(len(events), 0)
-    
+
     def test_verify_invalid_token(self):
         """測試驗證無效 Token"""
         invalid_token = "invalid.token.string"
         trace_id = str(uuid4())
-        
+
         is_valid = self.loop.run_until_complete(
             self.auth_manager.verify_token(invalid_token, trace_id=trace_id)
         )
-        
+
         self.assertFalse(is_valid)
-        
+
         # 檢查是否記錄了審計事件
         events = self.loop.run_until_complete(
             self.logging_monitor.get_events(trace_id=trace_id)
         )
         self.assertGreater(len(events), 0)
-    
+
     def test_check_permission_admin(self):
         """測試管理員權限檢查"""
         self.loop.run_until_complete(
@@ -191,7 +191,7 @@ class TestAuthManager(unittest.TestCase):
                 role="admin"
             )
         )
-        
+
         # Admin 應該有所有權限
         has_perm = self.loop.run_until_complete(
             self.auth_manager.check_permission(
@@ -201,7 +201,7 @@ class TestAuthManager(unittest.TestCase):
             )
         )
         self.assertTrue(has_perm)
-        
+
         has_perm = self.loop.run_until_complete(
             self.auth_manager.check_permission(
                 user_id="admin-user",
@@ -210,7 +210,7 @@ class TestAuthManager(unittest.TestCase):
             )
         )
         self.assertTrue(has_perm)
-    
+
     def test_check_permission_operator(self):
         """測試操作員權限檢查"""
         self.loop.run_until_complete(
@@ -221,7 +221,7 @@ class TestAuthManager(unittest.TestCase):
                 role="operator"
             )
         )
-        
+
         # Operator 應該有 robot.move 權限
         has_perm = self.loop.run_until_complete(
             self.auth_manager.check_permission(
@@ -231,7 +231,7 @@ class TestAuthManager(unittest.TestCase):
             )
         )
         self.assertTrue(has_perm)
-        
+
         # Operator 應該有 robot.stop 權限
         has_perm = self.loop.run_until_complete(
             self.auth_manager.check_permission(
@@ -241,7 +241,7 @@ class TestAuthManager(unittest.TestCase):
             )
         )
         self.assertTrue(has_perm)
-    
+
     def test_check_permission_viewer(self):
         """測試觀察者權限檢查"""
         self.loop.run_until_complete(
@@ -252,7 +252,7 @@ class TestAuthManager(unittest.TestCase):
                 role="viewer"
             )
         )
-        
+
         # Viewer 應該有 robot.status 權限
         has_perm = self.loop.run_until_complete(
             self.auth_manager.check_permission(
@@ -262,7 +262,7 @@ class TestAuthManager(unittest.TestCase):
             )
         )
         self.assertTrue(has_perm)
-        
+
         # Viewer 不應該有 robot.move 權限
         has_perm = self.loop.run_until_complete(
             self.auth_manager.check_permission(
@@ -272,7 +272,7 @@ class TestAuthManager(unittest.TestCase):
             )
         )
         self.assertFalse(has_perm)
-    
+
     def test_check_permission_nonexistent_user(self):
         """測試不存在用戶的權限檢查"""
         has_perm = self.loop.run_until_complete(
@@ -282,19 +282,19 @@ class TestAuthManager(unittest.TestCase):
                 resource="robot_1"
             )
         )
-        
+
         self.assertFalse(has_perm)
-    
+
     def test_audit_logging_on_auth_failure(self):
         """測試認證失敗時的審計日誌"""
         trace_id = str(uuid4())
-        
+
         # 驗證無效 token
         invalid_token = "totally.invalid.token"
         self.loop.run_until_complete(
             self.auth_manager.verify_token(invalid_token, trace_id=trace_id)
         )
-        
+
         # 檢查審計事件
         events = self.loop.run_until_complete(
             self.logging_monitor.get_events(
@@ -302,9 +302,9 @@ class TestAuthManager(unittest.TestCase):
                 category=EventCategory.AUDIT
             )
         )
-        
+
         self.assertGreater(len(events), 0)
-        
+
         # 驗證事件內容
         audit_event = events[0]
         self.assertEqual(audit_event.category, EventCategory.AUDIT)
@@ -314,22 +314,22 @@ class TestAuthManager(unittest.TestCase):
 
 class TestAuthIntegration(unittest.TestCase):
     """測試認證整合場景"""
-    
+
     def setUp(self):
         """設定測試環境"""
         self.logging_monitor = LoggingMonitor()
         self.auth_manager = AuthManager(logging_monitor=self.logging_monitor)
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
-    
+
     def tearDown(self):
         """清理測試環境"""
         self.loop.close()
-    
+
     def test_full_auth_flow(self):
         """測試完整的認證流程"""
         trace_id = str(uuid4())
-        
+
         # 1. 註冊用戶
         register_result = self.loop.run_until_complete(
             self.auth_manager.register_user(
@@ -340,13 +340,13 @@ class TestAuthIntegration(unittest.TestCase):
             )
         )
         self.assertTrue(register_result)
-        
+
         # 2. 認證用戶
         user_id = self.loop.run_until_complete(
             self.auth_manager.authenticate_user("flowuser", "flowpass123")
         )
         self.assertEqual(user_id, "flow-user")
-        
+
         # 3. 創建 token
         token = self.loop.run_until_complete(
             self.auth_manager.create_token(
@@ -355,13 +355,13 @@ class TestAuthIntegration(unittest.TestCase):
             )
         )
         self.assertIsNotNone(token)
-        
+
         # 4. 驗證 token
         is_valid = self.loop.run_until_complete(
             self.auth_manager.verify_token(token, trace_id=trace_id)
         )
         self.assertTrue(is_valid)
-        
+
         # 5. 檢查權限
         has_perm = self.loop.run_until_complete(
             self.auth_manager.check_permission(
@@ -371,23 +371,23 @@ class TestAuthIntegration(unittest.TestCase):
             )
         )
         self.assertTrue(has_perm)
-    
+
     def test_auth_failure_flow(self):
         """測試認證失敗流程"""
         trace_id = str(uuid4())
-        
+
         # 1. 嘗試用錯誤密碼認證
         user_id = self.loop.run_until_complete(
             self.auth_manager.authenticate_user("nonexistent", "wrongpass")
         )
         self.assertIsNone(user_id)
-        
+
         # 2. 使用無效 token
         is_valid = self.loop.run_until_complete(
             self.auth_manager.verify_token("invalid.token", trace_id=trace_id)
         )
         self.assertFalse(is_valid)
-        
+
         # 3. 檢查審計日誌
         events = self.loop.run_until_complete(
             self.logging_monitor.get_events(trace_id=trace_id)

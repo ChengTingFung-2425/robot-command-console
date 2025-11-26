@@ -7,6 +7,7 @@
 Robot Service 提供：
 
 - **模組化架構**：清晰的 API 界限與職責分離
+- **服務協調器**：管理多個服務的啟動、停止與健康檢查
 - **本地佇列系統**：記憶體內實作，可擴展至 Redis/Kafka
 - **雙模式運行**：Electron 整合模式與獨立 CLI 模式
 - **優先權佇列**：4 個等級的訊息優先權
@@ -19,6 +20,7 @@ Robot Service 提供：
 src/robot_service/
 ├── __init__.py              # 模組入口
 ├── README.md                # 本文件
+├── service_coordinator.py   # 服務協調器
 ├── service_manager.py       # 服務管理器
 ├── queue/                   # 佇列模組
 │   ├── __init__.py
@@ -31,6 +33,128 @@ src/robot_service/
 └── cli/                     # CLI 模組
     ├── __init__.py
     └── runner.py            # CLI 執行器
+```
+
+## 服務協調器
+
+服務協調器 (`ServiceCoordinator`) 負責管理多個服務的生命週期：
+
+### 核心功能
+
+- **服務註冊**：註冊、取消註冊服務
+- **啟動/停止**：單個或批量啟動/停止服務
+- **健康檢查**：定期檢查服務健康狀態
+- **自動重啟**：失敗的服務可自動重啟
+- **告警通知**：健康異常時發送告警
+
+### 基本用法
+
+```python
+import asyncio
+from robot_service.service_coordinator import (
+    ServiceCoordinator,
+    ServiceConfig,
+    QueueService,
+)
+
+async def main():
+    # 建立服務協調器
+    coordinator = ServiceCoordinator(
+        health_check_interval=30.0,  # 健康檢查間隔（秒）
+        max_restart_attempts=3,       # 最大重啟嘗試次數
+        restart_delay=2.0,            # 重啟延遲（秒）
+        alert_threshold=3,            # 連續失敗閾值
+    )
+    
+    # 建立佇列服務
+    queue_service = QueueService(
+        queue_max_size=1000,
+        max_workers=5,
+        poll_interval=0.1,
+    )
+    
+    # 配置服務
+    queue_config = ServiceConfig(
+        name="queue_service",
+        service_type="QueueService",
+        enabled=True,
+        auto_restart=True,
+        max_restart_attempts=3,
+    )
+    
+    # 註冊服務
+    coordinator.register_service(queue_service, queue_config)
+    
+    # 啟動服務協調器（啟動所有服務並開始健康檢查）
+    await coordinator.start()
+    
+    # 查看服務狀態
+    status = coordinator.get_services_status()
+    print(status)
+    
+    # ... 執行業務邏輯 ...
+    
+    # 停止服務協調器
+    await coordinator.stop()
+
+asyncio.run(main())
+```
+
+### 自訂服務
+
+您可以實作 `ServiceBase` 介面來建立自訂服務：
+
+```python
+from robot_service.service_coordinator import ServiceBase
+from typing import Any, Dict, Optional
+
+class MyCustomService(ServiceBase):
+    """自訂服務範例"""
+    
+    def __init__(self):
+        self._running = False
+    
+    @property
+    def name(self) -> str:
+        return "my_custom_service"
+    
+    async def start(self) -> bool:
+        """啟動服務"""
+        self._running = True
+        # 初始化邏輯
+        return True
+    
+    async def stop(self, timeout: Optional[float] = None) -> bool:
+        """停止服務"""
+        self._running = False
+        # 清理邏輯
+        return True
+    
+    async def health_check(self) -> Dict[str, Any]:
+        """健康檢查"""
+        return {
+            "status": "healthy" if self._running else "stopped",
+            "details": {
+                # 可根據實際需求填入更多健康資訊
+            }
+        }
+    
+    @property
+    def is_running(self) -> bool:
+        return self._running
+```
+
+### 告警回呼
+
+設定告警回呼以接收服務健康問題通知：
+
+```python
+async def alert_callback(title: str, body: str, context: dict):
+    """處理告警"""
+    print(f"[告警] {title}: {body}")
+    # 可以發送到通知系統、記錄到日誌等
+
+coordinator.set_alert_callback(alert_callback)
 ```
 
 ## 快速開始
@@ -77,8 +201,14 @@ python3 run_service_cli.py \
   --queue-size 2000 \
   --workers 10 \
   --poll-interval 0.05 \
+  --health-check-interval 60.0 \
   --log-level DEBUG
 ```
+
+CLI 模式現在使用 `ServiceCoordinator` 來管理服務，提供：
+- 定期健康檢查
+- 自動服務重啟
+- 結構化狀態報告
 
 ## API 端點
 
@@ -248,10 +378,13 @@ queue = KafkaQueue(
 
 ```bash
 # 執行所有測試
-python3 -m pytest Test/test_queue_system.py -v
+python3 -m pytest tests/test_queue_system.py tests/test_service_coordinator.py -v
 
-# 執行特定測試
-python3 -m pytest Test/test_queue_system.py::TestMemoryQueue -v
+# 執行佇列系統測試
+python3 -m pytest tests/test_queue_system.py -v
+
+# 執行服務協調器測試
+python3 -m pytest tests/test_service_coordinator.py -v
 ```
 
 ## 監控

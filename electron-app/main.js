@@ -4,16 +4,28 @@ const path = require('path');
 const crypto = require('crypto');
 
 let mainWindow = null;
-let pythonProcess = null;
 let appToken = null;
 let healthCheckInterval = null;
-let healthStatus = 'unknown';
-let restartAttempts = 0;
-const MAX_RESTART_ATTEMPTS = 3;
-const RESTART_DELAY_MS = 2000;
-let consecutiveFailures = 0;
-const ALERT_THRESHOLD = 3;  // 連續失敗次數閾值，超過則發送告警
-let restartInProgress = false;  // 防止並發重啟
+
+// 服務協調器 - 管理多個服務
+const serviceCoordinator = {
+  services: {
+    flask: {
+      name: 'Flask API 服務',
+      process: null,
+      status: 'stopped',
+      port: 5000,
+      healthUrl: 'http://127.0.0.1:5000/health',
+      restartAttempts: 0,
+      consecutiveFailures: 0,
+      lastHealthCheck: null,
+    }
+  },
+  maxRestartAttempts: 3,
+  restartDelayMs: 2000,
+  alertThreshold: 3,
+  restartInProgress: false,
+};
 
 // JSON 結構化日誌函數
 function logJSON(level, event, message, extra = {}) {
@@ -22,7 +34,7 @@ function logJSON(level, event, message, extra = {}) {
     level: level.toUpperCase(),
     event: event,
     message: message,
-    service: 'electron-main',
+    service: 'electron-launcher',
     ...extra
   };
   console.log(JSON.stringify(logEntry));
@@ -31,16 +43,24 @@ function logJSON(level, event, message, extra = {}) {
 // 告警訊息常數（支援未來國際化擴展）
 const ALERT_MESSAGES = {
   SERVICE_RESTART_FAILED: {
-    title: 'Python 服務重啟失敗',
-    bodyTemplate: (attempts, max) => `嘗試 ${attempts}/${max} 次後仍無法重啟`
+    title: '服務重啟失敗',
+    bodyTemplate: (name, attempts, max) => `${name} 嘗試 ${attempts}/${max} 次後仍無法重啟`
   },
   SERVICE_FAILURE: {
-    title: 'Python 服務故障',
-    body: '已達最大重啟次數，服務無法恢復'
+    title: '服務故障',
+    bodyTemplate: (name) => `${name} 已達最大重啟次數，服務無法恢復`
   },
   HEALTH_ABNORMAL: {
     title: '服務健康狀態異常',
-    bodyTemplate: (failures) => `Python 服務已連續 ${failures} 次健康檢查失敗`
+    bodyTemplate: (name, failures) => `${name} 已連續 ${failures} 次健康檢查失敗`
+  },
+  ALL_SERVICES_STARTED: {
+    title: '所有服務已啟動',
+    body: '統一啟動器已成功啟動所有服務'
+  },
+  ALL_SERVICES_STOPPED: {
+    title: '所有服務已停止',
+    body: '統一啟動器已停止所有服務'
   }
 };
 
@@ -49,9 +69,6 @@ function sendHealthAlert(title, body, context = {}) {
   const alertContext = {
     title: title,
     body: body,
-    consecutive_failures: consecutiveFailures,
-    restart_attempts: restartAttempts,
-    alert_type: context.alertType || 'unknown',
     ...context
   };
   
@@ -74,151 +91,239 @@ function generateToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
-// 啟動 Python Flask 服務
-function startPythonService() {
+// 取得服務狀態摘要
+function getServicesStatus() {
+  const statuses = {};
+  for (const [key, service] of Object.entries(serviceCoordinator.services)) {
+    statuses[key] = {
+      name: service.name,
+      status: service.status,
+      port: service.port,
+      restartAttempts: service.restartAttempts,
+      consecutiveFailures: service.consecutiveFailures,
+      lastHealthCheck: service.lastHealthCheck,
+      isRunning: service.process !== null,
+    };
+  }
+  return statuses;
+}
+
+// 啟動單個服務
+async function startService(serviceKey) {
+  const service = serviceCoordinator.services[serviceKey];
+  if (!service) {
+    logJSON('error', 'service_not_found', `Service ${serviceKey} not found`);
+    return false;
+  }
+  
+  if (service.process) {
+    logJSON('warn', 'service_already_running', `${service.name} already running`);
+    return true;
+  }
+  
   return new Promise((resolve, reject) => {
-    const pythonScript = path.join(__dirname, '..', 'flask_service.py');
-    
-    // 生成 token 並設定環境變數
-    appToken = generateToken();
-    
-    logJSON('info', 'python_service_start', 'Starting Python service', {
-      script: pythonScript,
-      token_prefix: appToken.substring(0, 8)
-    });
-    
-    pythonProcess = spawn('python3', [pythonScript], {
-      env: { ...process.env, APP_TOKEN: appToken, PORT: '5000' },
-      stdio: 'pipe'
-    });
-    
-    pythonProcess.stdout.on('data', (data) => {
-      // Python 服務現在使用 JSON 日誌，直接輸出
-      const output = data.toString().trim();
-      console.log(`[Python] ${output}`);
+    if (serviceKey === 'flask') {
+      const pythonScript = path.join(__dirname, '..', 'flask_service.py');
       
-      // 檢查服務是否已啟動
-      if (output.includes('Running on')) {
-        logJSON('info', 'python_service_ready', 'Python service started successfully');
-        resolve();
+      // 生成 token
+      if (!appToken) {
+        appToken = generateToken();
       }
-    });
-    
-    pythonProcess.stderr.on('data', (data) => {
-      logJSON('error', 'python_service_error', 'Python service error', {
-        error: data.toString().trim()
-      });
-    });
-    
-    pythonProcess.on('error', (error) => {
-      logJSON('error', 'python_service_spawn_error', 'Failed to start Python service', {
-        error: error.message,
-        code: error.code
-      });
-      reject(error);
-    });
-    
-    pythonProcess.on('exit', (code, signal) => {
-      logJSON('warn', 'python_service_exit', 'Python service exited', {
-        exit_code: code,
-        signal: signal
-      });
-      pythonProcess = null;
       
-      // 自動重啟邏輯（僅在非正常退出且未超過重試次數時）
-      if (code !== 0 && restartAttempts < MAX_RESTART_ATTEMPTS) {
-        restartAttempts++;
-        logJSON('info', 'python_service_restart', 'Attempting to restart Python service', {
-          attempt: restartAttempts,
-          max_attempts: MAX_RESTART_ATTEMPTS,
-          delay_ms: RESTART_DELAY_MS
-        });
+      logJSON('info', 'service_start', `Starting ${service.name}`, {
+        script: pythonScript,
+        port: service.port,
+        token_prefix: appToken.substring(0, 8)
+      });
+      
+      service.process = spawn('python3', [pythonScript], {
+        env: { ...process.env, APP_TOKEN: appToken, PORT: String(service.port) },
+        stdio: 'pipe'
+      });
+      
+      service.process.stdout.on('data', (data) => {
+        const output = data.toString().trim();
+        console.log(`[${serviceKey}] ${output}`);
         
-        setTimeout(async () => {
-          try {
-            await startPythonService();
-            const healthy = await checkHealth();
-            if (healthy) {
-              logJSON('info', 'python_service_restart_success', 'Python service restarted successfully');
-              restartAttempts = 0;  // 重置重啟計數
-            }
-          } catch (error) {
-            logJSON('error', 'python_service_restart_failed', 'Failed to restart Python service', {
-              error: error.message
-            });
-            sendHealthAlert(
-              ALERT_MESSAGES.SERVICE_RESTART_FAILED.title,
-              ALERT_MESSAGES.SERVICE_RESTART_FAILED.bodyTemplate(restartAttempts, MAX_RESTART_ATTEMPTS),
-              { alertType: 'restart_failed' }
-            );
-          }
-        }, RESTART_DELAY_MS);
-      } else if (restartAttempts >= MAX_RESTART_ATTEMPTS) {
-        logJSON('error', 'python_service_restart_exhausted', 'Max restart attempts reached', {
-          attempts: restartAttempts
+        if (output.includes('Running on')) {
+          service.status = 'running';
+          logJSON('info', 'service_ready', `${service.name} started successfully`);
+          resolve(true);
+        }
+      });
+      
+      service.process.stderr.on('data', (data) => {
+        logJSON('error', 'service_error', `${service.name} error`, {
+          service: serviceKey,
+          error: data.toString().trim()
         });
-        sendHealthAlert(
-          ALERT_MESSAGES.SERVICE_FAILURE.title,
-          ALERT_MESSAGES.SERVICE_FAILURE.body,
-          { alertType: 'service_failure' }
-        );
-      }
-    });
-    
-    // 設定超時
-    setTimeout(() => {
-      if (pythonProcess && pythonProcess.exitCode === null) {
-        logJSON('info', 'python_service_timeout', 'Python service assumed started after timeout');
-        resolve(); // 假設已啟動
-      }
-    }, 5000);
+      });
+      
+      service.process.on('error', (error) => {
+        service.status = 'error';
+        logJSON('error', 'service_spawn_error', `Failed to start ${service.name}`, {
+          error: error.message,
+          code: error.code
+        });
+        reject(error);
+      });
+      
+      service.process.on('exit', (code, signal) => {
+        logJSON('warn', 'service_exit', `${service.name} exited`, {
+          exit_code: code,
+          signal: signal
+        });
+        service.process = null;
+        service.status = code === 0 ? 'stopped' : 'error';
+        
+        // 自動重啟邏輯
+        if (code !== 0 && service.restartAttempts < serviceCoordinator.maxRestartAttempts && !serviceCoordinator.restartInProgress) {
+          service.restartAttempts++;
+          logJSON('info', 'service_restart', `Attempting to restart ${service.name}`, {
+            attempt: service.restartAttempts,
+            max_attempts: serviceCoordinator.maxRestartAttempts
+          });
+          
+          setTimeout(async () => {
+            try {
+              serviceCoordinator.restartInProgress = true;
+              await startService(serviceKey);
+              const healthy = await checkServiceHealth(serviceKey);
+              if (healthy) {
+                service.restartAttempts = 0;
+                logJSON('info', 'service_restart_success', `${service.name} restarted successfully`);
+              }
+            } catch (error) {
+              sendHealthAlert(
+                ALERT_MESSAGES.SERVICE_RESTART_FAILED.title,
+                ALERT_MESSAGES.SERVICE_RESTART_FAILED.bodyTemplate(service.name, service.restartAttempts, serviceCoordinator.maxRestartAttempts),
+                { alertType: 'restart_failed', service: serviceKey }
+              );
+            } finally {
+              serviceCoordinator.restartInProgress = false;
+            }
+          }, serviceCoordinator.restartDelayMs);
+        } else if (service.restartAttempts >= serviceCoordinator.maxRestartAttempts) {
+          sendHealthAlert(
+            ALERT_MESSAGES.SERVICE_FAILURE.title,
+            ALERT_MESSAGES.SERVICE_FAILURE.bodyTemplate(service.name),
+            { alertType: 'service_failure', service: serviceKey }
+          );
+        }
+      });
+      
+      // 設定超時
+      setTimeout(() => {
+        if (service.process && service.process.exitCode === null && service.status !== 'running') {
+          service.status = 'running';
+          logJSON('info', 'service_timeout', `${service.name} assumed started after timeout`);
+          resolve(true);
+        }
+      }, 5000);
+    }
   });
 }
 
-// 健康檢查
-async function checkHealth() {
+// 停止單個服務
+async function stopService(serviceKey) {
+  const service = serviceCoordinator.services[serviceKey];
+  if (!service) {
+    logJSON('error', 'service_not_found', `Service ${serviceKey} not found`);
+    return false;
+  }
+  
+  if (!service.process) {
+    logJSON('info', 'service_not_running', `${service.name} is not running`);
+    return true;
+  }
+  
+  logJSON('info', 'service_stop', `Stopping ${service.name}`);
+  service.process.kill('SIGTERM');
+  service.process = null;
+  service.status = 'stopped';
+  service.restartAttempts = 0;
+  service.consecutiveFailures = 0;
+  
+  return true;
+}
+
+// 啟動所有服務
+async function startAllServices() {
+  logJSON('info', 'all_services_start', 'Starting all services');
+  
+  const results = {};
+  for (const serviceKey of Object.keys(serviceCoordinator.services)) {
+    try {
+      results[serviceKey] = await startService(serviceKey);
+    } catch (error) {
+      results[serviceKey] = false;
+      logJSON('error', 'service_start_failed', `Failed to start ${serviceKey}`, { error: error.message });
+    }
+  }
+  
+  // 執行初始健康檢查
+  await checkAllServicesHealth();
+  
+  const allSuccessful = Object.values(results).every(r => r === true);
+  if (allSuccessful) {
+    sendHealthAlert(
+      ALERT_MESSAGES.ALL_SERVICES_STARTED.title,
+      ALERT_MESSAGES.ALL_SERVICES_STARTED.body,
+      { alertType: 'all_started' }
+    );
+  }
+  
+  return results;
+}
+
+// 停止所有服務
+async function stopAllServices() {
+  logJSON('info', 'all_services_stop', 'Stopping all services');
+  
+  const results = {};
+  for (const serviceKey of Object.keys(serviceCoordinator.services)) {
+    results[serviceKey] = await stopService(serviceKey);
+  }
+  
+  return results;
+}
+
+// 檢查單個服務健康狀態
+async function checkServiceHealth(serviceKey) {
+  const service = serviceCoordinator.services[serviceKey];
+  if (!service) {
+    return false;
+  }
+  
   const maxRetries = 10;
   const retryDelay = 1000;
   
-  logJSON('info', 'health_check_start', 'Starting health check', {
-    max_retries: maxRetries,
-    retry_delay_ms: retryDelay
-  });
-  
   for (let i = 0; i < maxRetries; i++) {
     try {
-      const response = await fetch('http://127.0.0.1:5000/health');
+      const response = await fetch(service.healthUrl);
       if (response.ok) {
         const data = await response.json();
-        const newStatus = 'healthy';
         
         // 重置連續失敗計數
-        if (consecutiveFailures > 0) {
-          logJSON('info', 'health_recovered', 'Health check recovered after failures', {
-            previous_failures: consecutiveFailures
+        if (service.consecutiveFailures > 0) {
+          logJSON('info', 'health_recovered', `${service.name} health recovered`, {
+            previous_failures: service.consecutiveFailures
           });
-          consecutiveFailures = 0;
+          service.consecutiveFailures = 0;
         }
         
-        if (healthStatus !== newStatus) {
-          logJSON('info', 'health_status_transition', 'Health status changed', {
-            previous_status: healthStatus,
-            new_status: newStatus,
-            attempt: i + 1
-          });
-          healthStatus = newStatus;
-        }
+        service.status = 'healthy';
+        service.lastHealthCheck = new Date().toISOString();
         
-        logJSON('info', 'health_check_success', 'Health check passed', {
+        logJSON('info', 'health_check_success', `${service.name} health check passed`, {
           attempt: i + 1,
           response: data
         });
         return true;
       }
     } catch (error) {
-      logJSON('warn', 'health_check_attempt_failed', 'Health check attempt failed', {
+      logJSON('warn', 'health_check_attempt_failed', `${service.name} health check attempt failed`, {
         attempt: i + 1,
-        max_retries: maxRetries,
         error: error.message
       });
     }
@@ -228,55 +333,53 @@ async function checkHealth() {
     }
   }
   
-  const newStatus = 'unhealthy';
-  consecutiveFailures++;
+  service.consecutiveFailures++;
+  service.status = 'unhealthy';
+  service.lastHealthCheck = new Date().toISOString();
   
-  if (healthStatus !== newStatus) {
-    logJSON('error', 'health_status_transition', 'Health status changed', {
-      previous_status: healthStatus,
-      new_status: newStatus,
-      consecutive_failures: consecutiveFailures
-    });
-    healthStatus = newStatus;
-  }
-  
-  logJSON('error', 'health_check_failed', 'All health check attempts failed', {
-    total_attempts: maxRetries,
-    consecutive_failures: consecutiveFailures
+  logJSON('error', 'health_check_failed', `${service.name} health check failed`, {
+    consecutive_failures: service.consecutiveFailures
   });
   
-  // 連續失敗達到閾值時發送告警
-  if (consecutiveFailures >= ALERT_THRESHOLD) {
+  // 連續失敗達到閾值時發送告警並嘗試重啟
+  if (service.consecutiveFailures >= serviceCoordinator.alertThreshold) {
     sendHealthAlert(
       ALERT_MESSAGES.HEALTH_ABNORMAL.title,
-      ALERT_MESSAGES.HEALTH_ABNORMAL.bodyTemplate(consecutiveFailures),
-      { alertType: 'health_failure' }
+      ALERT_MESSAGES.HEALTH_ABNORMAL.bodyTemplate(service.name, service.consecutiveFailures),
+      { alertType: 'health_failure', service: serviceKey }
     );
     
-    // 嘗試自動重啟（防止並發重啟）
-    if (!pythonProcess && restartAttempts < MAX_RESTART_ATTEMPTS && !restartInProgress) {
-      restartInProgress = true;
-      logJSON('info', 'health_triggered_restart', 'Health check triggered automatic restart');
-      restartAttempts++;
+    // 嘗試自動重啟
+    if (!service.process && service.restartAttempts < serviceCoordinator.maxRestartAttempts && !serviceCoordinator.restartInProgress) {
+      serviceCoordinator.restartInProgress = true;
+      service.restartAttempts++;
       try {
-        await startPythonService();
-        const healthy = await checkHealth();
+        await startService(serviceKey);
+        const healthy = await checkServiceHealth(serviceKey);
         if (healthy) {
-          logJSON('info', 'health_restart_success', 'Automatic restart successful');
-          restartAttempts = 0;
-          consecutiveFailures = 0;
+          service.restartAttempts = 0;
+          service.consecutiveFailures = 0;
         }
       } catch (error) {
-        logJSON('error', 'health_restart_failed', 'Automatic restart failed', {
+        logJSON('error', 'health_restart_failed', `Automatic restart failed for ${service.name}`, {
           error: error.message
         });
       } finally {
-        restartInProgress = false;
+        serviceCoordinator.restartInProgress = false;
       }
     }
   }
   
   return false;
+}
+
+// 檢查所有服務健康狀態
+async function checkAllServicesHealth() {
+  const results = {};
+  for (const serviceKey of Object.keys(serviceCoordinator.services)) {
+    results[serviceKey] = await checkServiceHealth(serviceKey);
+  }
+  return results;
 }
 
 // 定期健康檢查
@@ -290,7 +393,7 @@ function startPeriodicHealthCheck() {
   });
   
   healthCheckInterval = setInterval(async () => {
-    await checkHealth();
+    await checkAllServicesHealth();
   }, 30000); // 每 30 秒檢查一次
 }
 
@@ -332,56 +435,111 @@ ipcMain.handle('get-token', () => {
   return appToken;
 });
 
-// IPC 處理：獲取健康狀態
+// IPC 處理：獲取所有服務狀態
+ipcMain.handle('get-services-status', () => {
+  return getServicesStatus();
+});
+
+// IPC 處理：獲取健康狀態（向後相容）
 ipcMain.handle('get-health-status', () => {
+  const flask = serviceCoordinator.services.flask;
   return {
-    status: healthStatus,
-    consecutiveFailures: consecutiveFailures,
-    restartAttempts: restartAttempts,
-    pythonRunning: pythonProcess !== null
+    status: flask.status,
+    consecutiveFailures: flask.consecutiveFailures,
+    restartAttempts: flask.restartAttempts,
+    pythonRunning: flask.process !== null
   };
 });
 
-// IPC 處理：手動重啟 Python 服務
+// IPC 處理：啟動單個服務
+ipcMain.handle('start-service', async (event, serviceKey) => {
+  logJSON('info', 'ipc_start_service', `IPC request to start service: ${serviceKey}`);
+  try {
+    const result = await startService(serviceKey);
+    const healthy = await checkServiceHealth(serviceKey);
+    return { success: result && healthy, message: healthy ? 'Service started successfully' : 'Service started but health check failed' };
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
+});
+
+// IPC 處理：停止單個服務
+ipcMain.handle('stop-service', async (event, serviceKey) => {
+  logJSON('info', 'ipc_stop_service', `IPC request to stop service: ${serviceKey}`);
+  try {
+    const result = await stopService(serviceKey);
+    return { success: result, message: result ? 'Service stopped successfully' : 'Failed to stop service' };
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
+});
+
+// IPC 處理：啟動所有服務
+ipcMain.handle('start-all-services', async () => {
+  logJSON('info', 'ipc_start_all_services', 'IPC request to start all services');
+  try {
+    const results = await startAllServices();
+    const allSuccessful = Object.values(results).every(r => r === true);
+    return { success: allSuccessful, results: results };
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
+});
+
+// IPC 處理：停止所有服務
+ipcMain.handle('stop-all-services', async () => {
+  logJSON('info', 'ipc_stop_all_services', 'IPC request to stop all services');
+  try {
+    const results = await stopAllServices();
+    const allSuccessful = Object.values(results).every(r => r === true);
+    return { success: allSuccessful, results: results };
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
+});
+
+// IPC 處理：手動重啟 Python 服務（向後相容）
 ipcMain.handle('restart-python-service', async () => {
   logJSON('info', 'manual_restart_requested', 'Manual Python service restart requested');
   
-  if (pythonProcess) {
-    pythonProcess.kill('SIGTERM');
-    pythonProcess = null;
-  }
+  await stopService('flask');
   
   // 重置計數器
-  restartAttempts = 0;
-  consecutiveFailures = 0;
+  serviceCoordinator.services.flask.restartAttempts = 0;
+  serviceCoordinator.services.flask.consecutiveFailures = 0;
   
   try {
-    await startPythonService();
-    const healthy = await checkHealth();
+    await startService('flask');
+    const healthy = await checkServiceHealth('flask');
     return { success: healthy, message: healthy ? 'Service restarted successfully' : 'Service started but health check failed' };
   } catch (error) {
     return { success: false, message: error.message };
   }
 });
 
+// IPC 處理：執行健康檢查
+ipcMain.handle('check-health', async (event, serviceKey) => {
+  logJSON('info', 'ipc_check_health', `IPC request to check health: ${serviceKey || 'all'}`);
+  if (serviceKey) {
+    const healthy = await checkServiceHealth(serviceKey);
+    return { [serviceKey]: healthy };
+  } else {
+    return await checkAllServicesHealth();
+  }
+});
+
 // 應用啟動
 app.whenReady().then(async () => {
-  logJSON('info', 'app_ready', 'Electron app ready, initializing services');
+  logJSON('info', 'app_ready', 'Unified Launcher ready, initializing services');
   
   try {
-    await startPythonService();
-    const healthy = await checkHealth();
-    
-    if (!healthy) {
-      logJSON('warn', 'health_check_initial_fail', 'Initial health check failed, but continuing');
-    } else {
-      logJSON('info', 'health_check_initial_success', 'Initial health check passed');
-    }
+    // 啟動所有服務
+    await startAllServices();
     
     createWindow();
     startPeriodicHealthCheck();
     
-    logJSON('info', 'app_initialized', 'Application initialized successfully');
+    logJSON('info', 'app_initialized', 'Unified Launcher initialized successfully');
   } catch (error) {
     logJSON('error', 'app_init_failed', 'Failed to initialize application', {
       error: error.message,
@@ -401,19 +559,16 @@ app.on('activate', () => {
 });
 
 // 關閉時清理
-app.on('before-quit', () => {
-  logJSON('info', 'app_before_quit', 'Application shutting down, cleaning up resources');
+app.on('before-quit', async () => {
+  logJSON('info', 'app_before_quit', 'Unified Launcher shutting down, cleaning up resources');
   
   if (healthCheckInterval) {
     clearInterval(healthCheckInterval);
     logJSON('info', 'health_check_stopped', 'Stopped periodic health checks');
   }
   
-  if (pythonProcess) {
-    logJSON('info', 'python_service_shutdown', 'Shutting down Python service');
-    pythonProcess.kill('SIGTERM');
-    pythonProcess = null;
-  }
+  // 停止所有服務
+  await stopAllServices();
 });
 
 app.on('window-all-closed', () => {

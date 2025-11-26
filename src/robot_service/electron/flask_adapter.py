@@ -15,8 +15,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, ge
 
 from ..queue import MessagePriority
 from ..service_manager import ServiceManager
-from ..utils.datetime_utils import utc_now, utc_now_iso
-from ..utils.logging_utils import CustomJsonFormatter
+from ..utils import utc_now, utc_now_iso, CustomJsonFormatter
 
 
 def create_flask_app(

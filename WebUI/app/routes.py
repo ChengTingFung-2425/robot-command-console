@@ -851,7 +851,7 @@ def check_internet():
         logging.error(f'檢查網路連線失敗: {str(e)}')
         return jsonify({
             'internet_available': None,
-            'error': str(e)
+            'error': '伺服器發生錯誤'
         }), 500
 
 

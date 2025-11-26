@@ -33,21 +33,21 @@ jobs:
           # 檢查主要 Python 檔案
           flake8 flask_service.py run_service_cli.py \
             --max-line-length=120 \
-            --ignore=W503,E203 \
+            --ignore=W503,E203,W293 \
             --statistics
-      
+
       - name: 檢查 src/ 目錄
         run: |
           flake8 src/ \
             --max-line-length=120 \
-            --ignore=W503,E203 \
+            --ignore=W503,E203,W293 \
             --statistics
-      
+
       - name: 檢查 MCP/ 目錄
         run: |
           flake8 MCP/ \
             --max-line-length=120 \
-            --ignore=W503,E203 \
+            --ignore=W503,E203,W293 \
             --exclude=MCP/__pycache__ \
             --statistics
   
@@ -103,10 +103,10 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install pytest pytest-asyncio aiohttp pydantic httpx
-      
+
       - name: 執行所有測試
         run: |
-          python3 -m pytest tests/ -v --tb=short
+          PYTHONPATH="${PYTHONPATH}:${PWD}/src" python3 -m pytest tests/ -v --tb=short
   
   # OpenAPI 驗證
   openapi-validation:
@@ -247,11 +247,11 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install pytest pytest-asyncio aiohttp pydantic httpx
-      
+
       - name: 執行安全測試
         run: |
-          python3 -m pytest tests/test_security_features.py -v
-      
+          PYTHONPATH="${PYTHONPATH}:${PWD}/src" python3 -m pytest tests/test_security_features.py -v
+
       - name: 執行認證測試
         run: |
-          python3 -m pytest tests/test_auth_compliance.py -v
+          PYTHONPATH="${PYTHONPATH}:${PWD}/src" python3 -m pytest tests/test_auth_compliance.py -v

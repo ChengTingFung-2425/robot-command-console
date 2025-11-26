@@ -35,10 +35,10 @@ logger = logging.getLogger(__name__)
 class ServiceBase(ABC):
     """
     服務基礎類別
-    
+
     所有需要被協調器管理的服務都應實作此介面
     """
-    
+
     @property
     @abstractmethod
     def name(self) -> str:
@@ -49,7 +49,7 @@ class ServiceBase(ABC):
             str: 服務的唯一名稱
         """
         pass
-    
+
     @abstractmethod
     async def start(self) -> bool:
         """
@@ -62,7 +62,7 @@ class ServiceBase(ABC):
             Exception: 啟動過程中發生的任何異常，應由實作類別處理
         """
         pass
-    
+
     @abstractmethod
     async def stop(self, timeout: Optional[float] = None) -> bool:
         """
@@ -78,7 +78,7 @@ class ServiceBase(ABC):
             Exception: 停止過程中發生的任何異常，應由實作類別處理
         """
         pass
-    
+
     @abstractmethod
     async def health_check(self) -> Dict[str, Any]:
         """
@@ -91,7 +91,7 @@ class ServiceBase(ABC):
             Exception: 健康檢查過程中發生的任何異常，應由實作類別處理
         """
         pass
-    
+
     @property
     @abstractmethod
     def is_running(self) -> bool:
@@ -107,10 +107,10 @@ class ServiceBase(ABC):
 class QueueService(ServiceBase):
     """
     佇列服務封裝
-    
+
     將 ServiceManager 封裝為符合 ServiceBase 介面的服務
     """
-    
+
     def __init__(
         self,
         queue_max_size: Optional[int] = None,
@@ -124,17 +124,17 @@ class QueueService(ServiceBase):
             poll_interval=poll_interval,
         )
         self._running = False
-    
+
     @property
     def name(self) -> str:
         """服務名稱"""
         return "queue_service"
-    
+
     @property
     def manager(self) -> ServiceManager:
         """取得內部的 ServiceManager 實例"""
         return self._manager
-    
+
     async def start(self) -> bool:
         """啟動服務"""
         try:
@@ -147,7 +147,7 @@ class QueueService(ServiceBase):
                 "service": self.name
             })
             return False
-    
+
     async def stop(self, timeout: Optional[float] = None) -> bool:
         """停止服務"""
         try:
@@ -160,11 +160,11 @@ class QueueService(ServiceBase):
                 "service": self.name
             })
             return False
-    
+
     async def health_check(self) -> Dict[str, Any]:
         """健康檢查"""
         return await self._manager.health_check()
-    
+
     @property
     def is_running(self) -> bool:
         """服務是否運行中"""
@@ -174,7 +174,7 @@ class QueueService(ServiceBase):
 class ServiceCoordinator:
     """
     服務協調器
-    
+
     負責：
     - 管理多個服務的生命週期
     - 啟動與停止服務
@@ -183,7 +183,7 @@ class ServiceCoordinator:
     - 提供統一的狀態查詢介面
     - 非同步狀態變更通知
     """
-    
+
     def __init__(
         self,
         health_check_interval: float = 30.0,
@@ -193,7 +193,7 @@ class ServiceCoordinator:
     ):
         """
         初始化服務協調器
-        
+
         Args:
             health_check_interval: 健康檢查間隔（秒）
             max_restart_attempts: 最大重啟嘗試次數
@@ -214,14 +214,14 @@ class ServiceCoordinator:
         self._state_change_callback: Optional[
             Callable[[str, ServiceStatus, ServiceStatus, ServiceState], Coroutine]
         ] = None
-        
+
         logger.info("ServiceCoordinator initialized", extra={
             "health_check_interval": health_check_interval,
             "max_restart_attempts": max_restart_attempts,
             "restart_delay": restart_delay,
             "service": "service_coordinator"
         })
-    
+
     def register_service(
         self,
         service: ServiceBase,
@@ -229,28 +229,28 @@ class ServiceCoordinator:
     ) -> None:
         """
         註冊服務到協調器
-        
+
         此方法使用簡單的狀態檢查來防止替換正在運行的服務。設計考量：
-        
+
         1. **簡單檢查 vs 鎖定機制**：選擇簡單檢查而非鎖定機制，因為：
            - 服務註冊通常在啟動階段完成，不會有並發問題
            - Python 的 GIL 和 asyncio 事件循環確保單線程執行
            - 避免引入不必要的複雜性和潛在死鎖風險
-        
+
         2. **安全保證**：
            - 若服務正在運行，會拋出 ValueError 拒絕替換
            - 調用方應確保在註冊新服務前先停止並取消註冊舊服務
-        
+
         3. **未來改進 (Phase 3.2)**：
            - 在 Linux 環境下，可實作基於檔案鎖定 (file lock) 搭配進程雜湊 (process hash) 的機制
            - 此機制可解決跨應用程式重啟時的服務狀態同步問題
            - 實作路徑：使用 fcntl.flock() 或 fcntl.lockf() 配合 PID 檔案
            - 詳見規劃文件：docs/plans/PHASE3_EDGE_ALL_IN_ONE.md
-        
+
         Args:
             service: 服務實例
             config: 服務配置（可選）
-            
+
         Raises:
             ValueError: 如果嘗試替換正在運行的服務
         """
@@ -262,74 +262,74 @@ class ServiceCoordinator:
                 "service_name": service.name,
                 "service": "service_coordinator"
             })
-        
+
         self._services[service.name] = service
-        
+
         # 建立或更新狀態
         if config is None:
             config = ServiceConfig(
                 name=service.name,
                 service_type=type(service).__name__,
             )
-        
+
         self._states[service.name] = ServiceState(config=config)
-        
+
         logger.info("Service registered", extra={
             "service_name": service.name,
             "service_type": config.service_type,
             "enabled": config.enabled,
             "service": "service_coordinator"
         })
-    
+
     def unregister_service(self, service_name: str) -> bool:
         """
         取消註冊服務
-        
+
         Args:
             service_name: 服務名稱
-            
+
         Returns:
             是否成功取消註冊
         """
         if service_name not in self._services:
             return False
-        
+
         del self._services[service_name]
         del self._states[service_name]
-        
+
         logger.info("Service unregistered", extra={
             "service_name": service_name,
             "service": "service_coordinator"
         })
-        
+
         return True
-    
+
     def set_alert_callback(
         self,
         callback: Callable[[str, str, Dict], Coroutine],
     ) -> None:
         """
         設定告警回呼函式
-        
+
         Args:
             callback: 告警回呼函式，接收 (title, body, context)
         """
         self._alert_callback = callback
-    
+
     def set_state_change_callback(
         self,
         callback: Callable[[str, ServiceStatus, ServiceStatus, ServiceState], Coroutine],
     ) -> None:
         """
         設定非同步狀態變更回呼函式
-        
+
         當服務狀態發生變更時，會非同步呼叫此回呼函式。
-        
+
         Args:
             callback: 非同步回呼函式，接收 (service_name, old_status, new_status, state)
         """
         self._state_change_callback = callback
-    
+
     async def _notify_state_change(
         self,
         service_name: str,
@@ -338,7 +338,7 @@ class ServiceCoordinator:
     ) -> None:
         """
         非同步通知狀態變更
-        
+
         Args:
             service_name: 服務名稱
             old_status: 舊狀態
@@ -346,18 +346,18 @@ class ServiceCoordinator:
         """
         if old_status == new_status:
             return
-        
+
         state = self._states.get(service_name)
         if not state:
             return
-        
+
         logger.debug("Service state changed", extra={
             "service_name": service_name,
             "old_status": old_status.value,
             "new_status": new_status.value,
             "service": "service_coordinator"
         })
-        
+
         if self._state_change_callback:
             try:
                 await self._state_change_callback(
@@ -369,19 +369,19 @@ class ServiceCoordinator:
                     "error": str(e),
                     "service": "service_coordinator"
                 })
-    
+
     async def _send_alert(self, title: str, body: str, context: Dict = None) -> None:
         """發送告警"""
         if context is None:
             context = {}
-        
+
         logger.warning("Alert triggered", extra={
             "alert_title": title,
             "alert_body": body,
             "context": context,
             "service": "service_coordinator"
         })
-        
+
         if self._alert_callback:
             try:
                 await self._alert_callback(title, body, context)
@@ -390,14 +390,14 @@ class ServiceCoordinator:
                     "error": str(e),
                     "service": "service_coordinator"
                 })
-    
+
     async def start_service(self, service_name: str) -> bool:
         """
         啟動單個服務
-        
+
         Args:
             service_name: 服務名稱
-            
+
         Returns:
             是否成功啟動
         """
@@ -407,32 +407,32 @@ class ServiceCoordinator:
                 "service": "service_coordinator"
             })
             return False
-        
+
         service = self._services[service_name]
         state = self._states[service_name]
-        
+
         if service.is_running:
             logger.warning("Service already running", extra={
                 "service_name": service_name,
                 "service": "service_coordinator"
             })
             return True
-        
+
         old_status = state.status
         state.status = ServiceStatus.STARTING
         await self._notify_state_change(service_name, old_status, ServiceStatus.STARTING)
-        
+
         logger.info("Starting service", extra={
             "service_name": service_name,
             "service": "service_coordinator"
         })
-        
+
         try:
             success = await asyncio.wait_for(
                 service.start(),
                 timeout=state.config.startup_timeout_seconds,
             )
-            
+
             if success:
                 old_status = state.status
                 state.status = ServiceStatus.RUNNING
@@ -440,54 +440,54 @@ class ServiceCoordinator:
                 state.restart_attempts = 0
                 state.last_error = None
                 await self._notify_state_change(service_name, old_status, ServiceStatus.RUNNING)
-                
+
                 logger.info("Service started successfully", extra={
                     "service_name": service_name,
                     "service": "service_coordinator"
                 })
-                
+
                 return True
             else:
                 old_status = state.status
                 state.status = ServiceStatus.ERROR
                 state.last_error = "Start returned False"
                 await self._notify_state_change(service_name, old_status, ServiceStatus.ERROR)
-                
+
                 logger.error("Service failed to start", extra={
                     "service_name": service_name,
                     "service": "service_coordinator"
                 })
-                
+
                 return False
-        
+
         except asyncio.TimeoutError:
             old_status = state.status
             state.status = ServiceStatus.ERROR
             state.last_error = "Startup timeout"
             await self._notify_state_change(service_name, old_status, ServiceStatus.ERROR)
-            
+
             logger.error("Service startup timeout", extra={
                 "service_name": service_name,
                 "timeout": state.config.startup_timeout_seconds,
                 "service": "service_coordinator"
             })
-            
+
             return False
-        
+
         except Exception as e:
             old_status = state.status
             state.status = ServiceStatus.ERROR
             state.last_error = str(e)
             await self._notify_state_change(service_name, old_status, ServiceStatus.ERROR)
-            
+
             logger.error("Service startup error", extra={
                 "service_name": service_name,
                 "error": str(e),
                 "service": "service_coordinator"
             }, exc_info=True)
-            
+
             return False
-    
+
     async def stop_service(
         self,
         service_name: str,
@@ -495,11 +495,11 @@ class ServiceCoordinator:
     ) -> bool:
         """
         停止單個服務
-        
+
         Args:
             service_name: 服務名稱
             timeout: 停止逾時（秒）
-            
+
         Returns:
             是否成功停止
         """
@@ -509,29 +509,29 @@ class ServiceCoordinator:
                 "service": "service_coordinator"
             })
             return False
-        
+
         service = self._services[service_name]
         state = self._states[service_name]
-        
+
         if not service.is_running:
             logger.info("Service not running", extra={
                 "service_name": service_name,
                 "service": "service_coordinator"
             })
             return True
-        
+
         old_status = state.status
         state.status = ServiceStatus.STOPPING
         await self._notify_state_change(service_name, old_status, ServiceStatus.STOPPING)
-        
+
         logger.info("Stopping service", extra={
             "service_name": service_name,
             "service": "service_coordinator"
         })
-        
+
         try:
             success = await service.stop(timeout=timeout)
-            
+
             if success:
                 old_status = state.status
                 state.status = ServiceStatus.STOPPED
@@ -539,44 +539,44 @@ class ServiceCoordinator:
                 state.consecutive_failures = 0
                 state.started_at = None
                 await self._notify_state_change(service_name, old_status, ServiceStatus.STOPPED)
-                
+
                 logger.info("Service stopped successfully", extra={
                     "service_name": service_name,
                     "service": "service_coordinator"
                 })
-                
+
                 return True
             else:
                 old_status = state.status
                 state.status = ServiceStatus.ERROR
                 state.last_error = "Stop returned False"
                 await self._notify_state_change(service_name, old_status, ServiceStatus.ERROR)
-                
+
                 logger.error("Service failed to stop", extra={
                     "service_name": service_name,
                     "service": "service_coordinator"
                 })
-                
+
                 return False
-        
+
         except Exception as e:
             old_status = state.status
             state.status = ServiceStatus.ERROR
             state.last_error = str(e)
             await self._notify_state_change(service_name, old_status, ServiceStatus.ERROR)
-            
+
             logger.error("Service stop error", extra={
                 "service_name": service_name,
                 "error": str(e),
                 "service": "service_coordinator"
             }, exc_info=True)
-            
+
             return False
-    
+
     async def start_all_services(self) -> Dict[str, bool]:
         """
         啟動所有已註冊的服務
-        
+
         Returns:
             服務名稱 -> 是否成功的字典
         """
@@ -584,9 +584,9 @@ class ServiceCoordinator:
             "service_count": len(self._services),
             "service": "service_coordinator"
         })
-        
+
         results = {}
-        
+
         for service_name in self._services:
             state = self._states[service_name]
             if state.config.enabled:
@@ -597,27 +597,27 @@ class ServiceCoordinator:
                     "service": "service_coordinator"
                 })
                 results[service_name] = True
-        
+
         all_success = all(results.values())
-        
+
         if all_success:
             logger.info("All services started successfully", extra={
                 "service_count": len(self._services),
                 "service": "service_coordinator"
             })
-        
+
         return results
-    
+
     async def stop_all_services(
         self,
         timeout: Optional[float] = None,
     ) -> Dict[str, bool]:
         """
         停止所有已註冊的服務
-        
+
         Args:
             timeout: 每個服務的停止逾時（秒）
-            
+
         Returns:
             服務名稱 -> 是否成功的字典
         """
@@ -625,32 +625,32 @@ class ServiceCoordinator:
             "service_count": len(self._services),
             "service": "service_coordinator"
         })
-        
+
         results = {}
-        
+
         for service_name in self._services:
             results[service_name] = await self.stop_service(
                 service_name,
                 timeout=timeout,
             )
-        
+
         all_success = all(results.values())
-        
+
         if all_success:
             logger.info("All services stopped successfully", extra={
                 "service_count": len(self._services),
                 "service": "service_coordinator"
             })
-        
+
         return results
-    
+
     async def check_service_health(self, service_name: str) -> bool:
         """
         檢查單個服務的健康狀態
-        
+
         Args:
             service_name: 服務名稱
-            
+
         Returns:
             是否健康
         """
@@ -660,23 +660,23 @@ class ServiceCoordinator:
                 "service": "service_coordinator"
             })
             return False
-        
+
         service = self._services[service_name]
         state = self._states[service_name]
-        
+
         if not service.is_running:
             logger.info("Service not running, health check skipped", extra={
                 "service_name": service_name,
                 "service": "service_coordinator"
             })
             return False
-        
+
         try:
             health = await service.health_check()
             state.last_health_check = datetime.now(timezone.utc)
-            
+
             is_healthy = health.get("status") in ["healthy", "running"]
-            
+
             if is_healthy:
                 if state.consecutive_failures > 0:
                     logger.info("Service health recovered", extra={
@@ -684,36 +684,36 @@ class ServiceCoordinator:
                         "previous_failures": state.consecutive_failures,
                         "service": "service_coordinator"
                     })
-                
+
                 old_status = state.status
                 state.status = ServiceStatus.HEALTHY
                 state.consecutive_failures = 0
                 await self._notify_state_change(service_name, old_status, ServiceStatus.HEALTHY)
-                
+
                 logger.info("Service health check passed", extra={
                     "service_name": service_name,
                     "health": health,
                     "service": "service_coordinator"
                 })
-                
+
                 return True
             else:
                 old_status = state.status
                 state.consecutive_failures += 1
                 state.status = ServiceStatus.UNHEALTHY
                 await self._notify_state_change(service_name, old_status, ServiceStatus.UNHEALTHY)
-                
+
                 logger.warning("Service health check failed", extra={
                     "service_name": service_name,
                     "consecutive_failures": state.consecutive_failures,
                     "health": health,
                     "service": "service_coordinator"
                 })
-                
+
                 await self._handle_health_failure(service_name)
-                
+
                 return False
-        
+
         except Exception as e:
             old_status = state.status
             state.consecutive_failures += 1
@@ -721,68 +721,68 @@ class ServiceCoordinator:
             state.last_error = str(e)
             state.last_health_check = datetime.now(timezone.utc)
             await self._notify_state_change(service_name, old_status, ServiceStatus.UNHEALTHY)
-            
+
             logger.error("Service health check error", extra={
                 "service_name": service_name,
                 "consecutive_failures": state.consecutive_failures,
                 "error": str(e),
                 "service": "service_coordinator"
             })
-            
+
             await self._handle_health_failure(service_name)
-            
+
             return False
-    
+
     async def check_all_services_health(self) -> Dict[str, bool]:
         """
         檢查所有服務的健康狀態
-        
+
         Returns:
             服務名稱 -> 是否健康的字典
         """
         results = {}
-        
+
         for service_name in self._services:
             results[service_name] = await self.check_service_health(service_name)
-        
+
         return results
-    
+
     async def _handle_health_failure(self, service_name: str) -> None:
         """處理健康檢查失敗"""
         state = self._states[service_name]
-        
+
         if state.consecutive_failures >= self._alert_threshold:
             await self._send_alert(
                 "服務健康狀態異常",
                 f"{service_name} 已連續 {state.consecutive_failures} 次健康檢查失敗",
                 {"alert_type": "health_failure", "service": service_name}
             )
-            
+
             # 嘗試自動重啟
             # 避免重複重啟：當服務處於 STARTING 狀態時表示重啟操作正在進行中，
             # 此時不應觸發新的重啟操作以防止並發重啟導致資源競爭
             if state.config.auto_restart and state.restart_attempts < state.config.max_restart_attempts:
                 if state.status != ServiceStatus.STARTING:
                     await self._attempt_restart(service_name)
-    
+
     async def _attempt_restart(self, service_name: str) -> None:
         """嘗試重啟服務"""
         state = self._states[service_name]
-        
+
         state.restart_attempts += 1
-        
+
         logger.info("Attempting to restart service", extra={
             "service_name": service_name,
             "attempt": state.restart_attempts,
             "max_attempts": state.config.max_restart_attempts,
             "service": "service_coordinator"
         })
-        
+
         await asyncio.sleep(state.config.restart_delay_seconds)
-        
+
         await self.stop_service(service_name, timeout=10.0)
         success = await self.start_service(service_name)
-        
+
         if success:
             # 給服務預熱時間再進行健康檢查（使用配置的預熱時間）
             if state.config.warmup_seconds > 0:
@@ -791,7 +791,7 @@ class ServiceCoordinator:
             if healthy:
                 state.restart_attempts = 0
                 state.consecutive_failures = 0
-                
+
                 logger.info("Service restarted successfully", extra={
                     "service_name": service_name,
                     "service": "service_coordinator"
@@ -808,14 +808,14 @@ class ServiceCoordinator:
                 f"{service_name} 重啟失敗 (嘗試 {state.restart_attempts}/{state.config.max_restart_attempts})",
                 {"alert_type": "restart_failed", "service": service_name}
             )
-    
+
     async def _periodic_health_check(self) -> None:
         """定期健康檢查協程"""
         logger.info("Starting periodic health check", extra={
             "interval_seconds": self._health_check_interval,
             "service": "service_coordinator"
         })
-        
+
         while self._running:
             try:
                 await asyncio.wait_for(
@@ -834,15 +834,15 @@ class ServiceCoordinator:
                     "error": str(e),
                     "service": "service_coordinator"
                 }, exc_info=True)
-        
+
         logger.info("Periodic health check stopped", extra={
             "service": "service_coordinator"
         })
-    
+
     async def start(self) -> bool:
         """
         啟動服務協調器
-        
+
         Returns:
             是否成功啟動
         """
@@ -851,56 +851,56 @@ class ServiceCoordinator:
                 "service": "service_coordinator"
             })
             return True
-        
+
         logger.info("Starting ServiceCoordinator", extra={
             "service": "service_coordinator"
         })
-        
+
         try:
             self._running = True
             self._shutdown_event.clear()
-            
+
             # 啟動所有服務
             results = await self.start_all_services()
-            
+
             # 執行初始健康檢查
             await self.check_all_services_health()
-            
+
             # 啟動定期健康檢查
             self._health_check_task = asyncio.create_task(
                 self._periodic_health_check()
             )
-            
+
             logger.info("ServiceCoordinator started", extra={
                 "service_results": results,
                 "service": "service_coordinator"
             })
-            
+
             return all(results.values())
         except Exception:
             self._running = False
             raise
-    
+
     async def stop(self, timeout: Optional[float] = None) -> bool:
         """
         停止服務協調器
-        
+
         Args:
             timeout: 停止逾時（秒）
-            
+
         Returns:
             是否成功停止
         """
         if not self._running:
             return True
-        
+
         logger.info("Stopping ServiceCoordinator", extra={
             "service": "service_coordinator"
         })
-        
+
         self._running = False
         self._shutdown_event.set()
-        
+
         # 停止定期健康檢查
         if self._health_check_task:
             self._health_check_task.cancel()
@@ -910,29 +910,29 @@ class ServiceCoordinator:
                 # 健康檢查任務被取消是正常流程，安全忽略
                 pass
             self._health_check_task = None
-        
+
         # 停止所有服務
         results = await self.stop_all_services(timeout=timeout)
-        
+
         logger.info("ServiceCoordinator stopped", extra={
             "service_results": results,
             "service": "service_coordinator"
         })
-        
+
         return all(results.values())
-    
+
     def get_services_status(self) -> Dict[str, Dict[str, Any]]:
         """
         取得所有服務的狀態
-        
+
         Returns:
             服務狀態字典
         """
         statuses = {}
-        
+
         for service_name, service in self._services.items():
             state = self._states[service_name]
-            
+
             statuses[service_name] = {
                 "name": state.config.name,
                 "type": state.config.service_type,
@@ -945,29 +945,29 @@ class ServiceCoordinator:
                 "last_error": state.last_error,
                 "started_at": state.started_at.isoformat() if state.started_at else None,
             }
-        
+
         return statuses
-    
+
     async def health_check(self) -> Dict[str, Any]:
         """
         服務協調器自身的健康檢查
-        
+
         Returns:
             健康狀態資訊
         """
         service_healths = {}
-        
+
         for service_name in self._services:
             state = self._states[service_name]
             service_healths[service_name] = {
                 "status": state.status.value,
                 "healthy": state.status in [ServiceStatus.HEALTHY, ServiceStatus.RUNNING],
             }
-        
+
         all_healthy = len(service_healths) > 0 and all(
             h["healthy"] for h in service_healths.values()
         )
-        
+
         return {
             "status": "healthy" if (self._running and all_healthy) else "unhealthy",
             "running": self._running,

@@ -62,7 +62,7 @@ class TestPubSubActionsArray(unittest.TestCase):
         mock_packet = Mock()
         mock_packet.topic = self.settings['input_topic']
         mock_packet.payload = json.dumps(payload).encode('utf-8')
-        
+
         # Mock the PublishPacket class to return True for isinstance check
         mock_mqtt5.PublishPacket = type('PublishPacket', (), {})
         mock_packet.__class__ = mock_mqtt5.PublishPacket
@@ -99,7 +99,7 @@ class TestPubSubActionsArray(unittest.TestCase):
         mock_packet = Mock()
         mock_packet.topic = self.settings['input_topic']
         mock_packet.payload = json.dumps(payload).encode('utf-8')
-        
+
         # Mock the PublishPacket class
         mock_mqtt5.PublishPacket = type('PublishPacket', (), {})
         mock_packet.__class__ = mock_mqtt5.PublishPacket
@@ -134,7 +134,7 @@ class TestPubSubActionsArray(unittest.TestCase):
         mock_packet = Mock()
         mock_packet.topic = self.settings['input_topic']
         mock_packet.payload = json.dumps(payload).encode('utf-8')
-        
+
         # Mock the PublishPacket class
         mock_mqtt5.PublishPacket = type('PublishPacket', (), {})
         mock_packet.__class__ = mock_mqtt5.PublishPacket
@@ -168,7 +168,7 @@ class TestPubSubActionsArray(unittest.TestCase):
         mock_packet = Mock()
         mock_packet.topic = self.settings['input_topic']
         mock_packet.payload = json.dumps(payload).encode('utf-8')
-        
+
         # Mock the PublishPacket class
         mock_mqtt5.PublishPacket = type('PublishPacket', (), {})
         mock_packet.__class__ = mock_mqtt5.PublishPacket
@@ -205,7 +205,7 @@ class TestPubSubActionsArray(unittest.TestCase):
         mock_packet = Mock()
         mock_packet.topic = self.settings['input_topic']
         mock_packet.payload = json.dumps(payload).encode('utf-8')
-        
+
         # Mock the PublishPacket class
         mock_mqtt5.PublishPacket = type('PublishPacket', (), {})
         mock_packet.__class__ = mock_mqtt5.PublishPacket
@@ -269,7 +269,7 @@ class TestPubSubActionsArray(unittest.TestCase):
         mock_packet = Mock()
         mock_packet.topic = self.settings['input_topic']
         mock_packet.payload = json.dumps(payload).encode('utf-8')
-        
+
         # Mock the PublishPacket class
         mock_mqtt5.PublishPacket = type('PublishPacket', (), {})
         mock_packet.__class__ = mock_mqtt5.PublishPacket
@@ -304,7 +304,7 @@ class TestPubSubActionsArray(unittest.TestCase):
         mock_packet = Mock()
         mock_packet.topic = self.settings['input_topic']
         mock_packet.payload = json.dumps(payload).encode('utf-8')
-        
+
         # Mock the PublishPacket class
         mock_mqtt5.PublishPacket = type('PublishPacket', (), {})
         mock_packet.__class__ = mock_mqtt5.PublishPacket
@@ -367,7 +367,7 @@ class TestPubSubBackwardCompatibility(unittest.TestCase):
         mock_packet = Mock()
         mock_packet.topic = self.settings['input_topic']
         mock_packet.payload = json.dumps(payload).encode('utf-8')
-        
+
         # Mock the PublishPacket class
         mock_mqtt5.PublishPacket = type('PublishPacket', (), {})
         mock_packet.__class__ = mock_mqtt5.PublishPacket

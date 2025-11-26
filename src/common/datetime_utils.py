@@ -12,7 +12,7 @@ from typing import Optional
 def utc_now() -> datetime:
     """
     取得當前 UTC 時間
-    
+
     Returns:
         當前 UTC 時間的 datetime 物件
     """
@@ -22,7 +22,7 @@ def utc_now() -> datetime:
 def utc_now_iso() -> str:
     """
     取得當前 UTC 時間的 ISO 格式字串
-    
+
     Returns:
         ISO 8601 格式的時間字串（例如：2025-11-26T02:00:00.000000+00:00）
     """
@@ -32,10 +32,10 @@ def utc_now_iso() -> str:
 def parse_iso_datetime(iso_string: str) -> Optional[datetime]:
     """
     解析 ISO 格式的時間字串
-    
+
     Args:
         iso_string: ISO 8601 格式的時間字串
-        
+
     Returns:
         datetime 物件，如果解析失敗則返回 None
     """
@@ -48,10 +48,10 @@ def parse_iso_datetime(iso_string: str) -> Optional[datetime]:
 def format_timestamp(dt: Optional[datetime] = None) -> str:
     """
     格式化時間戳為 ISO 格式
-    
+
     Args:
         dt: datetime 物件，如果為 None 則使用當前 UTC 時間
-        
+
     Returns:
         ISO 8601 格式的時間字串
     """
@@ -63,10 +63,10 @@ def format_timestamp(dt: Optional[datetime] = None) -> str:
 def seconds_since(start_time: datetime) -> float:
     """
     計算從指定時間到現在經過的秒數
-    
+
     Args:
         start_time: 開始時間
-        
+
     Returns:
         經過的秒數
     """
@@ -76,10 +76,10 @@ def seconds_since(start_time: datetime) -> float:
 def is_expired(expiry_time: datetime) -> bool:
     """
     檢查時間是否已過期
-    
+
     Args:
         expiry_time: 過期時間
-        
+
     Returns:
         True 如果已過期，否則 False
     """

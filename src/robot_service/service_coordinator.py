@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Callable, Coroutine, Dict, List, Optional
+from typing import Any, Callable, Coroutine, Dict, Optional
 
 from .service_manager import ServiceManager
 
@@ -646,14 +646,6 @@ class ServiceCoordinator:
     async def _attempt_restart(self, service_name: str) -> None:
         """嘗試重啟服務"""
         state = self._states[service_name]
-        
-        if state.restart_attempts >= state.config.max_restart_attempts:
-            await self._send_alert(
-                "服務重啟失敗",
-                f"{service_name} 已達最大重啟次數 ({state.config.max_restart_attempts})，服務無法恢復",
-                {"alert_type": "restart_exhausted", "service": service_name}
-            )
-            return
         
         state.restart_attempts += 1
         

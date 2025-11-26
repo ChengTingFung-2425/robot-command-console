@@ -147,9 +147,9 @@ jobs:
       - name: 檢查必要文檔
         run: |
           required_docs=(
-            "docs/threat-model.md"
-            "docs/security-checklist.md"
-            "docs/observability.md"
+            "docs/security/threat-model.md"
+            "docs/security/security-checklist.md"
+            "docs/security/observability.md"
             "docs/architecture.md"
             "docs/proposal.md"
             "openapi.yaml"

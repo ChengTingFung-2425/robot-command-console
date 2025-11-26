@@ -7,8 +7,11 @@
 | 文件 | 用途 |
 |------|------|
 | [MASTER_PLAN.md](plans/MASTER_PLAN.md) | WebUI → Native App 轉換的完整計畫（合併版） |
+| [PHASE3_EDGE_ALL_IN_ONE.md](plans/PHASE3_EDGE_ALL_IN_ONE.md) | Phase 3 ALL-in-One Edge App 詳細規劃 |
 | [architecture.md](architecture.md) | 系統架構與目錄結構說明 |
 | [proposal.md](proposal.md) | 專案原始提案 |
+| [MCP_LLM_PROVIDERS.md](MCP_LLM_PROVIDERS.md) | LLM 提供商整合指南（Phase 2） |
+| [MCP_PLUGIN_ARCHITECTURE.md](MCP_PLUGIN_ARCHITECTURE.md) | 插件架構指南（Phase 2） |
 
 ## 🏗️ 架構演進
 
@@ -100,21 +103,62 @@ config = get_config()  # 根據 ENV_TYPE 自動選擇
 - 佇列測試：`test_queue_system.py`
 - 共用模組測試：`test_common_module_imports()`
 
-## 🚀 Phase 3+ 規劃
+## 🚀 Phase 3 規劃 — ALL-in-One Edge App
 
-- [ ] Server-Edge-Runner 架構完整實作
-- [ ] Redis/Kafka 整合（分散式佇列）
-- [ ] 邊緣運算支援（本地 LLM）
-- [ ] Kubernetes 部署
-- [ ] 多租戶支援
+> **詳細規劃**：參見 [PHASE3_EDGE_ALL_IN_ONE.md](plans/PHASE3_EDGE_ALL_IN_ONE.md)
+
+### 核心目標
+
+將 MCP、WebUI、Robot-Console 整合為統一的 ALL-in-One Edge App，部署於消費級邊緣運算設備。
+
+### 基於 Phase 2 的延續
+
+Phase 3 建立在 Phase 2 完成的基礎上：
+
+| Phase 2 成果 | Phase 3 運用 |
+|-------------|-------------|
+| `src/common/` 共用模組 | 繼續使用，擴充 Edge 專用工具 |
+| `src/robot_service/` 佇列系統 | 整合至 Edge 服務層 |
+| `LLMProviderManager` | 作為 Edge LLM 管理基礎 |
+| `PluginManager` | 支援運行時插件熱載入 |
+| Server-Edge-Runner 架構 | 完整實作三層分離 |
+
+### Edge vs Cloud 職責劃分
+
+**Edge（本地）**：
+- 用戶設定儲存
+- 機器人監控
+- 固件更新管理
+- LLM 指令介面
+- 離線模式支援
+
+**Cloud（雲端）**：
+- 進階指令共享與排名
+- 用戶討論區
+- 用戶授權與信任評級
+- 共享 LLM 分析服務（大數據優化）
+
+### 子階段規劃
+
+- [ ] **Phase 3.1**：基礎整合（統一啟動器、服務協調、LLM 選擇 UI）
+- [ ] **Phase 3.2**：功能完善（WebUI 本地版、監控、CLI/TUI）
+- [ ] **Phase 3.3**：雲端整合（同步、共享指令、授權）
+- [ ] **Phase 3.4**：打包與發佈（AppImage、DMG、NSIS、Docker）
+
+### 硬體目標
+
+- Intel NUC / Beelink Mini-PC（x86_64）
+- NVIDIA Jetson Nano/Xavier（ARM64 + GPU）
+- Raspberry Pi 4/5（ARM64）
 
 ## 📝 重要提醒
 
 1. **新增共用工具**：放在 `src/common/`，由 `MCP/utils/` 和 `src/robot_service/utils/` 重新導出
 2. **環境區分**：使用 `ENV_TYPE=edge` 或 `ENV_TYPE=server`
 3. **文檔位置**：規劃文檔放 `docs/plans/`，技術文檔放 `docs/`
+4. **Phase 3 文檔**：詳見 `docs/plans/PHASE3_EDGE_ALL_IN_ONE.md`
 
 ---
 
 **最後更新**：2025-11-26  
-**版本**：Phase 2
+**版本**：Phase 2（Phase 3 規劃中）

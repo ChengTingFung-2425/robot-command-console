@@ -874,8 +874,8 @@ def get_llm_providers():
             'error': '無法連線到 MCP API 伺服器'
         }), 503
     except Exception as e:
-        logging.error(f'取得 LLM 提供商失敗: {str(e)}')
+        logging.error(f'取得 LLM 提供商失敗: {str(e)}', exc_info=True)
         return jsonify({
             'providers': [],
-            'error': str(e)
+            'error': '伺服器發生錯誤'
         }), 500

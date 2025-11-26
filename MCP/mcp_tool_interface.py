@@ -3,11 +3,10 @@ MCP 工具介面
 將 MCP 指令功能暴露為工具，供 LLM 提供商呼叫
 """
 
-import json
 import logging
 from typing import Any, Dict, List, Optional
 
-from .models import CommandRequest, CommandSpec, CommandTarget, Priority
+from .models import CommandSpec, CommandTarget, Priority
 
 logger = logging.getLogger(__name__)
 

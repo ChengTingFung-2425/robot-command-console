@@ -4,7 +4,6 @@ LLM 提供商管理器
 MCP 可透過此管理器注入到各個提供商
 """
 
-import asyncio
 import logging
 from typing import Dict, List, Optional, Type
 

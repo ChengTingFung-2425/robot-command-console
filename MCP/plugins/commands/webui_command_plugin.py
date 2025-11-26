@@ -9,7 +9,6 @@ from typing import Any, Dict, List, Optional
 from ...plugin_base import (
     CommandPluginBase,
     PluginCapability,
-    PluginConfig,
     PluginMetadata,
     PluginType,
 )

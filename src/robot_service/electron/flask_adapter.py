@@ -7,36 +7,16 @@ import asyncio
 import logging
 import os
 import sys
-from datetime import datetime, timezone
 from functools import wraps
 from typing import Optional
 
 from flask import Flask, g, jsonify, request
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
-from pythonjsonlogger import jsonlogger
 
 from ..queue import MessagePriority
 from ..service_manager import ServiceManager
-
-
-# 設定 JSON 結構化日誌
-class CustomJsonFormatter(jsonlogger.JsonFormatter):
-    """自定義 JSON 日誌格式器"""
-    def add_fields(self, log_record, record, message_dict):
-        super().add_fields(log_record, record, message_dict)
-        log_record['timestamp'] = datetime.now(timezone.utc).isoformat()
-        log_record['level'] = record.levelname
-        log_record['event'] = record.name
-        log_record['service'] = 'robot-service-flask'
-        # 添加 request_id 如果在請求上下文中
-        try:
-            if hasattr(g, 'request_id'):
-                log_record['request_id'] = g.request_id
-            if hasattr(g, 'correlation_id'):
-                log_record['correlation_id'] = g.correlation_id
-        except RuntimeError:
-            # 若不在 Flask request context 下，g 物件不可用，安全忽略此例外
-            pass
+from ..utils.datetime_utils import utc_now, utc_now_iso
+from ..utils.logging_utils import CustomJsonFormatter
 
 
 def create_flask_app(
@@ -57,7 +37,10 @@ def create_flask_app(
     
     # 配置日誌處理器
     log_handler = logging.StreamHandler(sys.stdout)
-    formatter = CustomJsonFormatter('%(timestamp)s %(level)s %(event)s %(message)s')
+    formatter = CustomJsonFormatter(
+        '%(timestamp)s %(level)s %(event)s %(message)s',
+        service_name='robot-service-flask'
+    )
     log_handler.setFormatter(formatter)
     
     app.logger.handlers.clear()
@@ -119,7 +102,7 @@ def create_flask_app(
         import uuid
         g.request_id = str(uuid.uuid4())
         g.correlation_id = request.headers.get('X-Correlation-ID', g.request_id)
-        g.start_time = datetime.now(timezone.utc)
+        g.start_time = utc_now()
         ACTIVE_CONNECTIONS.inc()
         
         logger.info('Request started', extra={
@@ -132,7 +115,7 @@ def create_flask_app(
     def after_request(response):
         """在每個請求之後執行"""
         if hasattr(g, 'start_time'):
-            duration = (datetime.now(timezone.utc) - g.start_time).total_seconds()
+            duration = (utc_now() - g.start_time).total_seconds()
             
             REQUEST_COUNT.labels(
                 method=request.method,
@@ -235,7 +218,7 @@ def create_flask_app(
         return jsonify({
             'status': 'healthy',
             'service': 'robot-command-console-flask',
-            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'timestamp': utc_now_iso(),
             'version': '1.0.0',
             'request_id': g.request_id if hasattr(g, 'request_id') else None,
             'service_manager': health,
@@ -252,7 +235,7 @@ def create_flask_app(
         })
         return jsonify({
             'message': 'pong',
-            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'timestamp': utc_now_iso(),
             'method': request.method,
             'authenticated': True,
             'request_id': g.request_id if hasattr(g, 'request_id') else None,

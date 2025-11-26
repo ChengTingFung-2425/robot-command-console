@@ -8,7 +8,22 @@ Robot Command Console 是一個用於機器人指令管理、路由與執行的�
 
 ```
 robot-command-console/
-├── electron-app/              # Electron 應用程序
+├── src/                       # 源代碼
+│   ├── common/               # 共用模組（Edge 和 Server 共用）
+│   │   ├── __init__.py
+│   │   ├── logging_utils.py  # 統一 JSON 日誌
+│   │   ├── datetime_utils.py # 時間處理工具
+│   │   └── config.py         # 環境配置
+│   │
+│   └── robot_service/        # Edge 環境：模組化機器人服務
+│       ├── __init__.py
+│       ├── service_manager.py
+│       ├── cli/              # CLI 模式
+│       ├── electron/         # Electron 整合
+│       ├── queue/            # 佇列系統
+│       └── utils/            # Edge 工具（重導出 common）
+│
+├── electron-app/              # Edge 環境：Electron 應用程序
 │   ├── main.js               # Electron 主程序
 │   ├── preload.js            # 預載入腳本（安全橋接）
 │   ├── renderer/             # 渲染器進程（UI）
@@ -16,15 +31,7 @@ robot-command-console/
 │   │   └── renderer.js
 │   └── package.json          # Electron 專用依賴
 │
-├── src/                      # 源代碼
-│   └── robot_service/        # 模組化機器人服務（背景服務）
-│       ├── __init__.py
-│       ├── service_manager.py
-│       ├── cli/              # CLI 模式
-│       ├── electron/         # Electron 整合
-│       └── queue/            # 佇列系統
-│
-├── MCP/                      # Model Context Protocol 服務
+├── MCP/                       # Server 環境：Model Context Protocol 服務
 │   ├── api.py                # FastAPI 主應用
 │   ├── auth_manager.py       # 認證管理
 │   ├── command_handler.py    # 指令處理
@@ -32,56 +39,90 @@ robot-command-console/
 │   ├── llm_processor.py      # LLM 處理器
 │   ├── robot_router.py       # 機器人路由
 │   ├── schema_validator.py   # Schema 驗證
+│   ├── utils/                # Server 工具（重導出 common）
 │   └── requirements.txt      # MCP 依賴
 │
-├── Robot-Console/            # 機器人執行層
+├── Robot-Console/             # 機器人執行層（可部署於 Edge 或 Server）
 │   ├── action_executor.py    # 動作執行器
-│   ├── advanced_decoder.py   # 進階指令解碼器（已棄用）
 │   ├── pubsub.py            # 發布/訂閱機制
 │   └── tools.py             # 工具函數
 │
-├── WebUI/                    # Web 使用者介面
+├── WebUI/                     # Server 環境：Web 使用者介面
 │   ├── app/                  # Flask 應用
-│   │   ├── __init__.py
-│   │   ├── routes.py
-│   │   ├── models.py
-│   │   ├── forms.py
-│   │   └── static/          # 靜態資源
-│   ├── migrations/          # 資料庫遷移
-│   └── microblog.py         # WebUI 入口
+│   ├── migrations/           # 資料庫遷移
+│   └── microblog.py          # WebUI 入口
 │
-├── tests/                    # 測試集合（統一）
-│   ├── test_auth_compliance.py
-│   ├── test_command_handler_compliance.py
-│   ├── test_contract_compliance.py
-│   ├── test_pubsub_actions_array.py
-│   ├── test_queue_system.py
-│   └── test_advanced_command_execution.py
+├── tests/                     # 測試集合（統一）
+│   └── test_*.py
 │
-├── config/                   # 配置管理
-│   └── README.md            # 配置說明文件
+├── config/                    # 配置管理
+│   └── README.md
 │
-├── docs/                     # 文檔
-│   ├── architecture.md      # 本文件
-│   ├── contract/            # JSON Schema 合約
-│   ├── observability.md     # 可觀測性指南
-│   ├── queue-architecture.md
-│   └── ...                  # 其他文檔
+├── docs/                      # 文檔
+│   ├── architecture.md       # 本文件
+│   ├── phase1/               # Phase 1 文檔
+│   ├── plans/                # 規劃文檔
+│   ├── contract/             # JSON Schema 合約
+│   └── ...                   # 其他文檔
 │
-├── plans/                    # 規劃文檔
-│   └── webui-to-app/        # WebUI 轉 App 計劃
+├── examples/                  # 範例代碼
 │
-├── examples/                 # 範例代碼
-│   └── demo_media_streaming.py
-│
-├── flask_service.py          # Flask 背景服務入口（Electron 用）
-├── run_service_cli.py        # CLI 模式入口
-├── app.py                    # WebUI 啟動入口
-├── config.py                 # Flask 配置（根目錄保留相容性）
-├── requirements.txt          # Python 依賴
-├── package.json              # 根層級 npm 腳本
-└── README.md                 # 專案主文檔
+├── flask_service.py           # Edge：Flask 背景服務入口
+├── run_service_cli.py         # Edge：CLI 模式入口
+├── app.py                     # Server：WebUI 啟動入口
+├── config.py                  # Flask 配置（向後相容）
+├── requirements.txt           # Python 依賴
+├── package.json               # 根層級 npm 腳本
+└── README.md                  # 專案主文檔
 ```
+
+## 環境隔離：Edge vs Server
+
+### Edge 環境（本地/邊緣）
+
+Edge 環境運行於本地設備或邊緣節點，特點：
+- 低延遲處理
+- 離線支援
+- 本地佇列系統
+- 直接與機器人通訊
+
+**組件**：
+- `electron-app/` - Electron 桌面應用
+- `src/robot_service/` - Python 背景服務
+- `flask_service.py` - Flask API 入口
+- `run_service_cli.py` - CLI 模式入口
+
+**配置**：
+```python
+from src.common.config import EdgeConfig
+config = EdgeConfig.from_env()
+```
+
+### Server 環境（伺服器端）
+
+Server 環境運行於中央伺服器，特點：
+- 集中管理多個 Edge 節點
+- 用戶認證與授權
+- 數據持久化
+- Web 管理介面
+
+**組件**：
+- `MCP/` - Model Context Protocol API
+- `WebUI/` - Web 管理介面
+- `app.py` - WebUI 入口
+
+**配置**：
+```python
+from src.common.config import ServerConfig
+config = ServerConfig.from_env()
+```
+
+### 共用模組
+
+`src/common/` 提供 Edge 和 Server 共用的工具：
+- `logging_utils.py` - 統一 JSON 結構化日誌
+- `datetime_utils.py` - 時間處理工具
+- `config.py` - 環境配置類別
 
 ## 模組職責
 
@@ -160,19 +201,52 @@ uvicorn api:app --host 0.0.0.0 --port 8000
 
 ### 5. WebUI (`WebUI/`)
 
-**目的**：Web 管理介面
+**目的**：Web 管理介面（基於 Flask Microblog 架構）
+
+**架構說明**：
+WebUI 基於 Flask Microblog 的 Server-Client 架構設計。目前為單體應用，未來將拆分為：
+- **Server 端**：API 後端、認證授權、資料庫管理、業務邏輯
+- **Edge 端**：前端 UI、本地快取、離線支援
 
 **功能**：
-- 使用者管理與認證
-- 機器人狀態監控
-- 指令發送與歷史
-- 進階指令展開
-- 使用者互動系統
+- 使用者管理與認證（Session/JWT）
+- 機器人狀態監控與儀表板
+- 指令發送、歷史記錄與審計
+- 進階指令展開與使用者互動
+- 積分系統與排行榜（用戶互動）
+
+**目錄結構**：
+```
+WebUI/
+├── app/
+│   ├── routes.py        # 路由處理
+│   ├── models.py        # 資料庫模型
+│   ├── forms.py         # 表單驗證
+│   ├── engagement.py    # 用戶互動系統
+│   ├── mqtt_client.py   # MQTT 通訊（連接 Edge）
+│   └── templates/       # Jinja2 模板
+├── migrations/          # 資料庫遷移
+└── microblog.py         # 應用入口
+```
 
 **運行**：
 ```bash
 cd WebUI
 python microblog.py
+```
+
+**未來規劃（Edge/Server 分離）**：
+```
+# Phase 3+ 規劃
+WebUI/
+├── server/              # Server 端（API + 業務邏輯）
+│   ├── api/
+│   ├── services/
+│   └── models/
+└── edge/                # Edge 端（前端 + 本地處理）
+    ├── components/
+    ├── services/
+    └── offline/
 ```
 
 ### 6. Tests (`tests/`)
@@ -256,10 +330,97 @@ python3 -m pytest tests/test_queue_system.py -v
                     ← Response ← Robot-Console ← MQTT/HTTP
 ```
 
+## 未來架構：Server-Edge-Runner
+
+> **🚀 架構演進方向**：本專案將演進為 **Server-Edge-Runner** 三層架構。
+
+### 架構概覽
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Server Layer                                 │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐     │
+│  │   MCP API       │  │   WebUI API     │  │   Auth Service  │     │
+│  │   (FastAPI)     │  │   (Flask)       │  │   (JWT/OAuth)   │     │
+│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘     │
+│           │                    │                    │               │
+│  ┌────────┴────────────────────┴────────────────────┴────────┐     │
+│  │              Message Queue / Event Bus                     │     │
+│  │              (Redis / Kafka / RabbitMQ)                   │     │
+│  └────────────────────────────┬──────────────────────────────┘     │
+└───────────────────────────────┼─────────────────────────────────────┘
+                                │
+                    ┌───────────┴───────────┐
+                    │                       │
+┌───────────────────┴───────────┐ ┌────────┴────────────────────────┐
+│         Edge Layer            │ │         Edge Layer              │
+│  ┌─────────────────────────┐  │ │  ┌─────────────────────────┐    │
+│  │   Electron App          │  │ │  │   Edge Gateway          │    │
+│  │   (Desktop Client)      │  │ │  │   (IoT Hub)             │    │
+│  └────────────┬────────────┘  │ │  └────────────┬────────────┘    │
+│               │               │ │               │                  │
+│  ┌────────────┴────────────┐  │ │  ┌────────────┴────────────┐    │
+│  │   Robot Service         │  │ │  │   Robot Service         │    │
+│  │   (Local Queue)         │  │ │  │   (Local Queue)         │    │
+│  └────────────┬────────────┘  │ │  └────────────┬────────────┘    │
+└───────────────┼───────────────┘ └───────────────┼─────────────────┘
+                │                                 │
+┌───────────────┴───────────────┐ ┌───────────────┴─────────────────┐
+│       Runner Layer            │ │       Runner Layer              │
+│  ┌─────────────────────────┐  │ │  ┌─────────────────────────┐    │
+│  │   Robot-Console         │  │ │  │   Robot-Console         │    │
+│  │   (Action Executor)     │  │ │  │   (Action Executor)     │    │
+│  └────────────┬────────────┘  │ │  └────────────┬────────────┘    │
+│               │               │ │               │                  │
+│  ┌────────────┴────────────┐  │ │  ┌────────────┴────────────┐    │
+│  │   Robot 1 (Humanoid)    │  │ │  │   Robot 2 (AGV)         │    │
+│  └─────────────────────────┘  │ │  └─────────────────────────┘    │
+└───────────────────────────────┘ └─────────────────────────────────┘
+```
+
+### 層級職責
+
+#### Server Layer（伺服器層）
+- **集中管理**：用戶認證、授權、審計
+- **數據持久化**：指令歷史、機器人狀態、分析數據
+- **API Gateway**：統一 API 入口、負載平衡
+- **訊息佇列**：跨節點通訊、事件分發
+
+#### Edge Layer（邊緣層）
+- **本地處理**：低延遲指令執行、離線支援
+- **本地佇列**：優先權佇列、重試機制
+- **協定適配**：MQTT/HTTP/WebSocket 轉換
+- **狀態同步**：與 Server 定期同步
+
+#### Runner Layer（執行層）
+- **動作執行**：直接控制機器人
+- **感測器整合**：收集機器人狀態
+- **安全機制**：緊急停止、邊界檢查
+- **協定支援**：ROS/ROS2、專有協定
+
+### 目錄對應
+
+| 層級 | 目前目錄 | 未來目錄（規劃） |
+|------|----------|------------------|
+| Server | `MCP/`, `WebUI/` | `src/server/` |
+| Edge | `src/robot_service/`, `electron-app/` | `src/edge/` |
+| Runner | `Robot-Console/` | `src/runner/` |
+| 共用 | `src/common/` | `src/common/` |
+
+### Phase 3+ 規劃
+
+- [ ] **Server 重構**：將 MCP 和 WebUI API 整合到 `src/server/`
+- [ ] **Edge 重構**：將 robot_service 和 Electron 整合到 `src/edge/`
+- [ ] **Runner 重構**：將 Robot-Console 遷移到 `src/runner/`
+- [ ] **分散式佇列**：Redis/Kafka 整合
+- [ ] **多節點部署**：Kubernetes 支援
+- [ ] **邊緣運算**：本地 AI 推論支援
+
 ## 未來擴展（Phase 3+）
 
+- [ ] Server-Edge-Runner 架構完整實作
 - [ ] Redis/Kafka 整合（分散式佇列）
-- [ ] 邊緣運算支援
+- [ ] 邊緣運算支援（本地 LLM）
 - [ ] Kubernetes 部署
 - [ ] 更多機器人類型支援
 - [ ] 進階分析與報表
@@ -278,4 +439,4 @@ python3 -m pytest tests/test_queue_system.py -v
 
 - **Phase 1** - 初始實作，功能完整性
 - **Phase 2** - 目錄重構，模組化清晰化（本版本）
-- **Phase 3+** - 規劃中，分散式擴展
+- **Phase 3+** - Server-Edge-Runner 架構演進（規劃中）

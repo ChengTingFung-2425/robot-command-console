@@ -4,25 +4,61 @@
 
 > **📢 Phase 2 重大更新** - 目錄結構已重新組織以提高模組化和清晰度。詳見 [架構說明](docs/architecture.md) 和 [遷移指南](docs/MIGRATION_GUIDE_PHASE2.md)。
 
+> **🚀 架構演進方向** - 本專案將演進為 **Server-Edge-Runner** 三層架構，支援分散式部署與邊緣運算。
+
 ## 核心目的
 
 - 集中管理來自多來源的機器人指令。  
 - 提供可插拔的模組（MCP、Robot-Console、WebUI），方便開發、測試與部署。  
 - 支援合約驅動的請求/回應格式（JSON schema），強化驗證與互通性。  
 - 內建測試與監控範例，協助維持系統可靠性。
+- **Server-Edge-Runner 架構**：支援伺服器、邊緣設備與執行層分離部署。
+
+## 架構概覽
+
+本專案基於 Flask Microblog 模式開發，將演進為 **Server-Edge-Runner** 三層架構：
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│     Server      │────▶│      Edge       │────▶│     Runner      │
+│  (MCP/WebUI)    │     │ (robot_service) │     │ (Robot-Console) │
+│  集中管理/API   │     │ 本地處理/佇列   │     │ 機器人執行     │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+```
+
+### Server Layer（伺服器層）
+- **MCP/** - Model Context Protocol API（指令中介層）
+- **WebUI/** - Web 管理介面（基於 Flask Microblog）
+- 負責：用戶認證、API Gateway、數據持久化
+
+### Edge Layer（邊緣層）
+- **electron-app/** - Electron 桌面應用程序
+- **src/robot_service/** - 模組化機器人服務（背景服務）
+- 負責：本地佇列、離線支援、低延遲處理
+
+### Runner Layer（執行層）
+- **Robot-Console/** - 機器人執行層與動作執行器
+- 負責：直接控制機器人、感測器整合、安全機制
+
+### 共用模組
+- **src/common/** - Edge 和 Server 共用的工具（日誌、時間處理、配置）
+- **tests/** - 統一測試集合
+- **config/** - 配置管理
 
 ## 主要元件概覽
 
-- **src/robot_service/** - 模組化機器人服務（新增）
+- **src/common/** - 共用工具模組（日誌格式器、時間工具、環境配置）
+- **src/robot_service/** - Edge 環境：模組化機器人服務
   - 本地佇列系統（記憶體內，可擴展至 Redis/Kafka）
   - Electron 整合模式與獨立 CLI 模式
   - 清晰的 API 界限與可測試架構
-- **electron-app/** - Electron 應用程序（主程序、預載入腳本、渲染器）
-- **MCP/** - 管理核心後端服務（API、身分驗證、指令處理、上下文管理、日誌監控）
+- **electron-app/** - Edge 環境：Electron 應用程序（主程序、預載入腳本、渲染器）
+- **MCP/** - Server 環境：管理核心後端服務（API、身分驗證、指令處理、上下文管理）
 - **Robot-Console/** - 機器人執行層與相關工具（action executor、decoder、pubsub）
-- **WebUI/** - 提供使用者介面與微服務整合的範例實作（microblog 與 Web UI routes）
-- **tests/** - 專案的自動化測試集合，包含單元測試與整合測試範例
-- **config/** - 配置文件目錄（集中管理配置策略）
+- **WebUI/** - Server 環境：Web 使用者介面（基於 Microblog 架構）
+- **tests/** - 專案的自動化測試集合
+- **config/** - 配置文件目錄
+- **docs/** - 文檔目錄（含 Phase 1 文檔、規劃文檔）
 
 ## 主要功能（摘要）
 

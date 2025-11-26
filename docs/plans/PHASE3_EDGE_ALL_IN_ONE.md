@@ -55,9 +55,10 @@ await manager.generate("請機器人向前移動", model="llama2:7b")
 
 **Phase 3 將延續**：
 - 自動偵測本地 LLM 提供商
+- 雲端 LLM 提供商配置
 - 動態切換提供商與模型
 - 健康監控與回退機制
-- 雲端 LLM 備援支援
+- 本地 LLM 備援支援
 
 ### 插件架構（Phase 2）
 

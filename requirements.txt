@@ -24,6 +24,7 @@ Babel==2.11.0
 # Authentication and security
 PyJWT==2.6.0
 passlib[bcrypt]>=1.7.4
+bcrypt>=4.0.0,<4.1.0
 
 # Development tools (template linting)
 djlint==1.19.7

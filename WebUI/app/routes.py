@@ -829,7 +829,7 @@ def clear_llm_warnings():
         logging.error(f'清除 LLM 警告失敗: {str(e)}')
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': '伺服器發生錯誤'
         }), 500
 
 

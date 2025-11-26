@@ -222,12 +222,24 @@ class AuthManager:
         return None
     
     def _hash_password(self, password: str) -> str:
-        """雜湊密碼（使用 bcrypt，自動產生隨機鹽值）"""
-        return bcrypt.hash(password)
+        """
+        雜湊密碼（使用 bcrypt，自動產生隨機鹽值）
+        
+        bcrypt 限制密碼長度最多 72 bytes，超過會自動截斷
+        """
+        # bcrypt 限制密碼長度為 72 bytes
+        password_bytes = password.encode('utf-8')[:72]
+        return bcrypt.hash(password_bytes.decode('utf-8', errors='ignore'))
     
     def _verify_password(self, password: str, password_hash: str) -> bool:
-        """驗證密碼（使用 bcrypt）"""
-        return bcrypt.verify(password, password_hash)
+        """
+        驗證密碼（使用 bcrypt）
+        
+        需要與 _hash_password 使用相同的截斷邏輯
+        """
+        # bcrypt 限制密碼長度為 72 bytes
+        password_bytes = password.encode('utf-8')[:72]
+        return bcrypt.verify(password_bytes.decode('utf-8', errors='ignore'), password_hash)
     
     async def _log_audit_event(
         self,

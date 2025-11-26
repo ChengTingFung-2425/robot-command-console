@@ -1050,7 +1050,7 @@ async def get_connection_status():
         }
     except Exception as e:
         logger.error(f"取得連線狀態失敗: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="取得連線狀態時發生內部錯誤")
 
 
 @v1_router.get("/llm/warnings")
@@ -1075,7 +1075,7 @@ async def get_llm_warnings(clear: bool = False):
         }
     except Exception as e:
         logger.error(f"取得警告訊息失敗: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="取得警告訊息時發生內部錯誤")
 
 
 @v1_router.delete("/llm/warnings")
@@ -1091,7 +1091,7 @@ async def clear_llm_warnings():
         }
     except Exception as e:
         logger.error(f"清除警告失敗: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="清除警告時發生內部錯誤")
 
 
 @v1_router.get("/llm/check-internet")
@@ -1112,7 +1112,7 @@ async def check_internet_connection():
         }
     except Exception as e:
         logger.error(f"檢查網路連線失敗: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="檢查網路連線時發生內部錯誤")
 
 
 # ===== 插件管理 API =====

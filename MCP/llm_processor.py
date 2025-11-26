@@ -259,13 +259,12 @@ class LLMProcessor:
                         )
                         return command
                 except Exception as e:
-                    # 本地 LLM 錯誤，添加警告
+                    # 本地 LLM 錯誤，添加警告（不向用戶暴露詳細錯誤）
                     self.add_warning(
                         warning_type="local_llm_error",
-                        message=f"本地 LLM 處理失敗: {str(e)}",
+                        message="本地 LLM 處理失敗，已切換到規則式解析",
                         details={
                             "provider": provider.provider_name if provider else None,
-                            "error": str(e),
                             "action": "fallback_to_rule_based"
                         }
                     )
@@ -300,8 +299,8 @@ class LLMProcessor:
             self.logger.error(f"指令解析失敗: {e}", exc_info=True)
             self.add_warning(
                 warning_type="parse_error",
-                message=f"指令解析過程發生錯誤: {str(e)}",
-                details={"error": str(e)}
+                message="指令解析過程發生錯誤",
+                details={}
             )
             return None
     

@@ -73,7 +73,6 @@ class OllamaProvider(LLMProviderBase):
                     
                     if response.status == 200:
                         # Ollama 根路徑回傳簡單訊息
-                        text = await response.text()
                         
                         # 嘗試取得版本資訊
                         version = None

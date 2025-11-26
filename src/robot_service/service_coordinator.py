@@ -6,53 +6,19 @@ Service Coordinator
 import asyncio
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from enum import Enum
 from typing import Any, Callable, Coroutine, Dict, Optional
 
 from .service_manager import ServiceManager
 
+# 從 common 模組導入共用服務類型
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from common.service_types import ServiceStatus, ServiceConfig, ServiceState
+
 
 logger = logging.getLogger(__name__)
-
-
-class ServiceStatus(Enum):
-    """服務狀態"""
-    STOPPED = "stopped"
-    STARTING = "starting"
-    RUNNING = "running"
-    HEALTHY = "healthy"
-    UNHEALTHY = "unhealthy"
-    STOPPING = "stopping"
-    ERROR = "error"
-
-
-@dataclass
-class ServiceConfig:
-    """服務配置"""
-    name: str
-    service_type: str
-    enabled: bool = True
-    auto_restart: bool = True
-    max_restart_attempts: int = 3
-    restart_delay_seconds: float = 2.0
-    health_check_interval_seconds: float = 30.0
-    startup_timeout_seconds: float = 5.0
-    warmup_seconds: float = 2.0
-    extra_config: Dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class ServiceState:
-    """服務狀態資訊"""
-    config: ServiceConfig
-    status: ServiceStatus = ServiceStatus.STOPPED
-    restart_attempts: int = 0
-    consecutive_failures: int = 0
-    last_health_check: Optional[datetime] = None
-    last_error: Optional[str] = None
-    started_at: Optional[datetime] = None
 
 
 class ServiceBase(ABC):

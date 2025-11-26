@@ -11,6 +11,7 @@ __all__ = [
     "ServiceBase",
     "ServiceStatus",
     "ServiceConfig",
+    "ServiceState",
     "QueueService",
     "CLIRunner",
 ]
@@ -22,6 +23,7 @@ from .service_coordinator import (
     ServiceBase,
     ServiceStatus,
     ServiceConfig,
+    ServiceState,
     QueueService,
 )
 

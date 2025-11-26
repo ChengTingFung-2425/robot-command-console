@@ -6,6 +6,7 @@
 - logging_utils: 統一的 JSON 結構化日誌
 - datetime_utils: 時間處理工具
 - config: 共用配置載入器
+- service_types: 服務類型定義
 
 環境隔離：
 - Edge: 運行於本地/邊緣設備（Electron、CLI）
@@ -20,6 +21,11 @@ from .config import (
     EdgeConfig,
     ServerConfig,
     get_config,
+)
+from .service_types import (
+    ServiceStatus,
+    ServiceConfig,
+    ServiceState,
 )
 
 __version__ = "1.0.0"
@@ -41,4 +47,8 @@ __all__ = [
     "EdgeConfig",
     "ServerConfig",
     "get_config",
+    # 服務類型
+    "ServiceStatus",
+    "ServiceConfig",
+    "ServiceState",
 ]

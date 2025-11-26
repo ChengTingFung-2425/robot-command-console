@@ -229,6 +229,7 @@ class ServiceCoordinator:
            - 在 Linux 環境下，可實作基於檔案鎖定 (file lock) 搭配進程雜湊 (process hash) 的機制
            - 此機制可解決跨應用程式重啟時的服務狀態同步問題
            - 實作路徑：使用 fcntl.flock() 或 fcntl.lockf() 配合 PID 檔案
+           - 詳見規劃文件：docs/plans/PHASE3_EDGE_ALL_IN_ONE.md
         
         Args:
             service: 服務實例

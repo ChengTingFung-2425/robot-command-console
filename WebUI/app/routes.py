@@ -804,7 +804,7 @@ def get_llm_warnings():
         logging.error(f'取得 LLM 警告失敗: {str(e)}')
         return jsonify({
             'warnings': [],
-            'error': str(e)
+            'error': '無法取得警告訊息'
         }), 500
 
 

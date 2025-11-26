@@ -13,6 +13,7 @@ const MAX_RESTART_ATTEMPTS = 3;
 const RESTART_DELAY_MS = 2000;
 let consecutiveFailures = 0;
 const ALERT_THRESHOLD = 3;  // 連續失敗次數閾值，超過則發送告警
+let restartInProgress = false;  // 防止並發重啟
 
 // JSON 結構化日誌函數
 function logJSON(level, event, message, extra = {}) {
@@ -27,8 +28,33 @@ function logJSON(level, event, message, extra = {}) {
   console.log(JSON.stringify(logEntry));
 }
 
+// 告警訊息常數（支援未來國際化擴展）
+const ALERT_MESSAGES = {
+  SERVICE_RESTART_FAILED: {
+    title: 'Python 服務重啟失敗',
+    bodyTemplate: (attempts, max) => `嘗試 ${attempts}/${max} 次後仍無法重啟`
+  },
+  SERVICE_FAILURE: {
+    title: 'Python 服務故障',
+    body: '已達最大重啟次數，服務無法恢復'
+  },
+  HEALTH_ABNORMAL: {
+    title: '服務健康狀態異常',
+    bodyTemplate: (failures) => `Python 服務已連續 ${failures} 次健康檢查失敗`
+  }
+};
+
 // 發送系統通知告警
-function sendHealthAlert(title, body) {
+function sendHealthAlert(title, body, context = {}) {
+  const alertContext = {
+    title: title,
+    body: body,
+    consecutive_failures: consecutiveFailures,
+    restart_attempts: restartAttempts,
+    alert_type: context.alertType || 'unknown',
+    ...context
+  };
+  
   if (Notification.isSupported()) {
     const notification = new Notification({
       title: `Robot Console: ${title}`,
@@ -37,15 +63,9 @@ function sendHealthAlert(title, body) {
     });
     notification.show();
     
-    logJSON('warn', 'health_alert_sent', 'Health alert notification sent', {
-      title: title,
-      body: body
-    });
+    logJSON('warn', 'health_alert_sent', 'Health alert notification sent', alertContext);
   } else {
-    logJSON('warn', 'health_alert_unsupported', 'System notifications not supported', {
-      title: title,
-      body: body
-    });
+    logJSON('warn', 'health_alert_unsupported', 'System notifications not supported', alertContext);
   }
 }
 
@@ -126,14 +146,22 @@ function startPythonService() {
             logJSON('error', 'python_service_restart_failed', 'Failed to restart Python service', {
               error: error.message
             });
-            sendHealthAlert('Python 服務重啟失敗', `嘗試 ${restartAttempts}/${MAX_RESTART_ATTEMPTS} 次後仍無法重啟`);
+            sendHealthAlert(
+              ALERT_MESSAGES.SERVICE_RESTART_FAILED.title,
+              ALERT_MESSAGES.SERVICE_RESTART_FAILED.bodyTemplate(restartAttempts, MAX_RESTART_ATTEMPTS),
+              { alertType: 'restart_failed' }
+            );
           }
         }, RESTART_DELAY_MS);
       } else if (restartAttempts >= MAX_RESTART_ATTEMPTS) {
         logJSON('error', 'python_service_restart_exhausted', 'Max restart attempts reached', {
           attempts: restartAttempts
         });
-        sendHealthAlert('Python 服務故障', '已達最大重啟次數，服務無法恢復');
+        sendHealthAlert(
+          ALERT_MESSAGES.SERVICE_FAILURE.title,
+          ALERT_MESSAGES.SERVICE_FAILURE.body,
+          { alertType: 'service_failure' }
+        );
       }
     });
     
@@ -219,10 +247,15 @@ async function checkHealth() {
   
   // 連續失敗達到閾值時發送告警
   if (consecutiveFailures >= ALERT_THRESHOLD) {
-    sendHealthAlert('服務健康狀態異常', `Python 服務已連續 ${consecutiveFailures} 次健康檢查失敗`);
+    sendHealthAlert(
+      ALERT_MESSAGES.HEALTH_ABNORMAL.title,
+      ALERT_MESSAGES.HEALTH_ABNORMAL.bodyTemplate(consecutiveFailures),
+      { alertType: 'health_failure' }
+    );
     
-    // 嘗試自動重啟
-    if (!pythonProcess && restartAttempts < MAX_RESTART_ATTEMPTS) {
+    // 嘗試自動重啟（防止並發重啟）
+    if (!pythonProcess && restartAttempts < MAX_RESTART_ATTEMPTS && !restartInProgress) {
+      restartInProgress = true;
       logJSON('info', 'health_triggered_restart', 'Health check triggered automatic restart');
       restartAttempts++;
       try {
@@ -237,6 +270,8 @@ async function checkHealth() {
         logJSON('error', 'health_restart_failed', 'Automatic restart failed', {
           error: error.message
         });
+      } finally {
+        restartInProgress = false;
       }
     }
   }

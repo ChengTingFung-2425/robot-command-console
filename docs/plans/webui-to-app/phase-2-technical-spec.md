@@ -424,10 +424,10 @@ await queue.enqueue(message)
 
 ## 參考文件
 
-- [PHASE2_COMPLETION_SUMMARY.md](../../PHASE2_COMPLETION_SUMMARY.md) - Phase 2 完成摘要
-- [observability.md](../../observability.md) - 可觀測性指南
-- [security-checklist.md](../../security-checklist.md) - 安全檢查清單
-- [threat-model.md](../../threat-model.md) - 威脅模型
+- [PHASE2_COMPLETION_SUMMARY.md](../../phase2/PHASE2_COMPLETION_SUMMARY.md) - Phase 2 完成摘要
+- [observability-guide.md](../../features/observability-guide.md) - 可觀測性指南
+- [security-checklist.md](../../security/security-checklist.md) - 安全檢查清單
+- [threat-model.md](../../security/threat-model.md) - 威脅模型
 - [openapi.yaml](../../../openapi.yaml) - OpenAPI 規範
 
 ---

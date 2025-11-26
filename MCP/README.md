@@ -81,7 +81,7 @@ MCP 服務已整合 Prometheus metrics 和結構化 JSON 日誌：
 - correlation_id（跨服務追蹤）
 - 詳細的上下文資訊
 
-詳細說明請參閱專案根目錄的 [可觀測性指南](../docs/observability.md)。
+詳細說明請參閱專案根目錄的 [可觀測性指南](../docs/features/observability-guide.md)。
 
 ## 設定選項（環境變數）
 

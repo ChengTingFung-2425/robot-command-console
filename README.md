@@ -2,7 +2,7 @@
 
 本專案（robot-command-console）是一個用於機器人指令管理、路由與執行的整合式控制台與服務平台。目標是提供一套模組化、可測試且可部署的系統，用來接收、驗證、路由並執行來自各種介面（WebUI、API、排程或其他整合服務）的指令，同時保留豐富的日誌、驗證與合約（schema）檢查。
 
-> **📢 Phase 2 重大更新** - 目錄結構已重新組織以提高模組化和清晰度。詳見 [架構說明](docs/architecture.md) 和 [遷移指南](docs/MIGRATION_GUIDE_PHASE2.md)。
+> **📢 Phase 2 重大更新** - 目錄結構已重新組織以提高模組化和清晰度。詳見 [架構說明](docs/architecture.md) 和 [遷移指南](docs/phase2/MIGRATION_GUIDE_PHASE2.md)。
 
 > **🚀 架構演進方向** - 本專案將演進為 **Server-Edge-Runner** 三層架構，支援分散式部署與邊緣運算。
 
@@ -77,7 +77,7 @@
 - 向後相容：仍支援舊格式（可選啟用）
 
 詳細說明請參閱：
-- [進階指令職責變更說明](docs/ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md)
+- [進階指令職責變更說明](docs/phase2/ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md)
 - [遷移指南](Robot-Console/MIGRATION_GUIDE.md)
 
 ## 快速啟動（開發者）
@@ -175,7 +175,7 @@ npm start
 python3 flask_service.py
 ```
 
-詳細說明請參閱 [可觀測性指南](docs/observability.md)。
+詳細說明請參閱 [可觀測性指南](docs/features/observability-guide.md)。
 
 ## Robot Service 模組化架構
 
@@ -190,32 +190,32 @@ python3 flask_service.py
 
 詳細文件：
 - [Robot Service README](src/robot_service/README.md) - 模組使用說明
-- [Queue Architecture](docs/queue-architecture.md) - 佇列架構與設計
+- [Queue Architecture](docs/features/queue-architecture.md) - 佇列架構與設計
 
 ## 參考與文件
 
 ### 核心文檔
 - [架構說明](docs/architecture.md) - 完整的專案架構與目錄結構說明（Phase 2）
-- [Phase 2 遷移指南](docs/MIGRATION_GUIDE_PHASE2.md) - 從 Phase 1 遷移到 Phase 2 的詳細指南
+- [Phase 2 遷移指南](docs/phase2/MIGRATION_GUIDE_PHASE2.md) - 從 Phase 1 遷移到 Phase 2 的詳細指南
 - [README](README.md) - 本文件，快速啟動與概覽
 
 ### API 與安全性
 - **[OpenAPI 規範](openapi.yaml)** - 完整的 API 合約定義（OpenAPI 3.1）
-- **[API 與安全性使用指南](docs/api-security-guide.md)** - API 版本控制、認證流程、秘密管理使用說明
-- **[威脅模型](docs/threat-model.md)** - STRIDE 威脅分析與緩解措施
-- **[安全檢查清單](docs/security-checklist.md)** - 開發、測試、部署、維護階段安全檢查項
-- **[API 安全實作摘要](docs/API_SECURITY_IMPLEMENTATION_SUMMARY.md)** - 完整實作細節與驗收標準
+- **[API 與安全性使用指南](docs/security/api-security-guide.md)** - API 版本控制、認證流程、秘密管理使用說明
+- **[威脅模型](docs/security/threat-model.md)** - STRIDE 威脅分析與緩解措施
+- **[安全檢查清單](docs/security/security-checklist.md)** - 開發、測試、部署、維護階段安全檢查項
+- **[API 安全實作摘要](docs/security/API_SECURITY_IMPLEMENTATION_SUMMARY.md)** - 完整實作細節與驗收標準
 
 ### 專業領域文檔
-- [可觀測性指南](docs/observability.md) - Prometheus metrics 和結構化日誌的完整文件
-- [Queue Architecture](docs/queue-architecture.md) - 佇列系統架構與訊息合約
+- [可觀測性指南](docs/features/observability-guide.md) - Prometheus metrics 和結構化日誌的完整文件
+- [Queue Architecture](docs/features/queue-architecture.md) - 佇列系統架構與訊息合約
 - [Robot Service](src/robot_service/README.md) - 模組化服務說明
 - [MCP Module](MCP/README.md) - MCP 服務模組說明
 - [Robot-Console](Robot-Console/README.md) - 機器人執行層說明
 
 ### 配置與測試
 - [配置策略](config/README.md) - 配置管理說明
-- [測試指南](docs/testing-guide.md) - 測試編寫與執行指南
+- [測試指南](docs/features/webui-testing-guide.md) - 測試編寫與執行指南
 
 ## API 版本控制與認證
 
@@ -258,4 +258,4 @@ curl http://localhost:8000/v1/robots \
 - **秘密管理**: 可插拔的秘密儲存後端（環境變數、檔案、keychain、DPAPI）
 - **審計日誌**: 所有認證和授權事件都記錄到審計日誌
 
-詳細說明請參閱 [API 與安全性使用指南](docs/api-security-guide.md)。
+詳細說明請參閱 [API 與安全性使用指南](docs/security/api-security-guide.md)。

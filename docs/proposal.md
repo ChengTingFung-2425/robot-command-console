@@ -312,7 +312,7 @@ Phase 2 開始演進為 Server-Edge-Runner 三層架構，Phase 3 將完整實�
 
 ### Phase 2：模組化與後端服務層（✅ 已完成）
 
-> 詳細內容請參見 [PHASE2_COMPLETION_SUMMARY.md](PHASE2_COMPLETION_SUMMARY.md)
+> 詳細內容請參見 [phase2/PHASE2_COMPLETION_SUMMARY.md](phase2/PHASE2_COMPLETION_SUMMARY.md)
 
 **目錄結構重構**：
 - [x] Electron 應用獨立至 `electron-app/`
@@ -324,13 +324,13 @@ Phase 2 開始演進為 Server-Edge-Runner 三層架構，Phase 3 將完整實�
 - [x] 自動偵測本地 LLM 服務（Ollama、LM Studio）
 - [x] `LLMProviderManager` 統一管理介面
 - [x] 健康監控與回退機制
-- [x] 參見 [MCP_LLM_PROVIDERS.md](MCP_LLM_PROVIDERS.md)
+- [x] 參見 [mcp/MCP_LLM_PROVIDERS.md](mcp/MCP_LLM_PROVIDERS.md)
 
 **插件架構**：
 - [x] 指令插件（`CommandPlugin`）
 - [x] 裝置插件（`DevicePlugin`）
 - [x] 整合插件（`IntegrationPlugin`）
-- [x] 參見 [MCP_PLUGIN_ARCHITECTURE.md](MCP_PLUGIN_ARCHITECTURE.md)
+- [x] 參見 [mcp/MCP_PLUGIN_ARCHITECTURE.md](mcp/MCP_PLUGIN_ARCHITECTURE.md)
 
 **本地佇列系統**：
 - [x] `src/robot_service/queue/` 優先權佇列
@@ -341,7 +341,7 @@ Phase 2 開始演進為 Server-Edge-Runner 三層架構，Phase 3 將完整實�
 - [x] 進階指令解碼從 Robot-Console 移至 WebUI
 - [x] 新格式 `{"actions": [...]}` 支援
 - [x] 向後相容舊格式
-- [x] 參見 [ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md](ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md)
+- [x] 參見 [phase2/ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md](phase2/ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md)
 
 ### Phase 3：ALL-in-One Edge App（📋 規劃中）
 
@@ -472,11 +472,11 @@ Phase 2 開始演進為 Server-Edge-Runner 三層架構，Phase 3 將完整實�
 - [PROJECT_MEMORY.md](PROJECT_MEMORY.md)：專案記憶與架構決策
 
 ### Phase 2 文件
-- [PHASE2_COMPLETION_SUMMARY.md](PHASE2_COMPLETION_SUMMARY.md)：Phase 2 完成摘要
-- [MIGRATION_GUIDE_PHASE2.md](MIGRATION_GUIDE_PHASE2.md)：Phase 2 遷移指南
-- [MCP_LLM_PROVIDERS.md](MCP_LLM_PROVIDERS.md)：LLM 提供商整合指南
-- [MCP_PLUGIN_ARCHITECTURE.md](MCP_PLUGIN_ARCHITECTURE.md)：插件架構指南
-- [ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md](ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md)：進階指令職責變更
+- [phase2/PHASE2_COMPLETION_SUMMARY.md](phase2/PHASE2_COMPLETION_SUMMARY.md)：Phase 2 完成摘要
+- [phase2/MIGRATION_GUIDE_PHASE2.md](phase2/MIGRATION_GUIDE_PHASE2.md)：Phase 2 遷移指南
+- [mcp/MCP_LLM_PROVIDERS.md](mcp/MCP_LLM_PROVIDERS.md)：LLM 提供商整合指南
+- [mcp/MCP_PLUGIN_ARCHITECTURE.md](mcp/MCP_PLUGIN_ARCHITECTURE.md)：插件架構指南
+- [phase2/ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md](phase2/ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md)：進階指令職責變更
 
 ### 模組設計文件
 - `MCP/Module.md`：MCP 服務層詳細設計

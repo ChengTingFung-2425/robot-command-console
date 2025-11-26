@@ -2,218 +2,116 @@
 mode: agent
 ---
 
-> 使用者為中文使用者，但為了提高編碼與撰寫速度偏好在程式碼中使用英文；因此請在程式碼外以中文進行撰寫與說明；若你在程式碼外讀到英文，請將其翻譯回中文。
+> 使用者為中文使用者，但為了提高編碼與撰寫速度偏好在程式碼中使用英文；因此請在程式碼外以中文進行撰寫與說明。
 
-## 專案總覽與作業規範
+## ⚠️ 必讀：專案記憶
 
+**貢獻前必須閱讀：**
 
-本文件定義本專案「機器人指令中介層」的設計原則、模組邊界、資料契約、處理流程與完成定義，確保系統模組化、可擴充、可監督、可追溯與高可用。
+| 文件 | 用途 | 優先級 |
+|------|------|--------|
+| [`docs/proposal.md`](../../../docs/proposal.md) | **權威規格**：專案目標、架構、模組、資料契約、實作路徑 | 🔴 最高 |
+| [`docs/architecture.md`](../../../docs/architecture.md) | 目錄結構、Edge/Server 隔離、模組職責 | 🟠 高 |
+| [`docs/plans/MASTER_PLAN.md`](../../../docs/plans/MASTER_PLAN.md) | Phase 0-6 規劃、技術選型 | 🟠 高 |
+| [`docs/PROJECT_MEMORY.md`](../../../docs/PROJECT_MEMORY.md) | 架構決策、共用工具 | 🟡 中 |
 
-> **說明：如遇規格疑義，請以 proposal.md 為最終依據。**
+> **規格疑義以 `docs/proposal.md` 為準。**
 
-## 目標與核心原則
-- 模組化與鬆耦合：MCP、指令/路由、通訊協定、認證/授權、日誌/監控、機器人抽象、WebUI 皆為清楚邊界的獨立模組。
-- 標準化資料契約：所有請求/回應/事件均使用一致的 JSON 契約，並具全鏈路追蹤能力。
-- 可監督與人類可介入：任何指令可被審批、暫停、取消、覆寫，且具即時狀態與審計軌跡。
-- 安全與合規：強制身份驗證、授權與審計；敏感資訊不落地至原始碼。
-- 高可用與可維護：明確的超時/重試策略、錯誤分級、可觀測性指標。
-- **所有設計、資料契約、流程、完成定義等，若與 proposal.md 有出入，請以 proposal.md 為準。**
+---
 
-## 架構總覽（模組與職責）
-- MCP 服務模組：統一接入層，負責指令標準化、上下文管理、驗證、授權、路由、觀測事件產生。
-- 指令/路由模組：根據指令類型與目標路由到對應協定與機器人實作，處理重試與超時。
-- 通訊協定模組：各協定（如串口、TCP、ROS、gRPC…）的轉接器，負責封包編解碼與傳輸可靠性。
-- 認證/授權模組：身份驗證（如 JWT/OAuth2/Token）、RBAC/ABAC 授權、權限審計。
-- 日誌與監控模組：集中化事件、審計、指標；支援查詢、告警與追蹤。
-- 機器人抽象模組：統一機器人能力介面（如移動、抓取、狀態讀取），屏蔽廠商差異。
-- WebUI 模組：人機界面，提供下達/審批/監控/介入，不直接與機器人通訊。
+## Server-Edge-Runner 架構
 
-目錄參考：
-- MCP：`MCP/Module.md`
-- WebUI：`WebUI/Module.md`
-- Robot-Console：`Robot-Console/module.md`
-- 測試：`Test/` 下各模組測試檔
+> 📖 詳見 [`docs/architecture.md`](../../../docs/architecture.md) 與 [`docs/proposal.md`](../../../docs/proposal.md)
 
-## 測試先行（Test-Driven Development, TDD）原則
-本專案遵循 **測試先行** 原則，旨在：
-- **明確需求**：測試案例定義功能的明確需求與邊界條件。
-- **確保品質**：每項功能必須有對應的測試覆蓋，包括成功路徑、失敗路徑、邊界案例與異常處理。
-- **降低缺陷**：提前發現設計問題，減少後期修改成本。
-- **易於重構**：測試作為執行檔案文件，確保重構不破壞既有功能。
-- **可追溯性**：測試案例清楚記錄功能行為與驗收條件。
-
-## 新增功能時的重要步驟
-1. **參考擴充規範**：見下文「擴充規範」章節。
-2. **測試先行**：在 `Test/[Your_Functionality]` 目錄中先建立測試案例；若無則新增。
-3. **實作功能**：根據規格與測試案例實作。
-4. **驗證通過**：確保所有測試案例通過。
-
-此流程確保新功能的一致性與完整性，絕勿跳過。如有疑問，請參考 proposal.md。
-
-
-## 標準資料契約（JSON）
-
-通用欄位（所有請求/回應/事件均推薦包含）：
-- trace_id：全鏈路追蹤 ID（UUIDv4）。
-- timestamp：ISO8601 時間戳（UTC）。
-- actor：觸發者（human|ai|system）與識別資訊。
-- source：入口來源（webui|api|cli|scheduler|…）。
-- labels：可選鍵值標籤（環境、租戶、任務編號等）。
-
-指令請求 CommandRequest（範例，詳見 proposal.md）：
-```json
-{
-	"trace_id": "uuid-v4",
-	"timestamp": "2025-10-16T10:30:00Z",
-	"actor": {
-		"type": "human|ai|system",
-		"id": "user-123",
-		"name": "張三"
-	},
-	"source": "webui|api|cli|scheduler",
-	"command": {
-		"id": "cmd-xxx",
-		"type": "robot.action",
-		"target": {
-			"robot_id": "robot_7",
-			"robot_type": "humanoid"
-		},
-		"params": {
-			"action_name": "go_forward",
-			"duration_ms": 3000,
-			"speed": "normal"
-		},
-		"timeout_ms": 10000,
-		"priority": "low|normal|high"
-	},
-	"auth": {
-		"token": "<jwt-token>"
-	},
-	"labels": {
-		"department": "研發部",
-		"project": "demo-001"
-	}
-}
+```
+Server (MCP/WebUI) → Edge (robot_service/electron-app) → Runner (Robot-Console)
+                              ↓ 共用模組 ↓
+                           src/common/
 ```
 
-指令回應 CommandResponse（範例，詳見 proposal.md）：
-```json
-{
-	"trace_id": "uuid-v4",
-	"timestamp": "2025-10-16T10:30:05Z",
-	"command": {
-		"id": "cmd-xxx",
-		"status": "accepted|running|succeeded|failed|cancelled"
-	},
-	"result": {
-		"data": {
-			"execution_time_ms": 2850,
-			"final_position": {"x": 1.2, "y": 0.5}
-		},
-		"summary": "動作執行完成"
-	},
-	"error": {
-		"code": "ERR_ROBOT_OFFLINE",
-		"message": "機器人連線中斷",
-		"details": {"last_ping": "2025-10-16T10:29:50Z"}
-	}
-}
+| 層級 | 目錄 | 職責 |
+|------|------|------|
+| Server | `MCP/`, `WebUI/` | API Gateway、認證授權、資料持久化 |
+| Edge | `src/robot_service/`, `electron-app/` | 本地佇列、離線支援、LLM/插件整合 |
+| Runner | `Robot-Console/` | 動作執行、協定適配、安全機制 |
+| 共用 | `src/common/` | JSON 日誌、時間工具、配置 |
+
+---
+
+## 核心原則
+
+- **模組化**：MCP、通訊協定、認證授權、機器人抽象各自獨立
+- **標準化契約**：所有請求/回應使用 JSON Schema，含 `trace_id` 全鏈路追蹤
+- **人類可介入**：指令可審批、暫停、取消、覆寫
+- **安全合規**：JWT 認證、RBAC 授權、審計日誌
+
+---
+
+## 開發流程
+
+### TDD 原則
+```
+撰寫測試 → 執行（失敗）→ 實作 → 執行（通過）→ 重構
 ```
 
-事件/日誌 EventLog（監控/審計用，詳見 proposal.md）：
-```json
-{
-	"trace_id": "uuid-v4",
-	"timestamp": "2025-10-16T10:30:03Z",
-	"severity": "INFO|WARN|ERROR",
-	"category": "command|auth|protocol|robot|audit",
-	"message": "機器人開始執行動作 go_forward",
-	"context": {
-		"command_id": "cmd-xxx",
-		"robot_id": "robot_7",
-		"user_id": "user-123"
-	}
-}
-```
+### 新增功能步驟
+1. 閱讀 `docs/proposal.md`、`docs/architecture.md`
+2. 在 `tests/` 建立測試案例
+3. 實作功能並通過測試
+4. 更新相關文件
 
-錯誤格式（統一，詳見 proposal.md）：
-```json
-{
-	"code": "ERR_TIMEOUT|ERR_UNAUTHORIZED|ERR_VALIDATION|ERR_ROUTING|ERR_PROTOCOL|ERR_INTERNAL",
-	"message": "人類可讀訊息",
-	"details": { "hint": "排查建議或關鍵欄位" }
-}
-```
+### 文件更新對照
+| 變更類型 | 更新文件 |
+|----------|----------|
+| API 端點 | `docs/proposal.md`、`openapi.yaml` |
+| 資料契約 | `docs/proposal.md`、`docs/contract/*.json` |
+| 架構調整 | `docs/architecture.md` |
 
-## 指令處理流程（高層級）
-1) 接收：入口（WebUI/API/CLI）提交 CommandRequest，生成/傳入 trace_id。
-2) 驗證：結構化驗證（schema）、業務校驗（機器人狀態/參數範圍）。
-3) 認證與授權：驗證 token / session，執行 RBAC/ABAC 規則。
-4) 上下文豐富：補齊預設值、租戶/環境標籤、冪等鍵。
-5) 路由：依 command.type/target 送至對應協定適配器與機器人抽象。
-6) 執行：協定轉換、傳輸；實施超時與重試；編排必要的子步驟。
-7) 觀測：過程事件（accepted/running/succeeded/failed/cancelled）與關鍵指標上報。
-8) 回應：即時回傳 accepted/running；完成後回調/輪詢查詢最終狀態。
-9) 人類介入：可在 running 階段暫停、取消或覆寫（見下節）。
+---
 
-邊界條件與考量：
-- 超時與重試：協定層與指令層分開配置；避免雪崩（退避抖動）。
-- 冪等性：使用 command.id 或冪等鍵避免重複執行。
-- 併發：同一機器人併發隊列與鎖；跨機器人併發隔離。
-- 安全降級：授權失敗與驗證失敗需回應明確錯誤碼，不洩漏敏感資訊。
+## 資料契約摘要
 
-## 安全與存取控制
-- 身份驗證（AuthN）：建議採 JWT/OAuth2 或可插拔 Token；支援短期 token 與刷新流程。
-- 授權（AuthZ）：最小權限原則；RBAC 角色示例：viewer/operator/admin/auditor。
-- 審計與追溯：所有安全相關操作（登入、審批、覆寫）必須記錄 EventLog（category=audit）。
-- 秘密管理：API 金鑰、密碼、連線字串放置於環境變數或密管服務，不提交到版本庫。
-- 輸入輸出安全：對命令參數作邊界/白名單校驗；輸出脫敏（PII/秘鑰）。
+> 📖 完整定義見 [`docs/proposal.md`](../../../docs/proposal.md#資料契約與標準化格式)
 
-## 人類介入與手動覆寫
-- 審批流程：高風險指令（如急停、越權操作）需人工審批後才可執行。
-- 介入動作：pause/resume/cancel/override；所有介入需記審計事件並關聯 trace_id。
-- 回滾與保護：支援安全停止/回復策略（如安全姿態、原地停止）。
-- WebUI 呈現：清楚展示狀態流轉、當前風險與下一步建議。
+**通用欄位**：`trace_id`、`timestamp`、`actor`、`source`、`labels`
 
-## WebUI 模組職責界定
-- 只與 MCP 交互：不直接連線機器人；透過 API/事件匯流排存取狀態與日誌。
-- 功能：使用者登入/審批中心/指令下達/狀態面板/日誌查詢/告警訂閱。
-- 體驗：即時性（WebSocket/SSE）、可觀測性（指標/追蹤）、可操作（介入按鈕）。
-- 參考：`WebUI/Module.md`、`Test/Web/*.py` 測試用例。
+**契約類型**：
+- `CommandRequest`：指令請求（含 target、params、timeout_ms）
+- `CommandResponse`：執行結果（status、result、error）
+- `EventLog`：事件日誌（severity、category、context）
 
-## 擴充規範（指令/協定/機器人）
-- 新指令類型：
-	1) 定義 JSON Schema 與範例；
-	2) 新增路由規則與 Handler；
-	3) 單元測試（成功 + 驗證失敗 + 授權失敗 + 超時）。
-- 新協定適配器：
-	1) 實作統一介面（connect/send/receive/close、重試、超時）；
-	2) 記錄協定層事件與錯誤碼映射；
-	3) 壓力與可靠性測試。
-- 新機器人廠商：
-	1) 實作機器人抽象介面；
-	2) 對接協定適配器；
-	3) 完成驗證清單與測試。
-- 命名與目錄：以模組邏輯分區；測試放置於 `Test/` 對應檔；文件放置於模組目錄下的 `Module.md`。
+---
 
-## 完成定義（Definition of Done）
-- 有對應的資料契約（Schema/範例）與文件更新（MCP 或 WebUI 的 Module.md）。
-- 單元測試涵蓋率達到基本場景（成功、驗證錯、授權錯、超時/重試、日誌產生）。
-- 事件與審計：產生必要的 EventLog，包含 trace_id 與關鍵上下文。
-- 安全檢查：敏感資訊不落地；權限與輸入檢查通過；沒有硬編碼密鑰。
-- 可觀測性：關鍵指標（成功率、延遲、錯誤碼分佈）可被查詢。
-- **如有疑慮，請參考 proposal.md 的 DoD 條目與範例。**
+## Edge 層功能
 
-## 下一步與落地任務
-- 補齊 MCP 契約與處理流程細節：見 `MCP/Module.md`。
-- WebUI 介面與交互流程：見 `WebUI/Module.md` 與 `Test/Web/` 測試檔。
-- 逐步補充各模組單元測試：見 `Test/` 目錄下對應檔案。
+> 📖 詳見 [`docs/mcp/MCP_LLM_PROVIDERS.md`](../../../docs/mcp/MCP_LLM_PROVIDERS.md)、[`docs/mcp/MCP_PLUGIN_ARCHITECTURE.md`](../../../docs/mcp/MCP_PLUGIN_ARCHITECTURE.md)
 
-## 結構整理與清理建議
->> 建立新檔案/資料夾後，請同步更新對應 `Module.md`，並移除不再使用或重複的檔案與相依。
+- **LLM 整合**：`LLMProviderManager` 管理 Ollama/LM Studio/雲端服務
+- **插件架構**：CommandPlugin、DevicePlugin、IntegrationPlugin
+- **進階指令**：向後相容，詳見 [`docs/phase2/ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md`](../../../docs/phase2/ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md)
 
-最小檢查清單：
-- 目錄命名與模組歸屬一致（MCP/WebUI/Protocol/Robot/Logs）。
-- 無未使用的檔案與測試草稿；移除或合併陳舊文件。
-- `requirements.txt` 僅保留實際使用套件；敏感設定移至環境變數。
-- 文件以中文撰寫，與此規範一致；段落精簡、範例可直接複用。
+---
+
+## 完成定義
+
+- [ ] 有對應 JSON Schema 與文件更新
+- [ ] 單元測試覆蓋基本場景
+- [ ] 產生 EventLog 含 trace_id
+- [ ] 無硬編碼密鑰
+
+> 📖 完整 DoD 見 [`docs/proposal.md`](../../../docs/proposal.md#成功標準)
+
+---
+
+## 目錄參考
+
+| 模組 | 文件 |
+|------|------|
+| MCP | `MCP/Module.md` |
+| WebUI | `WebUI/Module.md` |
+| Robot-Console | `Robot-Console/module.md` |
+| 測試 | `tests/` |
+
+---
+
+**最後更新**：2025-11-26 ｜ **版本**：v2.1 ｜ **狀態**：Phase 2 完成

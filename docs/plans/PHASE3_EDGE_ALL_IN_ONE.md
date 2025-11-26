@@ -85,10 +85,10 @@ Phase 2 規劃的三層架構將在 Phase 3 完整實作：
 
 ### 相關文件
 
-- [MIGRATION_GUIDE_PHASE2.md](../MIGRATION_GUIDE_PHASE2.md) - Phase 2 遷移指南
-- [MCP_LLM_PROVIDERS.md](../MCP_LLM_PROVIDERS.md) - LLM 提供商整合
-- [MCP_PLUGIN_ARCHITECTURE.md](../MCP_PLUGIN_ARCHITECTURE.md) - 插件架構
-- [ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md](../ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md) - 進階指令職責變更
+- [MIGRATION_GUIDE_PHASE2.md](../phase2/MIGRATION_GUIDE_PHASE2.md) - Phase 2 遷移指南
+- [MCP_LLM_PROVIDERS.md](../mcp/MCP_LLM_PROVIDERS.md) - LLM 提供商整合
+- [MCP_PLUGIN_ARCHITECTURE.md](../mcp/MCP_PLUGIN_ARCHITECTURE.md) - 插件架構
+- [ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md](../phase2/ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md) - 進階指令職責變更
 
 ---
 
@@ -938,8 +938,8 @@ data_sharing:
 
 - [MASTER_PLAN.md](MASTER_PLAN.md) - 專案主計畫
 - [PROJECT_MEMORY.md](../PROJECT_MEMORY.md) - 專案記憶與架構決策
-- [MCP_LLM_PROVIDERS.md](../MCP_LLM_PROVIDERS.md) - LLM 提供商整合指南
-- [MCP_PLUGIN_ARCHITECTURE.md](../MCP_PLUGIN_ARCHITECTURE.md) - 插件架構指南
+- [MCP_LLM_PROVIDERS.md](../mcp/MCP_LLM_PROVIDERS.md) - LLM 提供商整合指南
+- [MCP_PLUGIN_ARCHITECTURE.md](../mcp/MCP_PLUGIN_ARCHITECTURE.md) - 插件架構指南
 - [architecture.md](../architecture.md) - 系統架構文件
 
 ---

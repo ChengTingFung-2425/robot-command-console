@@ -17,6 +17,17 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from common.service_types import ServiceStatus, ServiceConfig, ServiceState
 
+# 明確重新導出 common 模組的類型，確保向後相容
+__all__ = [
+    "ServiceBase",
+    "ServiceCoordinator",
+    "QueueService",
+    # 從 common 重新導出，保持向後相容
+    "ServiceStatus",
+    "ServiceConfig",
+    "ServiceState",
+]
+
 
 logger = logging.getLogger(__name__)
 

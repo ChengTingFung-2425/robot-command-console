@@ -6,7 +6,6 @@ MCP 工具模組
 Server 環境專用
 """
 
-# 從 common 模組導入
 import sys
 import os
 
@@ -16,14 +15,10 @@ src_path = os.path.abspath(src_path)
 if src_path not in sys.path:
     sys.path.insert(0, src_path)
 
-try:
-    from common.logging_utils import CustomJsonFormatter, setup_json_logging, get_logger
-    from common.datetime_utils import utc_now, utc_now_iso, parse_iso_datetime, format_timestamp, seconds_since
-    from common.config import ServerConfig, get_config
-except ImportError:
-    # 如果 common 模組不可用，使用本地版本
-    from .logging_utils import CustomJsonFormatter, setup_json_logging, get_logger
-    from .datetime_utils import utc_now, utc_now_iso, parse_iso_datetime, format_timestamp
+# 從 common 模組導入
+from common.logging_utils import CustomJsonFormatter, setup_json_logging, get_logger
+from common.datetime_utils import utc_now, utc_now_iso, parse_iso_datetime, format_timestamp, seconds_since
+from common.config import ServerConfig, get_config
 
 __all__ = [
     "CustomJsonFormatter",

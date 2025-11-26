@@ -149,23 +149,77 @@
 
 ---
 
-## Phase 3 — 前端移植為原生/混合 App
+## Phase 3 — ALL-in-One Edge App 整合與部署
 
 **狀態**：⏳ 待開始
 
+> **詳細規劃文件**：[PHASE3_EDGE_ALL_IN_ONE.md](PHASE3_EDGE_ALL_IN_ONE.md)
+
 ### 目標
-將前端 app 包裝為桌面或行動應用，並整合原生能力。
+
+基於 Phase 2 建立的模組化架構與 LLM 整合能力，將 MCP、WebUI、Robot-Console 整合為統一的 ALL-in-One Edge App，部署於消費級邊緣運算設備。
+
+### 核心功能
+
+1. **統一啟動器**：一鍵啟動/停止所有服務
+2. **LLM 選擇介面**：延續 Phase 2 的 `LLMProviderManager`，提供使用者選擇本地/雲端 LLM
+3. **Edge-Cloud 分離**：
+   - **Edge（本地）**：用戶設定、機器人監控、固件更新、指令介面
+   - **Cloud（雲端）**：進階指令共享、討論區、用戶授權、共享 LLM 分析服務
+4. **多模式部署**：GUI（Electron）、CLI/TUI、Docker
+
+### 與 Phase 2 的銜接
+
+| Phase 2 成果 | Phase 3 運用 |
+|-------------|-------------|
+| `src/common/` 共用模組 | 繼續使用，擴充 Edge 專用工具 |
+| `src/robot_service/` 佇列系統 | 整合至 Edge 服務層 |
+| `LLMProviderManager` | 作為 Edge LLM 管理基礎 |
+| `PluginManager` | 支援運行時插件熱載入 |
+| Server-Edge-Runner 架構 | 完整實作三層分離 |
 
 ### 交付物
-- [ ] 可執行的 App（開發版）
-- [ ] 原生整合清單與實作
-- [ ] 平台差異處理指南
-- [ ] 使用者介面微調與無障礙檢查
+
+#### Phase 3.1 — 基礎整合（4-6 週）
+- [ ] 統一啟動器原型（Electron）
+- [ ] 服務協調器（啟動/停止/健康檢查）
+- [ ] 基礎 LLM 選擇介面
+- [ ] 服務間狀態共享機制
+
+#### Phase 3.2 — 功能完善（4-6 週）
+- [ ] 完整的 WebUI 本地版
+- [ ] 機器人監控儀表板
+- [ ] 固件更新介面
+- [ ] 離線模式支援
+- [ ] CLI/TUI 版本
+
+#### Phase 3.3 — 雲端整合（4-6 週）
+- [ ] 雲端同步機制
+- [ ] 進階指令共享功能
+- [ ] 用戶授權整合
+- [ ] 共享 LLM 服務整合
+
+#### Phase 3.4 — 打包與發佈（2-4 週）
+- [ ] Linux AppImage
+- [ ] Windows 安裝程式
+- [ ] macOS DMG
+- [ ] Docker 映像
 
 ### 驗收條件
-- [ ] 目標平台可啟動 App
-- [ ] 核心功能與 Web 版一致
-- [ ] 支援必要的原生 API
+- [ ] 一鍵啟動所有服務，健康檢查通過
+- [ ] 可選擇本地/雲端 LLM 提供商
+- [ ] 離線模式下核心功能正常
+- [ ] CLI 可完整操作所有功能
+- [ ] 各平台安裝程式可用
+- [ ] Docker 部署正常
+
+### 硬體目標
+
+| 類別 | 代表設備 | 最低規格 |
+|------|---------|---------|
+| Mini-PC | Intel NUC, Beelink | 4GB RAM, 32GB 儲存 |
+| 邊緣運算 | NVIDIA Jetson | 4GB RAM, GPU |
+| 單板電腦 | Raspberry Pi 4/5 | 4GB RAM |
 
 ---
 

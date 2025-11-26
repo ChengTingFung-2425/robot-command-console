@@ -84,11 +84,11 @@ Server (MCP/WebUI) → Edge (robot_service/electron-app) → Runner (Robot-Conso
 
 ## Edge 層功能
 
-> 📖 詳見 [`docs/MCP_LLM_PROVIDERS.md`](../../../docs/MCP_LLM_PROVIDERS.md)、[`docs/MCP_PLUGIN_ARCHITECTURE.md`](../../../docs/MCP_PLUGIN_ARCHITECTURE.md)
+> 📖 詳見 [`docs/mcp/MCP_LLM_PROVIDERS.md`](../../../docs/mcp/MCP_LLM_PROVIDERS.md)、[`docs/mcp/MCP_PLUGIN_ARCHITECTURE.md`](../../../docs/mcp/MCP_PLUGIN_ARCHITECTURE.md)
 
 - **LLM 整合**：`LLMProviderManager` 管理 Ollama/LM Studio/雲端服務
 - **插件架構**：CommandPlugin、DevicePlugin、IntegrationPlugin
-- **進階指令**：向後相容，詳見 [`docs/ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md`](../../../docs/ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md)
+- **進階指令**：向後相容，詳見 [`docs/phase2/ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md`](../../../docs/phase2/ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md)
 
 ---
 

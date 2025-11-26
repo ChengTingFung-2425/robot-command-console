@@ -8,12 +8,12 @@
 |------|------|
 | [MASTER_PLAN.md](plans/MASTER_PLAN.md) | WebUI → Native App 轉換的完整計畫（合併版） |
 | [PHASE3_EDGE_ALL_IN_ONE.md](plans/PHASE3_EDGE_ALL_IN_ONE.md) | Phase 3 ALL-in-One Edge App 詳細規劃 |
-| [PHASE2_COMPLETION_SUMMARY.md](PHASE2_COMPLETION_SUMMARY.md) | Phase 2 完成摘要與成果記錄 |
+| [phase2/PHASE2_COMPLETION_SUMMARY.md](phase2/PHASE2_COMPLETION_SUMMARY.md) | Phase 2 完成摘要與成果記錄 |
 | [architecture.md](architecture.md) | 系統架構與目錄結構說明 |
 | [proposal.md](proposal.md) | 專案提案（含 Phase 進度） |
-| [MCP_LLM_PROVIDERS.md](MCP_LLM_PROVIDERS.md) | LLM 提供商整合指南（Phase 2） |
-| [MCP_PLUGIN_ARCHITECTURE.md](MCP_PLUGIN_ARCHITECTURE.md) | 插件架構指南（Phase 2） |
-| [MIGRATION_GUIDE_PHASE2.md](MIGRATION_GUIDE_PHASE2.md) | Phase 2 遷移指南 |
+| [mcp/MCP_LLM_PROVIDERS.md](mcp/MCP_LLM_PROVIDERS.md) | LLM 提供商整合指南（Phase 2） |
+| [mcp/MCP_PLUGIN_ARCHITECTURE.md](mcp/MCP_PLUGIN_ARCHITECTURE.md) | 插件架構指南（Phase 2） |
+| [phase2/MIGRATION_GUIDE_PHASE2.md](phase2/MIGRATION_GUIDE_PHASE2.md) | Phase 2 遷移指南 |
 
 ## 🏗️ 架構演進
 

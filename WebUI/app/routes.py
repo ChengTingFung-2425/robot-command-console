@@ -859,7 +859,8 @@ def check_internet():
         }), 500
 
 
-# LLM 設定頁面
+# ===== LLM 設定頁面與提供商管理 =====
+
 @bp.route('/llm_settings', methods=['GET'])
 @login_required
 def llm_settings():
@@ -924,7 +925,9 @@ def get_llm_providers_health():
 def select_llm_provider():
     """選擇要使用的 LLM 提供商"""
     try:
-        provider_name = request.args.get('provider_name')
+        # 支援 JSON body 或 query parameter
+        data = request.get_json(silent=True) or {}
+        provider_name = data.get('provider_name') or request.args.get('provider_name')
         if not provider_name:
             return jsonify({
                 'success': False,
@@ -933,7 +936,7 @@ def select_llm_provider():
         
         response = requests.post(
             f'{MCP_API_URL}/llm/providers/select',
-            params={'provider_name': provider_name},
+            json={'provider_name': provider_name},
             timeout=5
         )
         if response.status_code == 200:
@@ -1014,4 +1017,46 @@ def refresh_llm_provider(provider_name):
         return jsonify({
             'success': False,
             'error': '伺服器發生錯誤'
+        }), 500
+
+
+# ===== CORS 設定 API =====
+
+# 儲存 CORS 狀態（在實際應用中應儲存到配置文件或資料庫）
+_cors_enabled = False
+
+
+@bp.route('/api/llm/cors/status', methods=['GET'])
+def get_cors_status():
+    """取得 CORS 設定狀態"""
+    return jsonify({
+        'enabled': _cors_enabled,
+        'message': 'CORS 目前已' + ('啟用' if _cors_enabled else '停用')
+    })
+
+
+@bp.route('/api/llm/cors/toggle', methods=['POST'])
+@login_required
+def toggle_cors():
+    """切換 CORS 設定"""
+    global _cors_enabled
+    try:
+        data = request.get_json(silent=True) or {}
+        if 'enabled' in data:
+            _cors_enabled = bool(data['enabled'])
+        else:
+            _cors_enabled = not _cors_enabled
+        
+        logging.info(f'CORS 設定已切換為: {_cors_enabled}')
+        
+        return jsonify({
+            'success': True,
+            'enabled': _cors_enabled,
+            'message': 'CORS 已' + ('啟用' if _cors_enabled else '停用')
+        })
+    except Exception as e:
+        logging.error(f'切換 CORS 設定失敗: {str(e)}', exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': '切換 CORS 設定失敗'
         }), 500

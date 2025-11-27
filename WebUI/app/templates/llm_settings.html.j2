@@ -13,25 +13,32 @@
     </div>
     <div class="panel-body">
         <div class="row">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="well text-center" id="internet-status-card">
                     <span class="glyphicon glyphicon-globe" style="font-size: 24px;"></span>
                     <h4>網路連線</h4>
                     <p id="internet-status-text">檢查中...</p>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="well text-center" id="mcp-status-card">
                     <span class="glyphicon glyphicon-cloud" style="font-size: 24px;"></span>
                     <h4>MCP 伺服器</h4>
                     <p id="mcp-status-text">檢查中...</p>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="well text-center" id="llm-status-card">
                     <span class="glyphicon glyphicon-cog" style="font-size: 24px;"></span>
                     <h4>本地 LLM</h4>
                     <p id="llm-status-text">檢查中...</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="well text-center" id="cors-status-card" style="cursor: pointer;" onclick="toggleCors()">
+                    <span class="glyphicon glyphicon-transfer" style="font-size: 24px;"></span>
+                    <h4>CORS</h4>
+                    <p id="cors-status-text">檢查中...</p>
                 </div>
             </div>
         </div>
@@ -176,15 +183,93 @@
 </style>
 
 <script>
+/**
+ * LLM 設定頁面 JavaScript
+ * 
+ * 使用 IIFE (Immediately Invoked Function Expression) 封裝以避免全域命名空間污染
+ * 
+ * 功能：
+ * - 連線狀態監控和更新
+ * - LLM 提供商列表管理
+ * - 提供商選擇和刷新
+ * - CORS 設定切換
+ */
 (function() {
+    'use strict';
+    
+    // 狀態配置常數
+    var STATUS_CONFIG = {
+        'available': { cssClass: 'label label-success', text: '可用' },
+        'unavailable': { cssClass: 'label label-danger', text: '不可用' },
+        'default': { cssClass: 'label label-warning', text: '未知' }
+    };
+    
     var currentSelectedProvider = null;
     var providersData = {};
+    var corsEnabled = false;
 
     // 初始化
     document.addEventListener('DOMContentLoaded', function() {
         loadConnectionStatus();
         loadProviders();
+        loadCorsStatus();
     });
+    
+    // 載入 CORS 狀態
+    function loadCorsStatus() {
+        fetch('/api/llm/cors/status')
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                corsEnabled = data.enabled || false;
+                updateCorsCard(corsEnabled);
+            })
+            .catch(function(err) {
+                // CORS API 可能不存在，顯示未知狀態
+                updateCorsCard(null);
+            });
+    }
+    
+    // 更新 CORS 狀態卡片
+    function updateCorsCard(enabled) {
+        var corsCard = document.getElementById('cors-status-card');
+        var corsText = document.getElementById('cors-status-text');
+        
+        if (enabled === true) {
+            corsCard.className = 'well text-center status-available';
+            corsText.textContent = '已啟用';
+        } else if (enabled === false) {
+            corsCard.className = 'well text-center status-unavailable';
+            corsText.textContent = '已停用';
+        } else {
+            corsCard.className = 'well text-center status-error';
+            corsText.textContent = '未知';
+        }
+    }
+    
+    // 切換 CORS 設定
+    window.toggleCors = function() {
+        var newState = !corsEnabled;
+        
+        fetch('/api/llm/cors/toggle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: newState })
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.success) {
+                corsEnabled = data.enabled;
+                updateCorsCard(corsEnabled);
+                showAlert('success', 'CORS 已' + (corsEnabled ? '啟用' : '停用'));
+            } else {
+                showAlert('danger', '切換 CORS 設定失敗');
+            }
+        })
+        .catch(function(err) {
+            showAlert('danger', '切換 CORS 設定時發生錯誤');
+            console.error(err);
+        });
+    };
 
     // 載入連線狀態
     function loadConnectionStatus() {
@@ -198,7 +283,7 @@
                     internet_available: null,
                     local_llm_available: false,
                     mcp_available: false,
-                    error: '無法連線'
+                    error: '無法連線到狀態檢查服務，請確認 MCP 伺服器運行正常'
                 });
             });
     }
@@ -275,7 +360,7 @@
         });
     }
 
-    // 渲染提供商表格
+    // 渲染提供商表格（使用安全的 DOM 操作避免 XSS）
     function renderProviders(providersInfo, healthInfo) {
         var tbody = document.getElementById('providers-tbody');
         var noProvidersMsg = document.getElementById('no-providers-message');
@@ -300,41 +385,80 @@
             row.className = 'provider-row' + (isSelected ? ' selected' : '');
             row.id = 'provider-row-' + name;
 
-            // 狀態樣式
-            var statusClass = '';
-            var statusText = '';
-            switch (health.status) {
-                case 'available':
-                    statusClass = 'label label-success';
-                    statusText = '可用';
-                    break;
-                case 'unavailable':
-                    statusClass = 'label label-danger';
-                    statusText = '不可用';
-                    break;
-                default:
-                    statusClass = 'label label-warning';
-                    statusText = health.status || '未知';
-            }
+            // 使用常數配置取得狀態樣式
+            var statusConfig = STATUS_CONFIG[health.status] || STATUS_CONFIG['default'];
+            var statusClass = statusConfig.cssClass;
+            var statusText = health.status === 'available' || health.status === 'unavailable' 
+                ? statusConfig.text 
+                : (health.status || statusConfig.text);
 
-            row.innerHTML = 
-                '<td>' +
-                    '<strong>' + name + '</strong>' +
-                    (isSelected ? ' <span class="label label-primary">當前選擇</span>' : '') +
-                '</td>' +
-                '<td><span class="' + statusClass + '">' + statusText + '</span></td>' +
-                '<td>' + (health.response_time_ms ? health.response_time_ms.toFixed(1) + ' ms' : '-') + '</td>' +
-                '<td>' + (health.available_models ? health.available_models.length + ' 個模型' : '0 個模型') + '</td>' +
-                '<td>' +
-                    '<button class="btn btn-sm ' + (isSelected ? 'btn-default disabled' : 'btn-primary') + '" ' +
-                    'onclick="selectProvider(\'' + name + '\')" ' +
-                    (isSelected ? 'disabled' : '') + '>' +
-                        (isSelected ? '已選擇' : '選擇') +
-                    '</button> ' +
-                    '<button class="btn btn-sm btn-default" onclick="refreshProvider(\'' + name + '\')">' +
-                        '<span class="glyphicon glyphicon-refresh"></span>' +
-                    '</button>' +
-                '</td>';
+            // 提供商名稱欄位（安全的 DOM 操作）
+            var nameTd = document.createElement('td');
+            var strong = document.createElement('strong');
+            strong.textContent = name;
+            nameTd.appendChild(strong);
+            if (isSelected) {
+                var selectedSpan = document.createElement('span');
+                selectedSpan.className = 'label label-primary';
+                selectedSpan.textContent = '當前選擇';
+                nameTd.appendChild(document.createTextNode(' '));
+                nameTd.appendChild(selectedSpan);
+            }
+            row.appendChild(nameTd);
+
+            // 狀態欄位
+            var statusTd = document.createElement('td');
+            var statusSpan = document.createElement('span');
+            statusSpan.className = statusClass;
+            statusSpan.textContent = statusText;
+            statusTd.appendChild(statusSpan);
+            row.appendChild(statusTd);
+
+            // 回應時間欄位
+            var respTd = document.createElement('td');
+            respTd.textContent = health.response_time_ms ? health.response_time_ms.toFixed(1) + ' ms' : '-';
+            row.appendChild(respTd);
+
+            // 模型數量欄位
+            var modelTd = document.createElement('td');
+            modelTd.textContent = health.available_models ? health.available_models.length + ' 個模型' : '0 個模型';
+            row.appendChild(modelTd);
+
+            // 操作欄位
+            var actionsTd = document.createElement('td');
+
+            // 選擇按鈕
+            var selectBtn = document.createElement('button');
+            selectBtn.className = 'btn btn-sm ' + (isSelected ? 'btn-default disabled' : 'btn-primary');
+            selectBtn.type = 'button';
+            selectBtn.textContent = isSelected ? '已選擇' : '選擇';
+            if (isSelected) {
+                selectBtn.disabled = true;
+            } else {
+                (function(providerName) {
+                    selectBtn.addEventListener('click', function() {
+                        selectProvider(providerName);
+                    });
+                })(name);
+            }
+            actionsTd.appendChild(selectBtn);
+            actionsTd.appendChild(document.createTextNode(' '));
+
+            // 刷新按鈕
+            var refreshBtn = document.createElement('button');
+            refreshBtn.className = 'btn btn-sm btn-default';
+            refreshBtn.type = 'button';
+            var refreshIcon = document.createElement('span');
+            refreshIcon.className = 'glyphicon glyphicon-refresh';
+            refreshBtn.appendChild(refreshIcon);
+            (function(providerName, btn) {
+                refreshBtn.addEventListener('click', function(event) {
+                    refreshProvider(providerName, event);
+                });
+            })(name, refreshBtn);
+            actionsTd.appendChild(refreshBtn);
+
+            row.appendChild(actionsTd);
 
             tbody.appendChild(row);
         });
@@ -342,8 +466,10 @@
 
     // 選擇提供商
     window.selectProvider = function(providerName) {
-        fetch('/api/llm/providers/select?provider_name=' + encodeURIComponent(providerName), {
-            method: 'POST'
+        fetch('/api/llm/providers/select', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ provider_name: providerName })
         })
         .then(function(response) { return response.json(); })
         .then(function(data) {
@@ -361,8 +487,8 @@
         });
     };
 
-    // 重新整理提供商狀態
-    window.refreshProvider = function(providerName) {
+    // 重新整理提供商狀態（接收 event 參數）
+    window.refreshProvider = function(providerName, event) {
         var btn = event.target.closest('button');
         btn.disabled = true;
         btn.innerHTML = '<span class="glyphicon glyphicon-refresh glyphicon-spin"></span>';
@@ -430,7 +556,7 @@
         document.getElementById('selected-provider-response-time').textContent = 
             health.response_time_ms ? health.response_time_ms.toFixed(1) + ' ms' : '-';
 
-        // 模型列表
+        // 模型列表（使用安全的 DOM 操作）
         var modelsList = document.getElementById('selected-provider-models');
         modelsList.innerHTML = '';
 
@@ -438,7 +564,10 @@
             health.available_models.forEach(function(model) {
                 var li = document.createElement('li');
                 li.className = 'list-group-item';
-                li.innerHTML = '<span class="glyphicon glyphicon-cog"></span> ' + model;
+                var icon = document.createElement('span');
+                icon.className = 'glyphicon glyphicon-cog';
+                li.appendChild(icon);
+                li.appendChild(document.createTextNode(' ' + model));
                 modelsList.appendChild(li);
             });
         } else {
@@ -449,23 +578,33 @@
         }
     }
 
-    // 顯示提示訊息
+    // 顯示提示訊息（使用安全的 DOM 操作避免 XSS）
     function showAlert(type, message) {
-        var alertHtml = '<div class="alert alert-' + type + ' alert-dismissible" role="alert">' +
-            '<button type="button" class="close" data-dismiss="alert" aria-label="Close">' +
-                '<span aria-hidden="true">&times;</span>' +
-            '</button>' +
-            message +
-        '</div>';
+        var alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-' + type + ' alert-dismissible';
+        alertDiv.setAttribute('role', 'alert');
+
+        var closeButton = document.createElement('button');
+        closeButton.type = 'button';
+        closeButton.className = 'close';
+        closeButton.setAttribute('data-dismiss', 'alert');
+        closeButton.setAttribute('aria-label', 'Close');
+
+        var closeSpan = document.createElement('span');
+        closeSpan.setAttribute('aria-hidden', 'true');
+        closeSpan.innerHTML = '&times;';
+        closeButton.appendChild(closeSpan);
+
+        alertDiv.appendChild(closeButton);
+        alertDiv.appendChild(document.createTextNode(message));
 
         var container = document.querySelector('.container');
-        container.insertAdjacentHTML('afterbegin', alertHtml);
+        container.insertBefore(alertDiv, container.firstChild);
 
         // 5 秒後自動關閉
         setTimeout(function() {
-            var alert = container.querySelector('.alert');
-            if (alert) {
-                alert.remove();
+            if (alertDiv.parentNode) {
+                alertDiv.parentNode.removeChild(alertDiv);
             }
         }, 5000);
     }

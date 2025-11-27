@@ -16,7 +16,7 @@ mode: agent
 | [`docs/PROJECT_MEMORY.md`](../../../docs/PROJECT_MEMORY.md) | 架構決策、共用工具 | 🟡 中 |
 | [`docs/development/PYTHON_LINT_GUIDE.md`](../../../docs/development/PYTHON_LINT_GUIDE.md) | Python 程式碼風格與 lint 修復策略 | 🟡 中 | 
 
-> *docs/development目录可能包含更多经验总结*
+ *docs/development目录可能包含更多经验总结*
 > **規格疑義以 `docs/proposal.md` 為準。**
 
 ---

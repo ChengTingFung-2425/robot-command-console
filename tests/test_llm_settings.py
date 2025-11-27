@@ -314,5 +314,224 @@ class TestLLMSettingsIntegration:
             assert response.status_code in [200, 503, 500]
 
 
+class TestLLMPreferences:
+    """測試 LLM 偏好設定功能"""
+
+    @pytest.fixture
+    def app(self):
+        """建立測試應用"""
+        from WebUI.app import create_app, db
+
+        app = create_app(config_name='testing')
+
+        with app.app_context():
+            db.create_all()
+            yield app
+            db.drop_all()
+
+    @pytest.fixture
+    def client(self, app):
+        """建立測試客戶端"""
+        return app.test_client()
+
+    @pytest.fixture
+    def authenticated_client(self, app, client):
+        """建立已認證的測試客戶端"""
+        from WebUI.app import db
+        from WebUI.app.models import User, UserProfile
+
+        with app.app_context():
+            # 建立測試用戶
+            user = User(username='testuser', email='test@example.com')
+            user.set_password('testpassword')
+            db.session.add(user)
+            db.session.flush()
+
+            profile = UserProfile(user_id=user.id)
+            db.session.add(profile)
+            db.session.commit()
+
+        # 登入
+        client.post('/login', data={
+            'username': 'testuser',
+            'password': 'testpassword'
+        }, follow_redirects=True)
+
+        return client
+
+    def test_get_preferences_requires_login(self, client):
+        """測試取得 LLM 偏好設定需要登入"""
+        response = client.get('/api/llm/preferences')
+        # 應該重新導向到登入頁面
+        assert response.status_code == 302
+
+    def test_get_preferences_when_logged_in(self, authenticated_client):
+        """測試登入後可以取得 LLM 偏好設定"""
+        response = authenticated_client.get('/api/llm/preferences')
+        assert response.status_code == 200
+
+        data = response.get_json()
+        assert 'provider' in data
+        assert 'model' in data
+        assert data['success'] is True
+
+    def test_save_preferences_requires_login(self, client):
+        """測試保存 LLM 偏好設定需要登入"""
+        response = client.post(
+            '/api/llm/preferences',
+            json={'provider': 'ollama', 'model': 'llama2'}
+        )
+        assert response.status_code == 302
+
+    def test_save_preferences_api(self, authenticated_client):
+        """測試保存 LLM 偏好設定 API"""
+        # 保存偏好設定
+        response = authenticated_client.post(
+            '/api/llm/preferences',
+            json={'provider': 'ollama', 'model': 'llama2:latest'},
+            content_type='application/json'
+        )
+        assert response.status_code == 200
+
+        data = response.get_json()
+        assert data['success'] is True
+        assert data['provider'] == 'ollama'
+        assert data['model'] == 'llama2:latest'
+
+        # 驗證偏好已保存
+        response = authenticated_client.get('/api/llm/preferences')
+        assert response.status_code == 200
+
+        data = response.get_json()
+        assert data['provider'] == 'ollama'
+        assert data['model'] == 'llama2:latest'
+
+    def test_save_preferences_partial_update(self, authenticated_client):
+        """測試部分更新 LLM 偏好設定"""
+        # 先保存完整偏好
+        authenticated_client.post(
+            '/api/llm/preferences',
+            json={'provider': 'ollama', 'model': 'llama2:latest'},
+            content_type='application/json'
+        )
+
+        # 只更新模型
+        response = authenticated_client.post(
+            '/api/llm/preferences',
+            json={'model': 'mistral:latest'},
+            content_type='application/json'
+        )
+        assert response.status_code == 200
+
+        data = response.get_json()
+        assert data['success'] is True
+        assert data['provider'] == 'ollama'  # 保持不變
+        assert data['model'] == 'mistral:latest'  # 已更新
+
+    def test_clear_preferences(self, authenticated_client):
+        """測試清除 LLM 偏好設定"""
+        # 先保存偏好
+        authenticated_client.post(
+            '/api/llm/preferences',
+            json={'provider': 'ollama', 'model': 'llama2:latest'},
+            content_type='application/json'
+        )
+
+        # 清除偏好
+        response = authenticated_client.post(
+            '/api/llm/preferences',
+            json={'provider': None, 'model': None},
+            content_type='application/json'
+        )
+        assert response.status_code == 200
+
+        data = response.get_json()
+        assert data['success'] is True
+        assert data['provider'] is None
+        assert data['model'] is None
+
+    @patch('WebUI.app.routes.requests.get')
+    def test_get_provider_models_api(self, mock_get, client):
+        """測試取得提供商模型列表 API"""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            'provider': 'ollama',
+            'models': [
+                {'id': 'llama2:latest', 'name': 'llama2:latest', 'size': '7B'},
+                {'id': 'mistral:latest', 'name': 'mistral:latest', 'size': '7B'}
+            ],
+            'count': 2
+        }
+        mock_get.return_value = mock_response
+
+        response = client.get('/api/llm/providers/ollama/models')
+        assert response.status_code == 200
+
+        data = response.get_json()
+        assert data['provider'] == 'ollama'
+        assert len(data['models']) == 2
+        assert data['models'][0]['id'] == 'llama2:latest'
+
+    def test_get_provider_models_invalid_name(self, client):
+        """測試無效的提供商名稱被拒絕"""
+        response = client.get('/api/llm/providers/invalid<script>/models')
+        assert response.status_code == 400
+
+        data = response.get_json()
+        assert 'error' in data
+
+
+class TestUserModelWithLLMPreferences:
+    """測試 User 模型的 LLM 偏好欄位"""
+
+    @pytest.fixture
+    def app(self):
+        """建立測試應用"""
+        from WebUI.app import create_app, db
+
+        app = create_app(config_name='testing')
+
+        with app.app_context():
+            db.create_all()
+            yield app
+            db.drop_all()
+
+    def test_user_has_llm_preference_fields(self, app):
+        """測試 User 模型有 LLM 偏好欄位"""
+        from WebUI.app import db
+        from WebUI.app.models import User
+
+        with app.app_context():
+            user = User(username='testuser', email='test@example.com')
+            user.set_password('testpassword')
+            user.llm_provider = 'ollama'
+            user.llm_model = 'llama2:latest'
+
+            db.session.add(user)
+            db.session.commit()
+
+            # 重新查詢確認欄位已保存
+            saved_user = User.query.filter_by(username='testuser').first()
+            assert saved_user.llm_provider == 'ollama'
+            assert saved_user.llm_model == 'llama2:latest'
+
+    def test_user_llm_preferences_default_null(self, app):
+        """測試 User 的 LLM 偏好預設為 null"""
+        from WebUI.app import db
+        from WebUI.app.models import User
+
+        with app.app_context():
+            user = User(username='testuser', email='test@example.com')
+            user.set_password('testpassword')
+
+            db.session.add(user)
+            db.session.commit()
+
+            saved_user = User.query.filter_by(username='testuser').first()
+            assert saved_user.llm_provider is None
+            assert saved_user.llm_model is None
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

@@ -128,7 +128,53 @@ POST /api/llm/providers/select
 Content-Type: application/json
 
 {
-  "provider_name": "ollama"
+  "provider_name": "ollama",
+  "model_name": "llama2:latest",
+  "save_preference": true
+}
+```
+
+回應：
+```json
+{
+  "message": "提供商切換成功",
+  "provider": "ollama",
+  "preference_saved": true
+}
+```
+
+### 取得用戶 LLM 偏好設定
+```http
+GET /api/llm/preferences
+```
+
+回應：
+```json
+{
+  "provider": "ollama",
+  "model": "llama2:latest",
+  "success": true
+}
+```
+
+### 保存用戶 LLM 偏好設定
+```http
+POST /api/llm/preferences
+Content-Type: application/json
+
+{
+  "provider": "ollama",
+  "model": "llama2:latest"
+}
+```
+
+回應：
+```json
+{
+  "success": true,
+  "provider": "ollama",
+  "model": "llama2:latest",
+  "message": "LLM 偏好設定已保存"
 }
 ```
 

@@ -1035,8 +1035,8 @@ def save_llm_preferences():
 def get_provider_models(provider_name):
     """取得特定提供商的可用模型列表"""
     try:
-        # 驗證 provider_name 僅包含允許的字元
-        if not re.match(r'^[a-zA-Z0-9_-]+$', provider_name):
+        # 驗證 provider_name 僅包含允許的字元（不允許以連字號開頭）
+        if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9_-]*$', provider_name):
             return jsonify({
                 'models': [],
                 'error': '無效的提供商名稱'

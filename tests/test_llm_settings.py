@@ -481,6 +481,14 @@ class TestLLMPreferences:
         data = response.get_json()
         assert 'error' in data
 
+    def test_get_provider_models_hyphen_at_start_rejected(self, client):
+        """測試以連字號開頭的提供商名稱被拒絕"""
+        response = client.get('/api/llm/providers/-invalid/models')
+        assert response.status_code == 400
+
+        data = response.get_json()
+        assert 'error' in data
+
 
 class TestUserModelWithLLMPreferences:
     """測試 User 模型的 LLM 偏好欄位"""

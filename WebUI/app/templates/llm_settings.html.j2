@@ -606,6 +606,62 @@
         loadUserPreferences();
     }
 
+    // 保存的偏好設定
+    var savedProviderPreference = null;
+    var savedModelPreference = null;
+
+    // 載入用戶偏好設定（在載入模型列表之前載入）
+    function loadUserPreferences() {
+        fetch('/api/llm/preferences')
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                savedProviderPreference = data.provider;
+                savedModelPreference = data.model;
+                
+                // 更新顯示
+                var prefText = document.getElementById('saved-preference-text');
+                if (data.provider) {
+                    var text = data.provider;
+                    if (data.model) {
+                        text += ' / ' + data.model;
+                    }
+                    prefText.textContent = text;
+                } else {
+                    prefText.textContent = '尚未設定';
+                }
+
+                // 如果模型選擇器已載入，嘗試設定選中的模型
+                applySavedModelToSelect();
+            })
+            .catch(function(err) {
+                console.error('載入偏好設定失敗:', err);
+            });
+    }
+
+    // 統一的模型選擇應用邏輯
+    function applySavedModelToSelect() {
+        var modelSelect = document.getElementById('model-select');
+        if (!savedModelPreference || !modelSelect || modelSelect.disabled) {
+            return;
+        }
+        
+        // 檢查保存的模型是否存在於選項中
+        var modelExists = false;
+        for (var i = 0; i < modelSelect.options.length; i++) {
+            if (modelSelect.options[i].value === savedModelPreference) {
+                modelExists = true;
+                break;
+            }
+        }
+        
+        if (modelExists) {
+            modelSelect.value = savedModelPreference;
+        } else if (savedModelPreference) {
+            // 保存的模型不存在於選項中，顯示警告
+            console.warn('保存的模型 "' + savedModelPreference + '" 不再可用');
+        }
+    }
+
     // 載入提供商的模型列表
     function loadProviderModels(providerName) {
         var modelSelect = document.getElementById('model-select');
@@ -632,10 +688,8 @@
                     });
                     modelSelect.disabled = false;
                     
-                    // 如果有保存的偏好，選擇對應的模型
-                    if (savedModelPreference) {
-                        modelSelect.value = savedModelPreference;
-                    }
+                    // 使用統一的邏輯應用保存的模型偏好
+                    applySavedModelToSelect();
                 } else {
                     var noModelOpt = document.createElement('option');
                     noModelOpt.value = '';
@@ -646,41 +700,6 @@
             .catch(function(err) {
                 console.error('載入模型失敗:', err);
                 modelSelect.innerHTML = '<option value="">-- 載入失敗 --</option>';
-            });
-    }
-
-    // 保存的偏好設定
-    var savedProviderPreference = null;
-    var savedModelPreference = null;
-
-    // 載入用戶偏好設定
-    function loadUserPreferences() {
-        fetch('/api/llm/preferences')
-            .then(function(response) { return response.json(); })
-            .then(function(data) {
-                savedProviderPreference = data.provider;
-                savedModelPreference = data.model;
-                
-                // 更新顯示
-                var prefText = document.getElementById('saved-preference-text');
-                if (data.provider) {
-                    var text = data.provider;
-                    if (data.model) {
-                        text += ' / ' + data.model;
-                    }
-                    prefText.textContent = text;
-                } else {
-                    prefText.textContent = '尚未設定';
-                }
-
-                // 如果模型選擇器已載入，設定選中的模型
-                var modelSelect = document.getElementById('model-select');
-                if (data.model && modelSelect && modelSelect.options.length > 1) {
-                    modelSelect.value = data.model;
-                }
-            })
-            .catch(function(err) {
-                console.error('載入偏好設定失敗:', err);
             });
     }
 

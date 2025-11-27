@@ -29,7 +29,7 @@ class SensorPlugin(DevicePluginBase):
     - 溫度感測器
     - 電池監控
     """
-    
+
     @property
     def metadata(self) -> PluginMetadata:
         return PluginMetadata(
@@ -70,39 +70,39 @@ class SensorPlugin(DevicePluginBase):
                 }
             }
         )
-    
+
     @property
     def device_type(self) -> str:
         return "sensor"
-    
+
     def __init__(self, config: Optional[PluginConfig] = None):
         super().__init__(config)
         self.sensor_types = []
         self.sampling_rate = 10
         self.is_streaming = False
-    
+
     async def _on_initialize(self) -> bool:
         """初始化感測器"""
         self.sensor_types = self.config.config.get("sensor_types", ["ultrasonic", "battery"])
         self.sampling_rate = self.config.config.get("sampling_rate_hz", 10)
-        
-        self.logger.info(f"感測器插件初始化", extra={
+
+        self.logger.info("感測器插件初始化", extra={
             "sensor_types": self.sensor_types,
             "sampling_rate": self.sampling_rate
         })
-        
+
         # 實際實作應該初始化硬體感測器
-        
+
         return True
-    
+
     async def _on_shutdown(self) -> bool:
         """關閉感測器"""
         if self.is_streaming:
             await self.stop_stream()
-        
+
         self.logger.info("感測器插件關閉")
         return True
-    
+
     async def read_data(self, **kwargs) -> Dict[str, Any]:
         """
         讀取感測器資料
@@ -117,33 +117,33 @@ class SensorPlugin(DevicePluginBase):
         """
         sensor_type = kwargs.get("sensor_type")
         samples = kwargs.get("samples", 1)
-        
+
         if sensor_type and sensor_type not in self.sensor_types:
             return {
                 "success": False,
                 "error": f"感測器類型不支援: {sensor_type}"
             }
-        
+
         # 讀取指定或所有感測器
         types_to_read = [sensor_type] if sensor_type else self.sensor_types
-        
+
         data = {}
         for stype in types_to_read:
             data[stype] = await self._read_sensor(stype, samples)
-        
+
         return {
             "success": True,
             "timestamp": datetime.utcnow().isoformat(),
             "sensors": data,
             "sample_count": samples
         }
-    
+
     async def _read_sensor(self, sensor_type: str, samples: int) -> Dict[str, Any]:
         """讀取特定感測器資料"""
-        
+
         # 實際實作應該從硬體讀取
         # 這裡返回模擬資料
-        
+
         if sensor_type == "ultrasonic":
             # 超音波距離感測器（公分）
             return {
@@ -152,7 +152,7 @@ class SensorPlugin(DevicePluginBase):
                 "value": random.uniform(5.0, 400.0),
                 "samples": [random.uniform(5.0, 400.0) for _ in range(samples)]
             }
-        
+
         elif sensor_type == "imu":
             # IMU 資料
             return {
@@ -178,7 +178,7 @@ class SensorPlugin(DevicePluginBase):
                     "orientation": "degrees"
                 }
             }
-        
+
         elif sensor_type == "temperature":
             # 溫度感測器（攝氏）
             return {
@@ -187,7 +187,7 @@ class SensorPlugin(DevicePluginBase):
                 "value": random.uniform(20.0, 35.0),
                 "samples": [random.uniform(20.0, 35.0) for _ in range(samples)]
             }
-        
+
         elif sensor_type == "battery":
             # 電池監控
             return {
@@ -204,12 +204,12 @@ class SensorPlugin(DevicePluginBase):
                 },
                 "estimated_time_remaining": random.randint(30, 120)  # 分鐘
             }
-        
+
         return {
             "type": sensor_type,
             "error": "未知的感測器類型"
         }
-    
+
     async def get_device_info(self) -> Dict[str, Any]:
         """取得感測器資訊"""
         return {
@@ -241,33 +241,33 @@ class SensorPlugin(DevicePluginBase):
                 }
             ]
         }
-    
+
     async def start_stream(self) -> bool:
         """啟動感測器資料串流"""
         if self.is_streaming:
             self.logger.warning("感測器串流已在運行")
             return True
-        
+
         self.logger.info(f"啟動感測器串流: {self.sensor_types}")
-        
+
         # 實際實作應該啟動連續取樣
         self.is_streaming = True
-        
+
         return True
-    
+
     async def stop_stream(self) -> bool:
         """停止感測器資料串流"""
         if not self.is_streaming:
             self.logger.warning("感測器串流未運行")
             return True
-        
+
         self.logger.info("停止感測器串流")
-        
+
         # 實際實作應該停止連續取樣
         self.is_streaming = False
-        
+
         return True
-    
+
     async def calibrate(self, sensor_type: str) -> Dict[str, Any]:
         """
         校準感測器
@@ -283,11 +283,11 @@ class SensorPlugin(DevicePluginBase):
                 "success": False,
                 "error": f"感測器類型不支援: {sensor_type}"
             }
-        
+
         self.logger.info(f"校準感測器: {sensor_type}")
-        
+
         # 實際實作應該執行校準程序
-        
+
         return {
             "success": True,
             "sensor_type": sensor_type,

@@ -31,11 +31,11 @@ class LMStudioProvider(LLMProviderBase):
     MCP 可作為協定適配層注入
     支援 function calling
     """
-    
+
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
         self.mcp_tool_interface = None
-    
+
     def set_mcp_tool_interface(self, tool_interface):
         """
         設定 MCP 工具介面
@@ -45,15 +45,15 @@ class LMStudioProvider(LLMProviderBase):
         """
         self.mcp_tool_interface = tool_interface
         self.logger.info("已注入 MCP 工具介面到 LM Studio 提供商")
-    
+
     @property
     def provider_name(self) -> str:
         return "lmstudio"
-    
+
     @property
     def default_port(self) -> int:
         return 1234
-    
+
     async def check_health(self) -> ProviderHealth:
         """
         檢查 LM Studio 服務健康狀態
@@ -62,7 +62,7 @@ class LMStudioProvider(LLMProviderBase):
             健康狀態資訊
         """
         start_time = time.time()
-        
+
         try:
             async with aiohttp.ClientSession() as session:
                 # LM Studio 使用 OpenAI 相容 API
@@ -72,15 +72,15 @@ class LMStudioProvider(LLMProviderBase):
                     timeout=aiohttp.ClientTimeout(total=self.config.timeout)
                 ) as response:
                     response_time_ms = (time.time() - start_time) * 1000
-                    
+
                     if response.status == 200:
                         data = await response.json()
-                        
+
                         # 取得可用模型
                         available_models = []
                         if "data" in data:
                             available_models = [model.get("id", "") for model in data["data"]]
-                        
+
                         return ProviderHealth(
                             status=ProviderStatus.AVAILABLE,
                             version=None,  # LM Studio 不提供版本資訊
@@ -93,7 +93,7 @@ class LMStudioProvider(LLMProviderBase):
                             error_message=f"HTTP {response.status}",
                             response_time_ms=response_time_ms
                         )
-        
+
         except asyncio.TimeoutError:
             return ProviderHealth(
                 status=ProviderStatus.UNAVAILABLE,
@@ -110,7 +110,7 @@ class LMStudioProvider(LLMProviderBase):
                 status=ProviderStatus.ERROR,
                 error_message=str(e)
             )
-    
+
     async def list_models(self) -> List[LLMModel]:
         """
         列出 LM Studio 可用模型
@@ -127,11 +127,11 @@ class LMStudioProvider(LLMProviderBase):
                 ) as response:
                     response.raise_for_status()
                     data = await response.json()
-                    
+
                     models = []
                     for model_data in data.get("data", []):
                         model_id = model_data.get("id", "")
-                        
+
                         # LM Studio 提供有限的模型資訊
                         capabilities = ModelCapability(
                             supports_streaming=True,
@@ -140,7 +140,7 @@ class LMStudioProvider(LLMProviderBase):
                             context_length=model_data.get("context_length", 2048),
                             max_tokens=2048
                         )
-                        
+
                         models.append(LLMModel(
                             id=model_id,
                             name=model_id,
@@ -151,16 +151,16 @@ class LMStudioProvider(LLMProviderBase):
                                 "owned_by": model_data.get("owned_by", "lmstudio")
                             }
                         ))
-                    
+
                     return models
-        
+
         except aiohttp.ClientError as e:
             self.logger.error(f"無法列出 LM Studio 模型: {e}")
             return []
         except Exception as e:
             self.logger.error(f"列出模型時發生錯誤: {e}", exc_info=True)
             return []
-    
+
     async def generate(
         self,
         prompt: str,
@@ -186,37 +186,37 @@ class LMStudioProvider(LLMProviderBase):
         """
         use_tools = kwargs.pop("use_tools", False)
         trace_id = kwargs.pop("trace_id", None)
-        
+
         # 如果啟用工具且有 MCP 工具介面，使用 function calling
         if use_tools and self.mcp_tool_interface:
             return await self._generate_with_tools(
                 prompt, model, temperature, max_tokens, trace_id, **kwargs
             )
-        
+
         # 一般生成
         try:
             async with aiohttp.ClientSession() as session:
                 # LM Studio 使用 OpenAI 相容的 Chat Completions API
                 url = self.get_api_endpoint("v1/chat/completions")
-                
+
                 messages = [
                     {"role": "user", "content": prompt}
                 ]
-                
+
                 # 如果有系統提示，加入 system message
                 if "system" in kwargs:
                     messages.insert(0, {"role": "system", "content": kwargs["system"]})
-                
+
                 payload = {
                     "model": model,
                     "messages": messages,
                     "temperature": temperature,
                     "stream": False
                 }
-                
+
                 if max_tokens:
                     payload["max_tokens"] = max_tokens
-                
+
                 async with session.post(
                     url,
                     json=payload,
@@ -225,34 +225,34 @@ class LMStudioProvider(LLMProviderBase):
                 ) as response:
                     response.raise_for_status()
                     data = await response.json()
-                    
+
                     # 從 OpenAI 格式回應中提取文字
                     choices = data.get("choices", [])
                     if not choices:
                         return "", 0.0
-                    
+
                     message = choices[0].get("message", {})
                     generated_text = message.get("content", "")
-                    
+
                     # LM Studio 不提供信心度，使用預設值
                     confidence = 0.85
-                    
+
                     # 如果有 finish_reason，可以根據它調整信心度
                     finish_reason = choices[0].get("finish_reason")
                     if finish_reason == "stop":
                         confidence = 0.9
                     elif finish_reason == "length":
                         confidence = 0.7
-                    
+
                     return generated_text, confidence
-        
+
         except aiohttp.ClientError as e:
             self.logger.error(f"LM Studio 生成失敗: {e}")
             raise
         except Exception as e:
             self.logger.error(f"生成時發生錯誤: {e}", exc_info=True)
             raise
-    
+
     async def _generate_with_tools(
         self,
         prompt: str,
@@ -279,10 +279,10 @@ class LMStudioProvider(LLMProviderBase):
         try:
             # 取得 MCP 工具定義（OpenAI 格式）
             tools = self.mcp_tool_interface.get_tool_definitions()
-            
+
             async with aiohttp.ClientSession() as session:
                 url = self.get_api_endpoint("v1/chat/completions")
-                
+
                 messages = [
                     {
                         "role": "system",
@@ -293,7 +293,7 @@ class LMStudioProvider(LLMProviderBase):
                         "content": prompt
                     }
                 ]
-                
+
                 payload = {
                     "model": model,
                     "messages": messages,
@@ -302,10 +302,10 @@ class LMStudioProvider(LLMProviderBase):
                     "temperature": temperature,
                     "stream": False
                 }
-                
+
                 if max_tokens:
                     payload["max_tokens"] = max_tokens
-                
+
                 async with session.post(
                     url,
                     json=payload,
@@ -314,16 +314,16 @@ class LMStudioProvider(LLMProviderBase):
                 ) as response:
                     response.raise_for_status()
                     data = await response.json()
-                    
+
                     choices = data.get("choices", [])
                     if not choices:
                         return "", 0.0
-                    
+
                     message = choices[0].get("message", {})
-                    
+
                     # 檢查是否有工具呼叫
                     tool_calls = message.get("tool_calls", [])
-                    
+
                     if tool_calls:
                         # 執行工具呼叫
                         results = []
@@ -331,20 +331,20 @@ class LMStudioProvider(LLMProviderBase):
                             function = tool_call.get("function", {})
                             tool_name = function.get("name")
                             arguments = function.get("arguments", {})
-                            
+
                             if isinstance(arguments, str):
                                 arguments = json.loads(arguments)
-                            
+
                             self.logger.info(f"LLM 呼叫工具: {tool_name}")
-                            
+
                             result = await self.mcp_tool_interface.execute_tool_call(
                                 tool_name=tool_name,
                                 arguments=arguments,
                                 trace_id=trace_id
                             )
-                            
+
                             results.append(result)
-                        
+
                         # 將工具執行結果格式化為回應
                         response_text = "已執行以下操作：\n"
                         for i, result in enumerate(results):
@@ -352,13 +352,13 @@ class LMStudioProvider(LLMProviderBase):
                                 response_text += f"{i+1}. {result.get('message', '操作完成')}\n"
                             else:
                                 response_text += f"{i+1}. 錯誤: {result.get('error', '未知錯誤')}\n"
-                        
+
                         return response_text, 0.9
                     else:
                         # 沒有工具呼叫，返回一般回應
                         content = message.get("content", "")
                         return content, 0.85
-        
+
         except Exception as e:
             self.logger.error(f"使用工具生成失敗: {e}", exc_info=True)
             raise

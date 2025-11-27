@@ -451,6 +451,7 @@ python3 -m pytest tests/test_queue_system.py -v
 - [Robot Service README](../src/robot_service/README.md) - Robot Service 說明
 - [MCP Module](../MCP/Module.md) - MCP 模組設計
 - [Robot-Console Module](../Robot-Console/module.md) - Robot-Console 設計
+- [Python Lint 指南](development/PYTHON_LINT_GUIDE.md) - 程式碼風格與 lint 修復策略
 
 ## 版本歷史
 

@@ -18,7 +18,7 @@ class MCPToolInterface:
     將 MCP 功能包裝為結構化的工具定義，
     可注入到支援 function calling 的 LLM 提供商
     """
-    
+
     def __init__(self, command_handler=None):
         """
         初始化 MCP 工具介面
@@ -28,7 +28,7 @@ class MCPToolInterface:
         """
         self.command_handler = command_handler
         self.logger = logging.getLogger(__name__)
-    
+
     def get_tool_definitions(self) -> List[Dict[str, Any]]:
         """
         取得 MCP 工具定義列表（OpenAI function calling 格式）
@@ -282,7 +282,7 @@ class MCPToolInterface:
                 }
             }
         ]
-    
+
     def get_ollama_tool_definitions(self) -> List[Dict[str, Any]]:
         """
         取得 Ollama 格式的工具定義
@@ -302,7 +302,7 @@ class MCPToolInterface:
                 }
             })
         return tools
-    
+
     async def execute_tool_call(
         self,
         tool_name: str,
@@ -326,7 +326,7 @@ class MCPToolInterface:
                 "arguments": arguments,
                 "trace_id": trace_id
             })
-            
+
             # 根據工具名稱路由到對應的處理函數
             if tool_name == "robot_move_forward":
                 return await self._handle_move_forward(arguments, trace_id)
@@ -353,14 +353,14 @@ class MCPToolInterface:
                     "success": False,
                     "error": f"未知的工具: {tool_name}"
                 }
-        
+
         except Exception as e:
             self.logger.error(f"工具呼叫失敗: {e}", exc_info=True)
             return {
                 "success": False,
                 "error": str(e)
             }
-    
+
     async def _handle_move_forward(
         self,
         arguments: Dict[str, Any],
@@ -369,10 +369,10 @@ class MCPToolInterface:
         """處理向前移動指令"""
         robot_id = arguments["robot_id"]
         duration_ms = arguments["duration_ms"]
-        
+
         if not self.command_handler:
             return {"success": False, "error": "指令處理器未初始化"}
-        
+
         # 建立指令請求
         command_spec = CommandSpec(
             type="robot.action",
@@ -383,20 +383,20 @@ class MCPToolInterface:
             },
             priority=Priority.NORMAL
         )
-        
+
         # 執行指令
         response = await self.command_handler.process_command_spec(
             command_spec,
             trace_id=trace_id
         )
-        
+
         return {
             "success": True,
             "command_id": response.command_id if hasattr(response, 'command_id') else None,
             "status": response.status if hasattr(response, 'status') else "accepted",
             "message": f"機器人 {robot_id} 向前移動 {duration_ms}ms"
         }
-    
+
     async def _handle_turn(
         self,
         arguments: Dict[str, Any],
@@ -406,12 +406,12 @@ class MCPToolInterface:
         robot_id = arguments["robot_id"]
         direction = arguments["direction"]
         duration_ms = arguments["duration_ms"]
-        
+
         action_name = "turn_left" if direction == "left" else "turn_right"
-        
+
         if not self.command_handler:
             return {"success": False, "error": "指令處理器未初始化"}
-        
+
         command_spec = CommandSpec(
             type="robot.action",
             target=CommandTarget(robot_id=robot_id),
@@ -421,19 +421,19 @@ class MCPToolInterface:
             },
             priority=Priority.NORMAL
         )
-        
+
         response = await self.command_handler.process_command_spec(
             command_spec,
             trace_id=trace_id
         )
-        
+
         return {
             "success": True,
             "command_id": response.command_id if hasattr(response, 'command_id') else None,
             "status": response.status if hasattr(response, 'status') else "accepted",
             "message": f"機器人 {robot_id} {direction}轉 {duration_ms}ms"
         }
-    
+
     async def _handle_stop(
         self,
         arguments: Dict[str, Any],
@@ -441,10 +441,10 @@ class MCPToolInterface:
     ) -> Dict[str, Any]:
         """處理停止指令"""
         robot_id = arguments["robot_id"]
-        
+
         if not self.command_handler:
             return {"success": False, "error": "指令處理器未初始化"}
-        
+
         command_spec = CommandSpec(
             type="robot.action",
             target=CommandTarget(robot_id=robot_id),
@@ -454,19 +454,19 @@ class MCPToolInterface:
             },
             priority=Priority.HIGH
         )
-        
+
         response = await self.command_handler.process_command_spec(
             command_spec,
             trace_id=trace_id
         )
-        
+
         return {
             "success": True,
             "command_id": response.command_id if hasattr(response, 'command_id') else None,
             "status": response.status if hasattr(response, 'status') else "accepted",
             "message": f"機器人 {robot_id} 已停止"
         }
-    
+
     async def _handle_gesture(
         self,
         arguments: Dict[str, Any],
@@ -475,7 +475,7 @@ class MCPToolInterface:
         """處理手勢指令"""
         robot_id = arguments["robot_id"]
         gesture = arguments["gesture"]
-        
+
         # 手勢對應到基礎動作
         gesture_map = {
             "wave": "wave",
@@ -484,12 +484,12 @@ class MCPToolInterface:
             "twist": "twist",
             "squat": "squat"
         }
-        
+
         action_name = gesture_map.get(gesture, gesture)
-        
+
         if not self.command_handler:
             return {"success": False, "error": "指令處理器未初始化"}
-        
+
         command_spec = CommandSpec(
             type="robot.action",
             target=CommandTarget(robot_id=robot_id),
@@ -498,19 +498,19 @@ class MCPToolInterface:
             },
             priority=Priority.NORMAL
         )
-        
+
         response = await self.command_handler.process_command_spec(
             command_spec,
             trace_id=trace_id
         )
-        
+
         return {
             "success": True,
             "command_id": response.command_id if hasattr(response, 'command_id') else None,
             "status": response.status if hasattr(response, 'status') else "accepted",
             "message": f"機器人 {robot_id} 執行手勢: {gesture}"
         }
-    
+
     async def _handle_basic_action(
         self,
         arguments: Dict[str, Any],
@@ -522,7 +522,7 @@ class MCPToolInterface:
         """
         robot_id = arguments["robot_id"]
         action_name = arguments["action_name"]
-        
+
         # 驗證動作名稱
         valid_actions = [
             "back_fast", "bow", "chest", "dance_two", "dance_three",
@@ -535,16 +535,16 @@ class MCPToolInterface:
             "stepping", "stop", "turn_left", "turn_right", "twist",
             "wave", "weightlifting", "wing_chun"
         ]
-        
+
         if action_name not in valid_actions:
             return {
                 "success": False,
                 "error": f"無效的動作: {action_name}，請使用有效的基礎動作"
             }
-        
+
         if not self.command_handler:
             return {"success": False, "error": "指令處理器未初始化"}
-        
+
         command_spec = CommandSpec(
             type="robot.action",
             target=CommandTarget(robot_id=robot_id),
@@ -553,19 +553,19 @@ class MCPToolInterface:
             },
             priority=Priority.NORMAL
         )
-        
+
         response = await self.command_handler.process_command_spec(
             command_spec,
             trace_id=trace_id
         )
-        
+
         return {
             "success": True,
             "command_id": response.command_id if hasattr(response, 'command_id') else None,
             "status": response.status if hasattr(response, 'status') else "accepted",
             "message": f"機器人 {robot_id} 執行基礎動作: {action_name}"
         }
-    
+
     async def _handle_dance(
         self,
         arguments: Dict[str, Any],
@@ -574,14 +574,14 @@ class MCPToolInterface:
         """處理跳舞指令"""
         robot_id = arguments["robot_id"]
         dance_number = arguments["dance_number"]
-        
+
         # 驗證舞蹈編號範圍
         if not (2 <= dance_number <= 10):
             return {
                 "success": False,
                 "error": f"無效的舞蹈編號: {dance_number}，有效範圍為 2-10"
             }
-        
+
         dance_map = {
             2: "dance_two",
             3: "dance_three",
@@ -593,12 +593,12 @@ class MCPToolInterface:
             9: "dance_nine",
             10: "dance_ten"
         }
-        
+
         action_name = dance_map[dance_number]
-        
+
         if not self.command_handler:
             return {"success": False, "error": "指令處理器未初始化"}
-        
+
         command_spec = CommandSpec(
             type="robot.action",
             target=CommandTarget(robot_id=robot_id),
@@ -607,19 +607,19 @@ class MCPToolInterface:
             },
             priority=Priority.NORMAL
         )
-        
+
         response = await self.command_handler.process_command_spec(
             command_spec,
             trace_id=trace_id
         )
-        
+
         return {
             "success": True,
             "command_id": response.command_id if hasattr(response, 'command_id') else None,
             "status": response.status if hasattr(response, 'status') else "accepted",
             "message": f"機器人 {robot_id} 執行舞蹈: {action_name}"
         }
-    
+
     async def _handle_combat(
         self,
         arguments: Dict[str, Any],
@@ -628,21 +628,21 @@ class MCPToolInterface:
         """處理戰鬥動作指令"""
         robot_id = arguments["robot_id"]
         move = arguments["move"]
-        
+
         valid_moves = [
             "kung_fu", "wing_chun", "left_kick", "right_kick",
             "left_uppercut", "right_uppercut", "left_shot_fast", "right_shot_fast"
         ]
-        
+
         if move not in valid_moves:
             return {
                 "success": False,
                 "error": f"無效的戰鬥動作: {move}"
             }
-        
+
         if not self.command_handler:
             return {"success": False, "error": "指令處理器未初始化"}
-        
+
         command_spec = CommandSpec(
             type="robot.action",
             target=CommandTarget(robot_id=robot_id),
@@ -651,19 +651,19 @@ class MCPToolInterface:
             },
             priority=Priority.NORMAL
         )
-        
+
         response = await self.command_handler.process_command_spec(
             command_spec,
             trace_id=trace_id
         )
-        
+
         return {
             "success": True,
             "command_id": response.command_id if hasattr(response, 'command_id') else None,
             "status": response.status if hasattr(response, 'status') else "accepted",
             "message": f"機器人 {robot_id} 執行戰鬥動作: {move}"
         }
-    
+
     async def _handle_exercise(
         self,
         arguments: Dict[str, Any],
@@ -672,18 +672,18 @@ class MCPToolInterface:
         """處理運動動作指令"""
         robot_id = arguments["robot_id"]
         exercise = arguments["exercise"]
-        
+
         valid_exercises = ["push_ups", "sit_ups", "squat", "squat_up", "chest", "weightlifting"]
-        
+
         if exercise not in valid_exercises:
             return {
                 "success": False,
                 "error": f"無效的運動動作: {exercise}"
             }
-        
+
         if not self.command_handler:
             return {"success": False, "error": "指令處理器未初始化"}
-        
+
         command_spec = CommandSpec(
             type="robot.action",
             target=CommandTarget(robot_id=robot_id),
@@ -692,19 +692,19 @@ class MCPToolInterface:
             },
             priority=Priority.NORMAL
         )
-        
+
         response = await self.command_handler.process_command_spec(
             command_spec,
             trace_id=trace_id
         )
-        
+
         return {
             "success": True,
             "command_id": response.command_id if hasattr(response, 'command_id') else None,
             "status": response.status if hasattr(response, 'status') else "accepted",
             "message": f"機器人 {robot_id} 執行運動動作: {exercise}"
         }
-    
+
     async def _handle_get_status(
         self,
         arguments: Dict[str, Any],
@@ -712,7 +712,7 @@ class MCPToolInterface:
     ) -> Dict[str, Any]:
         """處理查詢狀態指令"""
         robot_id = arguments["robot_id"]
-        
+
         # 這裡應該呼叫實際的狀態查詢邏輯
         # 目前返回模擬狀態
         return {
@@ -723,7 +723,7 @@ class MCPToolInterface:
             "location": {"x": 10, "y": 20},
             "message": f"機器人 {robot_id} 狀態正常"
         }
-    
+
     async def _handle_execute_sequence(
         self,
         arguments: Dict[str, Any],
@@ -732,10 +732,10 @@ class MCPToolInterface:
         """處理動作序列指令"""
         robot_id = arguments["robot_id"]
         actions = arguments["actions"]
-        
+
         if not self.command_handler:
             return {"success": False, "error": "指令處理器未初始化"}
-        
+
         command_spec = CommandSpec(
             type="robot.action.sequence",
             target=CommandTarget(robot_id=robot_id),
@@ -744,12 +744,12 @@ class MCPToolInterface:
             },
             priority=Priority.NORMAL
         )
-        
+
         response = await self.command_handler.process_command_spec(
             command_spec,
             trace_id=trace_id
         )
-        
+
         return {
             "success": True,
             "command_id": response.command_id if hasattr(response, 'command_id') else None,

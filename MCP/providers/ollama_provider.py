@@ -30,11 +30,11 @@ class OllamaProvider(LLMProviderBase):
     支援透過 MCP 協定層與 Ollama 服務通訊
     支援 function calling，可將 MCP 暴露為工具
     """
-    
+
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
         self.mcp_tool_interface = None
-    
+
     def set_mcp_tool_interface(self, tool_interface):
         """
         設定 MCP 工具介面
@@ -44,15 +44,15 @@ class OllamaProvider(LLMProviderBase):
         """
         self.mcp_tool_interface = tool_interface
         self.logger.info("已注入 MCP 工具介面到 Ollama 提供商")
-    
+
     @property
     def provider_name(self) -> str:
         return "ollama"
-    
+
     @property
     def default_port(self) -> int:
         return 11434
-    
+
     async def check_health(self) -> ProviderHealth:
         """
         檢查 Ollama 服務健康狀態
@@ -61,7 +61,7 @@ class OllamaProvider(LLMProviderBase):
             健康狀態資訊
         """
         start_time = time.time()
-        
+
         try:
             async with aiohttp.ClientSession() as session:
                 url = self.get_api_endpoint()
@@ -70,10 +70,10 @@ class OllamaProvider(LLMProviderBase):
                     timeout=aiohttp.ClientTimeout(total=self.config.timeout)
                 ) as response:
                     response_time_ms = (time.time() - start_time) * 1000
-                    
+
                     if response.status == 200:
                         # Ollama 根路徑回傳簡單訊息
-                        
+
                         # 嘗試取得版本資訊
                         version = None
                         try:
@@ -86,7 +86,7 @@ class OllamaProvider(LLMProviderBase):
                                     version = version_data.get("version")
                         except Exception as e:
                             self.logger.debug(f"無法取得 Ollama 版本: {e}")
-                        
+
                         # 取得可用模型列表
                         available_models = []
                         try:
@@ -94,7 +94,7 @@ class OllamaProvider(LLMProviderBase):
                             available_models = [model.id for model in models]
                         except Exception as e:
                             self.logger.debug(f"無法列出 Ollama 模型: {e}")
-                        
+
                         return ProviderHealth(
                             status=ProviderStatus.AVAILABLE,
                             version=version,
@@ -107,7 +107,7 @@ class OllamaProvider(LLMProviderBase):
                             error_message=f"HTTP {response.status}",
                             response_time_ms=response_time_ms
                         )
-        
+
         except asyncio.TimeoutError:
             return ProviderHealth(
                 status=ProviderStatus.UNAVAILABLE,
@@ -124,7 +124,7 @@ class OllamaProvider(LLMProviderBase):
                 status=ProviderStatus.ERROR,
                 error_message=str(e)
             )
-    
+
     async def list_models(self) -> List[LLMModel]:
         """
         列出 Ollama 可用模型
@@ -141,20 +141,20 @@ class OllamaProvider(LLMProviderBase):
                 ) as response:
                     response.raise_for_status()
                     data = await response.json()
-                    
+
                     models = []
                     for model_data in data.get("models", []):
                         # 解析模型資訊
                         model_name = model_data.get("name", "")
-                        
+
                         # 嘗試從名稱提取大小資訊（如 llama2:7b）
                         size = None
                         if ":" in model_name:
                             size = model_name.split(":")[1]
-                        
+
                         # 取得模型詳細資訊
                         details = model_data.get("details", {})
-                        
+
                         # 建立能力物件
                         capabilities = ModelCapability(
                             supports_streaming=True,  # Ollama 支援串流
@@ -163,7 +163,7 @@ class OllamaProvider(LLMProviderBase):
                             context_length=details.get("context_length", 2048),
                             max_tokens=2048
                         )
-                        
+
                         models.append(LLMModel(
                             id=model_name,
                             name=model_name,
@@ -175,16 +175,16 @@ class OllamaProvider(LLMProviderBase):
                                 "details": details
                             }
                         ))
-                    
+
                     return models
-        
+
         except aiohttp.ClientError as e:
             self.logger.error(f"無法列出 Ollama 模型: {e}")
             return []
         except Exception as e:
             self.logger.error(f"列出模型時發生錯誤: {e}", exc_info=True)
             return []
-    
+
     async def generate(
         self,
         prompt: str,
@@ -210,18 +210,18 @@ class OllamaProvider(LLMProviderBase):
         """
         use_tools = kwargs.pop("use_tools", False)
         trace_id = kwargs.pop("trace_id", None)
-        
+
         # 如果啟用工具且有 MCP 工具介面，使用 function calling
         if use_tools and self.mcp_tool_interface:
             return await self._generate_with_tools(
                 prompt, model, temperature, max_tokens, trace_id, **kwargs
             )
-        
+
         # 一般生成
         try:
             async with aiohttp.ClientSession() as session:
                 url = self.get_api_endpoint("api/generate")
-                
+
                 payload = {
                     "model": model,
                     "prompt": prompt,
@@ -230,14 +230,14 @@ class OllamaProvider(LLMProviderBase):
                         "temperature": temperature,
                     }
                 }
-                
+
                 if max_tokens:
                     payload["options"]["num_predict"] = max_tokens
-                
+
                 # 加入其他 Ollama 特定選項
                 if "system" in kwargs:
                     payload["system"] = kwargs["system"]
-                
+
                 async with session.post(
                     url,
                     json=payload,
@@ -246,26 +246,26 @@ class OllamaProvider(LLMProviderBase):
                 ) as response:
                     response.raise_for_status()
                     data = await response.json()
-                    
+
                     generated_text = data.get("response", "")
-                    
+
                     # Ollama 不直接提供信心度，使用預設值
                     confidence = 0.85
-                    
+
                     # 如果回應中有評估資訊，可以根據評估調整信心度
                     if data.get("done", False):
                         # 可以根據 total_duration, load_duration 等調整
                         pass
-                    
+
                     return generated_text, confidence
-        
+
         except aiohttp.ClientError as e:
             self.logger.error(f"Ollama 生成失敗: {e}")
             raise
         except Exception as e:
             self.logger.error(f"生成時發生錯誤: {e}", exc_info=True)
             raise
-    
+
     async def _generate_with_tools(
         self,
         prompt: str,
@@ -292,10 +292,10 @@ class OllamaProvider(LLMProviderBase):
         try:
             # 取得 MCP 工具定義
             tools = self.mcp_tool_interface.get_ollama_tool_definitions()
-            
+
             async with aiohttp.ClientSession() as session:
                 url = self.get_api_endpoint("api/chat")
-                
+
                 messages = [
                     {
                         "role": "system",
@@ -306,7 +306,7 @@ class OllamaProvider(LLMProviderBase):
                         "content": prompt
                     }
                 ]
-                
+
                 payload = {
                     "model": model,
                     "messages": messages,
@@ -316,10 +316,10 @@ class OllamaProvider(LLMProviderBase):
                         "temperature": temperature,
                     }
                 }
-                
+
                 if max_tokens:
                     payload["options"]["num_predict"] = max_tokens
-                
+
                 async with session.post(
                     url,
                     json=payload,
@@ -328,12 +328,12 @@ class OllamaProvider(LLMProviderBase):
                 ) as response:
                     response.raise_for_status()
                     data = await response.json()
-                    
+
                     message = data.get("message", {})
-                    
+
                     # 檢查是否有工具呼叫
                     tool_calls = message.get("tool_calls", [])
-                    
+
                     if tool_calls:
                         # 執行工具呼叫
                         results = []
@@ -341,20 +341,20 @@ class OllamaProvider(LLMProviderBase):
                             function = tool_call.get("function", {})
                             tool_name = function.get("name")
                             arguments = function.get("arguments", {})
-                            
+
                             if isinstance(arguments, str):
                                 arguments = json.loads(arguments)
-                            
+
                             self.logger.info(f"LLM 呼叫工具: {tool_name}")
-                            
+
                             result = await self.mcp_tool_interface.execute_tool_call(
                                 tool_name=tool_name,
                                 arguments=arguments,
                                 trace_id=trace_id
                             )
-                            
+
                             results.append(result)
-                        
+
                         # 將工具執行結果格式化為回應
                         response_text = "已執行以下操作：\n"
                         for i, result in enumerate(results):
@@ -362,13 +362,13 @@ class OllamaProvider(LLMProviderBase):
                                 response_text += f"{i+1}. {result.get('message', '操作完成')}\n"
                             else:
                                 response_text += f"{i+1}. 錯誤: {result.get('error', '未知錯誤')}\n"
-                        
+
                         return response_text, 0.9
                     else:
                         # 沒有工具呼叫，返回一般回應
                         content = message.get("content", "")
                         return content, 0.85
-        
+
         except Exception as e:
             self.logger.error(f"使用工具生成失敗: {e}", exc_info=True)
             raise

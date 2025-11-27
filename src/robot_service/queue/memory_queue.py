@@ -93,7 +93,7 @@ class MemoryQueue(QueueInterface):
         while True:
             async with self._lock:
                 # 依優先權順序檢查佇列
-                for priority in [MessagePriority.URGENT, MessagePriority.HIGH, 
+                for priority in [MessagePriority.URGENT, MessagePriority.HIGH,
                                 MessagePriority.NORMAL, MessagePriority.LOW]:
                     queue = self._queues[priority]
                     if queue:

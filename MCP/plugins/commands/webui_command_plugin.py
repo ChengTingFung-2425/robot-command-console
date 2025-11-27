@@ -25,7 +25,7 @@ class WebUICommandPlugin(CommandPluginBase):
     - video_stream_control: 視訊串流控制
     - ui_feedback: UI 回饋
     """
-    
+
     @property
     def metadata(self) -> PluginMetadata:
         return PluginMetadata(
@@ -58,18 +58,18 @@ class WebUICommandPlugin(CommandPluginBase):
                 }
             }
         )
-    
+
     async def _on_initialize(self) -> bool:
         """初始化插件"""
         self.webui_url = self.config.config.get("webui_url", "http://localhost:5000")
         self.logger.info(f"WebUI 指令插件初始化，WebUI URL: {self.webui_url}")
         return True
-    
+
     async def _on_shutdown(self) -> bool:
         """關閉插件"""
         self.logger.info("WebUI 指令插件關閉")
         return True
-    
+
     def get_supported_commands(self) -> List[str]:
         """取得支援的指令列表"""
         return [
@@ -79,7 +79,7 @@ class WebUICommandPlugin(CommandPluginBase):
             "robot_selection",
             "batch_command"
         ]
-    
+
     async def execute_command(
         self,
         command_name: str,
@@ -87,18 +87,18 @@ class WebUICommandPlugin(CommandPluginBase):
         context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """執行 WebUI 指令"""
-        
+
         if command_name not in self.get_supported_commands():
             return {
                 "success": False,
                 "error": f"不支援的指令: {command_name}"
             }
-        
+
         self.logger.info(f"執行 WebUI 指令: {command_name}", extra={
             "command": command_name,
             "parameters": parameters
         })
-        
+
         if command_name == "emergency_stop":
             return await self._execute_emergency_stop(parameters, context)
         elif command_name == "video_stream_control":
@@ -109,12 +109,12 @@ class WebUICommandPlugin(CommandPluginBase):
             return await self._execute_robot_selection(parameters, context)
         elif command_name == "batch_command":
             return await self._execute_batch_command(parameters, context)
-        
+
         return {
             "success": False,
             "error": "未實作的指令"
         }
-    
+
     async def _execute_emergency_stop(
         self,
         parameters: Dict[str, Any],
@@ -122,7 +122,7 @@ class WebUICommandPlugin(CommandPluginBase):
     ) -> Dict[str, Any]:
         """執行緊急停止"""
         robot_id = parameters.get("robot_id", "all")
-        
+
         return {
             "success": True,
             "command": "emergency_stop",
@@ -133,7 +133,7 @@ class WebUICommandPlugin(CommandPluginBase):
             ],
             "message": f"緊急停止指令已發送給 {robot_id}"
         }
-    
+
     async def _execute_video_stream_control(
         self,
         parameters: Dict[str, Any],
@@ -142,7 +142,7 @@ class WebUICommandPlugin(CommandPluginBase):
         """執行視訊串流控制"""
         action = parameters.get("action", "start")  # start/stop/pause
         robot_id = parameters.get("robot_id")
-        
+
         return {
             "success": True,
             "command": "video_stream_control",
@@ -150,7 +150,7 @@ class WebUICommandPlugin(CommandPluginBase):
             "robot_id": robot_id,
             "message": f"視訊串流 {action} 已執行"
         }
-    
+
     async def _execute_ui_feedback(
         self,
         parameters: Dict[str, Any],
@@ -159,14 +159,14 @@ class WebUICommandPlugin(CommandPluginBase):
         """執行 UI 回饋"""
         feedback_type = parameters.get("type", "notification")
         message = parameters.get("message", "")
-        
+
         return {
             "success": True,
             "command": "ui_feedback",
             "type": feedback_type,
             "message": message
         }
-    
+
     async def _execute_robot_selection(
         self,
         parameters: Dict[str, Any],
@@ -174,14 +174,14 @@ class WebUICommandPlugin(CommandPluginBase):
     ) -> Dict[str, Any]:
         """執行機器人選擇"""
         robot_ids = parameters.get("robot_ids", [])
-        
+
         return {
             "success": True,
             "command": "robot_selection",
             "selected_robots": robot_ids,
             "count": len(robot_ids)
         }
-    
+
     async def _execute_batch_command(
         self,
         parameters: Dict[str, Any],
@@ -189,7 +189,7 @@ class WebUICommandPlugin(CommandPluginBase):
     ) -> Dict[str, Any]:
         """執行批次指令"""
         commands = parameters.get("commands", [])
-        
+
         return {
             "success": True,
             "command": "batch_command",

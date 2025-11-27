@@ -144,9 +144,33 @@ Phase 3 建立在 Phase 2 完成的基礎上：
 ### 子階段規劃
 
 - [x] **Phase 3.1**：分析與優化（代碼去重、datetime 修復、測試更新）
+- [x] **Phase 3.1.3**：統一啟動器（一鍵啟動所有服務與健康檢查）
 - [ ] **Phase 3.2**：功能完善（WebUI 本地版、監控、CLI/TUI）
 - [ ] **Phase 3.3**：雲端整合（同步、共享指令、授權）
 - [ ] **Phase 3.4**：打包與發佈（AppImage、DMG、NSIS、Docker）
+
+### 統一啟動器（Phase 3.1.3 — 2025-11-27）
+
+實作一鍵啟動所有服務與健康檢查功能：
+
+| 組件 | 檔案 | 用途 |
+|------|------|------|
+| UnifiedLauncher | `src/robot_service/unified_launcher.py` | 統一服務協調 |
+| ProcessService | `src/robot_service/unified_launcher.py` | 外部進程管理 |
+| CLI 入口點 | `unified_launcher_cli.py` | 命令列介面 |
+
+**啟動方式**：
+```bash
+python3 unified_launcher_cli.py                    # 啟動所有服務
+python3 unified_launcher_cli.py --log-level DEBUG  # 調整日誌等級
+```
+
+**預設服務**：
+| 服務 | Port | 健康檢查 |
+|------|------|----------|
+| Flask API | 5000 | `/health` |
+| MCP Service | 8000 | `/health` |
+| Queue Service | (內部) | ServiceManager |
 
 ### 硬體目標
 
@@ -219,7 +243,67 @@ data = model.model_dump()
 
 當文檔結構變更時（如 `docs/MIGRATION_GUIDE_PHASE2.md` → `docs/phase2/MIGRATION_GUIDE_PHASE2.md`），需同步更新測試文件中的路徑驗證。
 
+### 統一啟動器經驗教訓（Phase 3.1.3）
+
+#### HTTP 會話重用
+
+```python
+# ❌ 每次健康檢查都建立新會話（效能差）
+async with aiohttp.ClientSession() as session:
+    async with session.get(url) as response:
+        ...
+
+# ✅ 重用會話以提高效能
+async def _get_http_session(self) -> aiohttp.ClientSession:
+    if self._http_session is None or self._http_session.closed:
+        self._http_session = aiohttp.ClientSession()
+    return self._http_session
+```
+
+**原因**：每次建立新的 HTTP 會話有額外開銷，重用會話可以提高健康檢查效能。
+
+#### 競態條件防護
+
+```python
+# ❌ 直接存取可能為 None 的屬性
+if self._process.poll() is not None:
+    ...
+
+# ✅ 先儲存引用再檢查
+process = self._process
+if process is None or process.poll() is not None:
+    ...
+```
+
+**原因**：在非同步環境中，`self._process` 可能在檢查過程中被其他協程修改為 None。
+
+#### 安全的 Token 生成
+
+```python
+# ❌ 使用硬編碼預設 token（安全風險）
+token = os.environ.get("APP_TOKEN", "dev-token")
+
+# ✅ 使用安全的隨機 token
+import secrets
+token = os.environ.get("APP_TOKEN") or secrets.token_hex(32)
+```
+
+**原因**：硬編碼的預設 token 在生產環境中是安全風險。使用 `secrets.token_hex()` 生成加密安全的隨機 token。
+
+---
+
+### 開發流程指引
+
+**任務開始前**：參閱 `docs/PROJECT_MEMORY.md` 獲取背景資訊與過去經驗。
+
+**每個步驟完成後**：更新 `docs/PROJECT_MEMORY.md`，記錄變更細節與經驗教訓。
+
+**全部完成後**：
+- 濃縮專案記憶，保留經驗教訓原樣
+- 在 `docs/development/` 建立專題開發指南
+- 在相關文件中加入參考連結
+
 ---
 
 **最後更新**：2025-11-27  
-**版本**：Phase 3.1.2 完成
+**版本**：Phase 3.1.3 完成（統一啟動器）

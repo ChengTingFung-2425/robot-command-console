@@ -71,7 +71,7 @@ class LocalEventBus:
         """
         self._subscriptions: Dict[str, Subscription] = {}
         self._topic_handlers: Dict[str, Set[str]] = defaultdict(set)
-        self._pattern_subscriptions: Dict[str, str] = {}  # pattern -> subscription_id
+        self._pattern_subscriptions: Dict[str, Set[str]] = defaultdict(set)  # pattern -> set of subscription_ids
         self._history: List[Event] = []
         self._history_size = history_size
         self._enable_history = enable_history
@@ -130,7 +130,7 @@ class LocalEventBus:
             self._subscriptions[subscription_id] = subscription
 
             if is_pattern:
-                self._pattern_subscriptions[pattern] = subscription_id
+                self._pattern_subscriptions[pattern].add(subscription_id)
             else:
                 self._topic_handlers[pattern].add(subscription_id)
 
@@ -161,7 +161,9 @@ class LocalEventBus:
 
             if subscription.is_pattern:
                 if subscription.pattern in self._pattern_subscriptions:
-                    del self._pattern_subscriptions[subscription.pattern]
+                    self._pattern_subscriptions[subscription.pattern].discard(subscription_id)
+                    if not self._pattern_subscriptions[subscription.pattern]:
+                        del self._pattern_subscriptions[subscription.pattern]
             else:
                 if subscription.pattern in self._topic_handlers:
                     self._topic_handlers[subscription.pattern].discard(subscription_id)
@@ -255,10 +257,11 @@ class LocalEventBus:
                         matching.append(self._subscriptions[sub_id])
 
             # 萬用字元匹配
-            for pattern, sub_id in self._pattern_subscriptions.items():
-                if sub_id in self._subscriptions:
-                    if fnmatch.fnmatch(topic, pattern):
-                        matching.append(self._subscriptions[sub_id])
+            for pattern, sub_ids in self._pattern_subscriptions.items():
+                if fnmatch.fnmatch(topic, pattern):
+                    for sub_id in sub_ids:
+                        if sub_id in self._subscriptions:
+                            matching.append(self._subscriptions[sub_id])
 
         return matching
 

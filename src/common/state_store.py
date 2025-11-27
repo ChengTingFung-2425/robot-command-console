@@ -16,8 +16,7 @@ import sqlite3
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from .datetime_utils import utc_now
@@ -146,6 +145,7 @@ class LocalStateStore:
             try:
                 await self._cleanup_task
             except asyncio.CancelledError:
+                # 任務被取消時屬預期行為，安全忽略
                 pass
             self._cleanup_task = None
 

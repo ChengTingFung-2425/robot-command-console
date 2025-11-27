@@ -10,15 +10,14 @@ Shared State Manager
 - 狀態變更通知
 """
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Coroutine, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from .datetime_utils import utc_now
-from .event_bus import Event, EventHandler, LocalEventBus
-from .state_store import LocalStateStore, StateEntry
+from .event_bus import EventHandler, LocalEventBus
+from .state_store import LocalStateStore
 
 logger = logging.getLogger(__name__)
 
@@ -307,7 +306,7 @@ class SharedStateManager:
             是否成功更新
         """
         key = StateKeys.QUEUE_STATUS
-        status["updated_at"] = utc_now().isoformat()
+        status = {**status, "updated_at": utc_now().isoformat()}
 
         success = await self._state_store.set(key, status)
 

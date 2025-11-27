@@ -7,17 +7,14 @@ import asyncio
 import sys
 import os
 import unittest
-from datetime import timedelta
-from typing import Any, Dict, List
 
 # 添加 src 目錄到路徑
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from common.state_store import LocalStateStore, StateEntry
+from common.state_store import LocalStateStore
 from common.event_bus import LocalEventBus, Event
 from common.shared_state import (
     SharedStateManager,
-    StateKeys,
     EventTopics,
     RobotStatus,
     QueueStatus,
@@ -223,6 +220,7 @@ class TestLocalEventBus(unittest.TestCase):
             self.assertIsNotNone(sub_id)
 
             await bus.publish("test.topic", {"data": "value"})
+            await asyncio.sleep(0.01)  # 確保異步事件傳遞完成
 
             self.assertEqual(len(received_events), 1)
             self.assertEqual(received_events[0].topic, "test.topic")
@@ -297,6 +295,37 @@ class TestLocalEventBus(unittest.TestCase):
             await bus.subscribe("test.topic", handler2)
 
             count = await bus.publish("test.topic", "data")
+            await asyncio.sleep(0.01)  # 確保異步事件傳遞完成
+            self.assertEqual(count, 2)
+
+            self.assertEqual(len(received1), 1)
+            self.assertEqual(len(received2), 1)
+
+            await bus.stop()
+
+        self.loop.run_until_complete(test())
+
+    def test_multiple_pattern_subscribers(self):
+        """測試多個萬用字元訂閱者"""
+        async def test():
+            bus = LocalEventBus()
+            await bus.start()
+
+            received1 = []
+            received2 = []
+
+            async def handler1(event: Event):
+                received1.append(event)
+
+            async def handler2(event: Event):
+                received2.append(event)
+
+            # 兩個處理器訂閱相同的萬用字元模式
+            await bus.subscribe("robot.*", handler1)
+            await bus.subscribe("robot.*", handler2)
+
+            count = await bus.publish("robot.status", "data")
+            await asyncio.sleep(0.01)  # 確保異步事件傳遞完成
             self.assertEqual(count, 2)
 
             self.assertEqual(len(received1), 1)

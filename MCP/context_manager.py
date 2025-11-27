@@ -4,13 +4,18 @@ MCP 上下文管理器
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from .models import CommandRequest, CommandResponse
 
 
 logger = logging.getLogger(__name__)
+
+
+def _utc_now() -> datetime:
+    """取得當前 UTC 時間"""
+    return datetime.now(timezone.utc)
 
 
 class ContextManager:
@@ -26,7 +31,7 @@ class ContextManager:
         self.contexts[trace_id] = {
             "trace_id": trace_id,
             "command_id": request.command.id,
-            "created_at": datetime.utcnow(),
+            "created_at": _utc_now(),
             "request": request.dict(),
             "events": []
         }

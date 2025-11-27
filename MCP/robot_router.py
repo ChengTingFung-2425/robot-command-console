@@ -5,7 +5,7 @@ MCP 機器人路由器
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from .config import MCPConfig
@@ -19,6 +19,11 @@ from .models import (
 
 
 logger = logging.getLogger(__name__)
+
+
+def _utc_now() -> datetime:
+    """取得當前 UTC 時間"""
+    return datetime.now(timezone.utc)
 
 
 class RobotRouter:
@@ -58,7 +63,7 @@ class RobotRouter:
                 self.robot_locks[robot_id] = asyncio.Lock()
 
             # 更新註冊資訊
-            registration.last_heartbeat = datetime.utcnow()
+            registration.last_heartbeat = _utc_now()
             registration.status = RobotStatus.ONLINE
             self.robots[robot_id] = registration
 
@@ -324,7 +329,7 @@ class RobotRouter:
             try:
                 await asyncio.sleep(60)  # 每分鐘檢查一次
 
-                threshold = datetime.utcnow() - timedelta(
+                threshold = _utc_now() - timedelta(
                     seconds=MCPConfig.ROBOT_OFFLINE_THRESHOLD_SEC
                 )
 

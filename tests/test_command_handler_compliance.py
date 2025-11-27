@@ -7,7 +7,7 @@ import sys
 import os
 import unittest
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 from unittest.mock import AsyncMock, MagicMock
 

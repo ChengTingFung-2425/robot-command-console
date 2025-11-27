@@ -6,7 +6,6 @@ MCP FastAPI 服務
 import asyncio
 import base64
 import logging
-import sys
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
@@ -15,7 +14,6 @@ from fastapi import APIRouter, FastAPI, HTTPException, Request, WebSocket, WebSo
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
-from pythonjsonlogger import jsonlogger
 
 from .auth_manager import AuthManager
 from .command_handler import CommandHandler
@@ -40,30 +38,10 @@ from .plugin_manager import PluginManager
 from .plugins.commands import AdvancedCommandPlugin, WebUICommandPlugin
 from .plugins.devices import CameraPlugin, SensorPlugin
 from .robot_router import RobotRouter
+from .utils import setup_json_logging
 
-
-# 設定 JSON 結構化日誌
-class CustomJsonFormatter(jsonlogger.JsonFormatter):
-    """自定義 JSON 日誌格式器"""
-    def add_fields(self, log_record, record, message_dict):
-        super().add_fields(log_record, record, message_dict)
-        log_record['timestamp'] = datetime.now(timezone.utc).isoformat()
-        log_record['level'] = record.levelname
-        log_record['event'] = record.name
-        log_record['service'] = 'mcp-api'
-
-
-# 配置日誌處理器
-log_handler = logging.StreamHandler(sys.stdout)
-formatter = CustomJsonFormatter('%(timestamp)s %(level)s %(event)s %(message)s')
-log_handler.setFormatter(formatter)
-
-# 配置 logger
-logging.basicConfig(level=MCPConfig.LOG_LEVEL, handlers=[log_handler])
-logger = logging.getLogger(__name__)
-logger.handlers.clear()
-logger.addHandler(log_handler)
-logger.setLevel(MCPConfig.LOG_LEVEL)
+# 配置 logger（使用共用模組）
+logger = setup_json_logging(__name__, service_name='mcp-api', level=MCPConfig.LOG_LEVEL)
 
 # Prometheus Metrics
 REQUEST_COUNT = Counter(
@@ -399,7 +377,7 @@ async def get_command_status(command_id: str):
 async def cancel_command(command_id: str, trace_id: Optional[str] = None):
     """取消指令"""
     if not trace_id:
-        trace_id = str(datetime.utcnow().timestamp())
+        trace_id = str(datetime.now(timezone.utc).timestamp())
 
     success = await command_handler.cancel_command(command_id, trace_id)
     if not success:

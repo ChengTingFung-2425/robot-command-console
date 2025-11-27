@@ -6,7 +6,7 @@
 import sys
 import os
 import unittest
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 # 添加 MCP 目錄到路徑
@@ -43,7 +43,7 @@ class TestSchemaValidation(unittest.TestCase):
         """測試有效的 CommandRequest"""
         data = {
             "trace_id": str(uuid4()),
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
             "actor": {
                 "type": "human",
                 "id": "user-123",
@@ -79,7 +79,7 @@ class TestSchemaValidation(unittest.TestCase):
         """測試缺少必要欄位的 CommandRequest"""
         # 缺少 trace_id
         data = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
             "actor": {
                 "type": "human",
                 "id": "user-123"
@@ -103,7 +103,7 @@ class TestSchemaValidation(unittest.TestCase):
         """測試無效的 actor type"""
         data = {
             "trace_id": str(uuid4()),
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
             "actor": {
                 "type": "invalid_type",  # 無效類型
                 "id": "user-123"
@@ -126,7 +126,7 @@ class TestSchemaValidation(unittest.TestCase):
         """測試超時時間超出範圍"""
         data = {
             "trace_id": str(uuid4()),
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
             "actor": {
                 "type": "system",
                 "id": "system"
@@ -150,7 +150,7 @@ class TestSchemaValidation(unittest.TestCase):
         """測試有效的成功 CommandResponse"""
         data = {
             "trace_id": str(uuid4()),
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
             "command": {
                 "id": "cmd-123",
                 "status": "succeeded"
@@ -172,7 +172,7 @@ class TestSchemaValidation(unittest.TestCase):
         """測試有效的錯誤 CommandResponse"""
         data = {
             "trace_id": str(uuid4()),
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
             "command": {
                 "id": "cmd-123",
                 "status": "failed"
@@ -195,7 +195,7 @@ class TestSchemaValidation(unittest.TestCase):
         """測試無效的錯誤代碼"""
         data = {
             "trace_id": str(uuid4()),
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
             "command": {
                 "id": "cmd-123",
                 "status": "failed"
@@ -215,7 +215,7 @@ class TestSchemaValidation(unittest.TestCase):
         """測試有效的 EventLog"""
         data = {
             "trace_id": str(uuid4()),
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
             "severity": "INFO",
             "category": "command",
             "message": "指令已接受",
@@ -233,7 +233,7 @@ class TestSchemaValidation(unittest.TestCase):
         """測試缺少訊息的 EventLog"""
         data = {
             "trace_id": str(uuid4()),
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
             "severity": "ERROR",
             "category": "audit",
             # 缺少 message
@@ -249,7 +249,7 @@ class TestSchemaValidation(unittest.TestCase):
         """測試使用 Pydantic 模型驗證"""
         data = {
             "trace_id": str(uuid4()),
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.now(timezone.utc),
             "actor": Actor(type=ActorType.HUMAN, id="user-123"),
             "source": Source.WEBUI,
             "command": CommandSpec(
@@ -283,7 +283,7 @@ class TestContractPropagation(unittest.TestCase):
         # 建立請求
         request = CommandRequest(
             trace_id=trace_id,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             actor=Actor(type=ActorType.HUMAN, id="user-123"),
             source=Source.API,
             command=CommandSpec(
@@ -296,7 +296,7 @@ class TestContractPropagation(unittest.TestCase):
         # 建立回應
         response = CommandResponse(
             trace_id=trace_id,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             command={
                 "id": request.command.id,
                 "status": CommandStatus.SUCCEEDED.value
@@ -317,7 +317,7 @@ class TestContractPropagation(unittest.TestCase):
 
         event = Event(
             trace_id=trace_id,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             severity=EventSeverity.INFO,
             category=EventCategory.COMMAND,
             message="測試事件",
@@ -343,7 +343,7 @@ class TestErrorContractCompliance(unittest.TestCase):
         """測試驗證錯誤回應格式"""
         response = CommandResponse(
             trace_id=str(uuid4()),
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             command={
                 "id": "cmd-123",
                 "status": CommandStatus.FAILED.value
@@ -367,7 +367,7 @@ class TestErrorContractCompliance(unittest.TestCase):
         """測試認證錯誤回應格式"""
         response = CommandResponse(
             trace_id=str(uuid4()),
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             command={
                 "id": "cmd-456",
                 "status": CommandStatus.FAILED.value
@@ -391,7 +391,7 @@ class TestErrorContractCompliance(unittest.TestCase):
         """測試超時錯誤回應格式"""
         response = CommandResponse(
             trace_id=str(uuid4()),
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             command={
                 "id": "cmd-789",
                 "status": CommandStatus.FAILED.value

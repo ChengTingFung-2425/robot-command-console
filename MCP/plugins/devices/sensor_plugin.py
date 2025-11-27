@@ -5,7 +5,7 @@
 
 import logging
 import random
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from ...plugin_base import (
@@ -133,7 +133,7 @@ class SensorPlugin(DevicePluginBase):
 
         return {
             "success": True,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "sensors": data,
             "sample_count": samples
         }

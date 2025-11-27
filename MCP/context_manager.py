@@ -4,10 +4,10 @@ MCP 上下文管理器
 """
 
 import logging
-from datetime import datetime
 from typing import Any, Dict, Optional
 
 from .models import CommandRequest, CommandResponse
+from .utils import utc_now
 
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ class ContextManager:
         self.contexts[trace_id] = {
             "trace_id": trace_id,
             "command_id": request.command.id,
-            "created_at": datetime.utcnow(),
+            "created_at": utc_now(),
             "request": request.dict(),
             "events": []
         }

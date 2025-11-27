@@ -5,7 +5,7 @@
 
 import base64
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from ...plugin_base import (
@@ -136,7 +136,7 @@ class CameraPlugin(DevicePluginBase):
 
         return {
             "success": True,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "format": format_type,
             "quality": quality,
             "resolution": self.resolution,

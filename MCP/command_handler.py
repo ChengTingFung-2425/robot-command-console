@@ -21,6 +21,7 @@ from .models import (
     EventSeverity,
 )
 from .schema_validator import validator
+from .utils import utc_now
 
 
 logger = logging.getLogger(__name__)
@@ -58,16 +59,16 @@ class CommandHandler:
             # 確保 timestamp 為 ISO8601 格式字串，並驗證格式
             ts = request.timestamp
             if isinstance(ts, datetime):
-                request_dict["timestamp"] = ts.isoformat() + "Z"
+                request_dict["timestamp"] = ts.isoformat()
             elif isinstance(ts, str):
                 try:
                     # 支援 "Z" 結尾的 ISO8601
                     datetime.fromisoformat(ts.replace("Z", "+00:00"))
                     request_dict["timestamp"] = ts
                 except (ValueError, TypeError):
-                    request_dict["timestamp"] = datetime.utcnow().isoformat() + "Z"
+                    request_dict["timestamp"] = utc_now().isoformat()
             else:
-                request_dict["timestamp"] = datetime.utcnow().isoformat() + "Z"
+                request_dict["timestamp"] = utc_now().isoformat()
 
             is_valid, error_msg = validator.validate_command_request(request_dict)
             if not is_valid:
@@ -160,7 +161,7 @@ class CommandHandler:
             # 7. 返回接受回應
             return CommandResponse(
                 trace_id=trace_id,
-                timestamp=datetime.utcnow(),
+                timestamp=utc_now(),
                 command={"id": command_id, "status": CommandStatus.ACCEPTED.value},
                 result=None,
                 error=None
@@ -191,7 +192,7 @@ class CommandHandler:
             # 標記為執行中
             self.active_commands[command_id] = {
                 "status": CommandStatus.RUNNING,
-                "started_at": datetime.utcnow(),
+                "started_at": utc_now(),
                 "request": request
             }
 
@@ -236,7 +237,7 @@ class CommandHandler:
             # 儲存結果
             response = CommandResponse(
                 trace_id=trace_id,
-                timestamp=datetime.utcnow(),
+                timestamp=utc_now(),
                 command={"id": command_id, "status": status.value},
                 result=CommandResult(
                     data=result.get("data"),
@@ -374,7 +375,7 @@ class CommandHandler:
         """建立錯誤回應"""
         return CommandResponse(
             trace_id=trace_id,
-            timestamp=datetime.utcnow(),
+            timestamp=utc_now(),
             command={"id": command_id, "status": CommandStatus.FAILED.value},
             result=None,
             error=ErrorDetail(
@@ -404,7 +405,7 @@ class CommandHandler:
         # 建立最小化的 CommandRequest
         request = CommandRequest(
             trace_id=trace_id or str(uuid4()),
-            timestamp=datetime.utcnow(),
+            timestamp=utc_now(),
             actor=Actor(type=ActorType.AI, id="mcp-tool-interface"),
             source=Source.API,
             command=command_spec,

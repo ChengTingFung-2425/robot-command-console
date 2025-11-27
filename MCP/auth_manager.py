@@ -4,13 +4,14 @@ MCP 認證授權管理器
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 import jwt
 from passlib.hash import bcrypt
 
 from .config import MCPConfig
+from .utils import utc_now
 
 
 logger = logging.getLogger(__name__)
@@ -60,7 +61,7 @@ class AuthManager:
 
             # 檢查過期時間
             exp = payload.get("exp")
-            if exp and datetime.fromtimestamp(exp) < datetime.utcnow():
+            if exp and datetime.fromtimestamp(exp, tz=timezone.utc) < utc_now():
                 logger.warning("Token 已過期")
                 await self._log_audit_event(
                     trace_id or "unknown",
@@ -109,7 +110,7 @@ class AuthManager:
 
             # 檢查過期時間
             exp = payload.get("exp")
-            if exp and datetime.fromtimestamp(exp) < datetime.utcnow():
+            if exp and datetime.fromtimestamp(exp, tz=timezone.utc) < utc_now():
                 return None
 
             return payload
@@ -171,7 +172,7 @@ class AuthManager:
         if expires_in_hours is None:
             expires_in_hours = MCPConfig.JWT_EXPIRATION_HOURS
 
-        exp = datetime.utcnow() + timedelta(hours=expires_in_hours)
+        exp = utc_now() + timedelta(hours=expires_in_hours)
 
         payload = {
             "user_id": user_id,
@@ -207,7 +208,7 @@ class AuthManager:
             "username": username,
             "password_hash": password_hash,
             "role": role,
-            "created_at": datetime.utcnow()
+            "created_at": utc_now()
         }
 
         logger.info(f"使用者已註冊: {user_id}")
@@ -255,7 +256,7 @@ class AuthManager:
 
         event = Event(
             trace_id=trace_id,
-            timestamp=datetime.utcnow(),
+            timestamp=utc_now(),
             severity=EventSeverity.INFO,
             category=EventCategory.AUDIT,
             message=f"Auth action: {action}",

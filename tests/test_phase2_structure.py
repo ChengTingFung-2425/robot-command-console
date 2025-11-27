@@ -97,12 +97,12 @@ def test_documentation_structure():
     project_root = Path(__file__).parent.parent
     docs_dir = project_root / "docs"
 
-    # Phase 2 關鍵文檔
+    # Phase 2 關鍵文檔（已更新路徑）
     key_docs = [
         "architecture.md",
-        "MIGRATION_GUIDE_PHASE2.md",
-        "observability.md",
-        "queue-architecture.md",
+        "phase2/MIGRATION_GUIDE_PHASE2.md",
+        "features/queue-architecture.md",
+        "proposal.md",
     ]
 
     for doc_file in key_docs:

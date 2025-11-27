@@ -8,6 +8,7 @@
 |------|------|
 | [MASTER_PLAN.md](plans/MASTER_PLAN.md) | WebUI → Native App 轉換的完整計畫（合併版） |
 | [PHASE3_EDGE_ALL_IN_ONE.md](plans/PHASE3_EDGE_ALL_IN_ONE.md) | Phase 3 ALL-in-One Edge App 詳細規劃 |
+| [phase3/PHASE3_1_STATUS_REPORT.md](phase3/PHASE3_1_STATUS_REPORT.md) | Phase 3.1 分析與優化狀態報告 |
 | [phase2/PHASE2_COMPLETION_SUMMARY.md](phase2/PHASE2_COMPLETION_SUMMARY.md) | Phase 2 完成摘要與成果記錄 |
 | [architecture.md](architecture.md) | 系統架構與目錄結構說明 |
 | [proposal.md](proposal.md) | 專案提案（含 Phase 進度） |
@@ -142,7 +143,7 @@ Phase 3 建立在 Phase 2 完成的基礎上：
 
 ### 子階段規劃
 
-- [ ] **Phase 3.1**：基礎整合（統一啟動器、服務協調、LLM 選擇 UI）
+- [x] **Phase 3.1**：分析與優化（代碼去重、datetime 修復、測試更新）
 - [ ] **Phase 3.2**：功能完善（WebUI 本地版、監控、CLI/TUI）
 - [ ] **Phase 3.3**：雲端整合（同步、共享指令、授權）
 - [ ] **Phase 3.4**：打包與發佈（AppImage、DMG、NSIS、Docker）
@@ -160,7 +161,65 @@ Phase 3 建立在 Phase 2 完成的基礎上：
 3. **文檔位置**：規劃文檔放 `docs/plans/`，技術文檔放 `docs/`
 4. **Phase 3 文檔**：詳見 `docs/plans/PHASE3_EDGE_ALL_IN_ONE.md`
 
+## 💡 經驗教訓（Phase 3.1）
+
+### 時間處理標準化
+
+```python
+# ❌ 不要使用（Python 3.12+ 已棄用）
+from datetime import datetime
+timestamp = datetime.utcnow()
+
+# ✅ 應該使用
+from datetime import datetime, timezone
+timestamp = datetime.now(timezone.utc)
+```
+
+**原因**：`datetime.utcnow()` 在 Python 3.12+ 中已被棄用，會產生警告。使用 timezone-aware datetime 更安全且符合未來標準。
+
+### 共用模組使用
+
+```python
+# ❌ 不要在各模組重複定義
+class CustomJsonFormatter(jsonlogger.JsonFormatter):
+    ...
+
+# ✅ 使用共用模組
+from .utils import setup_json_logging
+logger = setup_json_logging(__name__, service_name='mcp-api')
+```
+
+**原因**：消除代碼重複，統一日誌格式，減少維護成本。
+
+### ISO 時間格式
+
+```python
+# ❌ 不要這樣（會產生 +00:00Z 格式錯誤）
+timestamp = datetime.now(timezone.utc).isoformat() + "Z"
+
+# ✅ 直接使用 isoformat（已包含 +00:00）
+timestamp = datetime.now(timezone.utc).isoformat()
+```
+
+**原因**：`datetime.now(timezone.utc).isoformat()` 已經返回帶有 `+00:00` 的格式，無需額外添加 "Z"。
+
+### Pydantic V2 遷移提醒
+
+```python
+# ⚠️ 即將棄用
+data = model.dict()
+
+# ✅ Pydantic V2 建議
+data = model.model_dump()
+```
+
+**注意**：目前代碼中仍有 `.dict()` 使用，需在後續版本中遷移。
+
+### 測試與文檔同步
+
+當文檔結構變更時（如 `docs/MIGRATION_GUIDE_PHASE2.md` → `docs/phase2/MIGRATION_GUIDE_PHASE2.md`），需同步更新測試文件中的路徑驗證。
+
 ---
 
-**最後更新**：2025-11-26  
-**版本**：Phase 2（Phase 3 規劃中）
+**最後更新**：2025-11-27  
+**版本**：Phase 3.1.2 完成

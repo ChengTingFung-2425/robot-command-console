@@ -14,8 +14,9 @@ mode: agent
 | [`docs/architecture.md`](../../../docs/architecture.md) | 目錄結構、Edge/Server 隔離、模組職責 | 🟠 高 |
 | [`docs/plans/MASTER_PLAN.md`](../../../docs/plans/MASTER_PLAN.md) | Phase 0-6 規劃、技術選型 | 🟠 高 |
 | [`docs/PROJECT_MEMORY.md`](../../../docs/PROJECT_MEMORY.md) | 架構決策、共用工具 | 🟡 中 |
-| [`docs/development/PYTHON_LINT_GUIDE.md`](../../../docs/development/PYTHON_LINT_GUIDE.md) | Python 程式碼風格與 lint 修復策略 | 🟡 中 |
+| [`docs/development/PYTHON_LINT_GUIDE.md`](../../../docs/development/PYTHON_LINT_GUIDE.md) | Python 程式碼風格與 lint 修復策略 | 🟡 中 | 
 
+> *docs/development 目錄可能包含更多經驗總結*
 > **規格疑義以 `docs/proposal.md` 為準。**
 
 ---
@@ -69,10 +70,10 @@ mode: agent
 | API 端點 | `docs/proposal.md`、`openapi.yaml` |
 | 資料契約 | `docs/proposal.md`、`docs/contract/*.json` |
 | 架構調整 | `docs/architecture.md` |
-| 開發實踐 | `docs/development/PYTHON_LINT_GUIDE.md` |
+| 經驗總結 | `docs/development/*` |
 
 ### 最終步驟
-完成功能後，將經驗教訓整理至適當的文件中，並在相關文件中加入參考連結。
+完成功能後，將經驗總結和專案記憶整理和記錄至適當的文件中，並在相關文件中加入參考連結。
 
 ---
 

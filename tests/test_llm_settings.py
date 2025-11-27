@@ -226,6 +226,7 @@ class TestLLMSettingsRoutes:
         
         data = response.get_json()
         assert 'enabled' in data
+        assert 'click_count' in data
 
     def test_cors_toggle_requires_login(self, client):
         """測試切換 CORS 需要登入"""
@@ -234,30 +235,43 @@ class TestLLMSettingsRoutes:
         assert response.status_code == 302
 
     def test_cors_toggle_api(self, authenticated_client):
-        """測試切換 CORS API"""
-        # 先啟用
+        """測試切換 CORS API - 基於點擊次數（奇數開啟，偶數關閉）"""
+        # 第 1 次點擊 (奇數) - 應該開啟
         response = authenticated_client.post('/api/llm/cors/toggle',
-                                            json={'enabled': True},
+                                            json={'enabled': True, 'click_count': 1},
                                             content_type='application/json')
         assert response.status_code == 200
         data = response.get_json()
         assert data['success'] is True
         assert data['enabled'] is True
+        assert data['click_count'] == 1
         
         # 檢查狀態
         response = authenticated_client.get('/api/llm/cors/status')
         assert response.status_code == 200
         data = response.get_json()
         assert data['enabled'] is True
+        assert data['click_count'] == 1
         
-        # 再停用
+        # 第 2 次點擊 (偶數) - 應該關閉
         response = authenticated_client.post('/api/llm/cors/toggle',
-                                            json={'enabled': False},
+                                            json={'enabled': False, 'click_count': 2},
                                             content_type='application/json')
         assert response.status_code == 200
         data = response.get_json()
         assert data['success'] is True
         assert data['enabled'] is False
+        assert data['click_count'] == 2
+        
+        # 第 3 次點擊 (奇數) - 應該再次開啟
+        response = authenticated_client.post('/api/llm/cors/toggle',
+                                            json={'enabled': True, 'click_count': 3},
+                                            content_type='application/json')
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['success'] is True
+        assert data['enabled'] is True
+        assert data['click_count'] == 3
 
 
 class TestLLMSettingsIntegration:

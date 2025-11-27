@@ -207,6 +207,7 @@
     var currentSelectedProvider = null;
     var providersData = {};
     var corsEnabled = false;
+    var corsClickCount = 0;  // 追蹤點擊次數
 
     // 初始化
     document.addEventListener('DOMContentLoaded', function() {
@@ -221,51 +222,57 @@
             .then(function(response) { return response.json(); })
             .then(function(data) {
                 corsEnabled = data.enabled || false;
-                updateCorsCard(corsEnabled);
+                corsClickCount = data.click_count || 0;
+                updateCorsCard(corsEnabled, corsClickCount);
             })
             .catch(function(err) {
                 // CORS API 可能不存在，顯示未知狀態
-                updateCorsCard(null);
+                updateCorsCard(null, 0);
             });
     }
     
     // 更新 CORS 狀態卡片
-    function updateCorsCard(enabled) {
+    function updateCorsCard(enabled, clickCount) {
         var corsCard = document.getElementById('cors-status-card');
         var corsText = document.getElementById('cors-status-text');
         
         if (enabled === true) {
             corsCard.className = 'well text-center status-available';
-            corsText.textContent = '已啟用';
+            corsText.textContent = '已啟用 (點擊: ' + clickCount + ')';
         } else if (enabled === false) {
             corsCard.className = 'well text-center status-unavailable';
-            corsText.textContent = '已停用';
+            corsText.textContent = '已停用 (點擊: ' + clickCount + ')';
         } else {
             corsCard.className = 'well text-center status-error';
             corsText.textContent = '未知';
         }
     }
     
-    // 切換 CORS 設定
+    // 切換 CORS 設定（基於點擊次數：奇數次開啟，偶數次關閉）
     window.toggleCors = function() {
-        var newState = !corsEnabled;
+        corsClickCount++;
+        // 奇數次點擊 (1, 3, 5...) 開啟 CORS，偶數次點擊 (2, 4, 6...) 關閉 CORS
+        var newState = (corsClickCount % 2 === 1);
         
         fetch('/api/llm/cors/toggle', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ enabled: newState })
+            body: JSON.stringify({ enabled: newState, click_count: corsClickCount })
         })
         .then(function(response) { return response.json(); })
         .then(function(data) {
             if (data.success) {
                 corsEnabled = data.enabled;
-                updateCorsCard(corsEnabled);
-                showAlert('success', 'CORS 已' + (corsEnabled ? '啟用' : '停用'));
+                corsClickCount = data.click_count || corsClickCount;
+                updateCorsCard(corsEnabled, corsClickCount);
+                showAlert('success', 'CORS 已' + (corsEnabled ? '啟用' : '停用') + ' (第 ' + corsClickCount + ' 次點擊)');
             } else {
+                corsClickCount--;  // 失敗時還原計數
                 showAlert('danger', '切換 CORS 設定失敗');
             }
         })
         .catch(function(err) {
+            corsClickCount--;  // 失敗時還原計數
             showAlert('danger', '切換 CORS 設定時發生錯誤');
             console.error(err);
         });

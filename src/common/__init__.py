@@ -7,6 +7,9 @@
 - datetime_utils: 時間處理工具
 - config: 共用配置載入器
 - service_types: 服務類型定義
+- state_store: 本地狀態存儲
+- event_bus: 事件匯流排
+- shared_state: 服務間狀態共享管理器
 
 環境隔離：
 - Edge: 運行於本地/邊緣設備（Electron、CLI）
@@ -26,6 +29,23 @@ from .service_types import (
     ServiceStatus,
     ServiceConfig,
     ServiceState,
+)
+from .state_store import (
+    LocalStateStore,
+    StateEntry,
+)
+from .event_bus import (
+    LocalEventBus,
+    Event,
+    Subscription,
+    EventHandler,
+)
+from .shared_state import (
+    SharedStateManager,
+    StateKeys,
+    EventTopics,
+    RobotStatus,
+    QueueStatus,
 )
 
 __version__ = "1.0.0"
@@ -51,4 +71,18 @@ __all__ = [
     "ServiceStatus",
     "ServiceConfig",
     "ServiceState",
+    # 狀態存儲
+    "LocalStateStore",
+    "StateEntry",
+    # 事件匯流排
+    "LocalEventBus",
+    "Event",
+    "Subscription",
+    "EventHandler",
+    # 共享狀態管理
+    "SharedStateManager",
+    "StateKeys",
+    "EventTopics",
+    "RobotStatus",
+    "QueueStatus",
 ]

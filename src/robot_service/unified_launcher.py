@@ -84,7 +84,10 @@ class ProcessService(ServiceBase):
 
     @property
     def is_running(self) -> bool:
-        return self._running and self._process is not None and self._process.poll() is None
+        if not self._running:
+            return False
+        process = self._process
+        return process is not None and process.poll() is None
 
     async def _get_http_session(self) -> aiohttp.ClientSession:
         """取得或建立 HTTP 客戶端會話（重複使用以提高效能）"""
@@ -216,7 +219,14 @@ class ProcessService(ServiceBase):
                     "service": "unified_launcher"
                 })
                 self._process.kill()
-                self._process.wait(timeout=5)
+                try:
+                    self._process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    logger.error(f"Service {self.name} did not respond to SIGKILL", extra={
+                        "service": "unified_launcher"
+                    })
+                    # 進程可能處於不可中斷的睡眠狀態，設為 None 避免洩漏
+                    self._process = None
 
             self._running = False
             self._process = None
@@ -505,7 +515,7 @@ class UnifiedLauncher:
             }, exc_info=True)
             raise
 
-    async def health_check_all(self) -> Dict[str, Dict[str, Any]]:
+    async def health_check_all(self) -> Dict[str, Any]:
         """
         統一健康檢查
 
@@ -564,8 +574,14 @@ class UnifiedLauncher:
 
 
 def setup_signal_handlers(launcher: UnifiedLauncher, shutdown_event: asyncio.Event) -> None:
-    """設定信號處理器"""
-    def signal_handler(signum, frame):
+    """
+    設定信號處理器
+
+    Args:
+        launcher: 統一啟動器實例
+        shutdown_event: 關閉事件物件，用於通知主迴圈停止
+    """
+    def signal_handler(signum, _frame):
         logger.info(f"Received signal {signum}, initiating shutdown", extra={
             "service": "unified_launcher"
         })
@@ -576,7 +592,15 @@ def setup_signal_handlers(launcher: UnifiedLauncher, shutdown_event: asyncio.Eve
 
 
 async def main_async(args) -> int:
-    """非同步主函式"""
+    """
+    非同步主函式
+
+    Args:
+        args: argparse 解析後的命令列參數
+
+    Returns:
+        int: 退出碼（0 表示成功，1 表示失敗）
+    """
     # 設定日誌
     logging.basicConfig(
         level=getattr(logging, args.log_level.upper()),
@@ -616,7 +640,16 @@ async def main_async(args) -> int:
 
 
 def main():
-    """CLI 入口點"""
+    """
+    CLI 入口點
+
+    解析命令列參數，並啟動統一啟動器（UnifiedLauncher）。
+    此函式負責：
+        - 建立並解析 argparse 參數
+        - 設定啟動器相關參數（健康檢查間隔、重啟次數、延遲、日誌等級）
+        - 啟動非同步主流程
+        - 結束時以適當的狀態碼離開
+    """
     import argparse
 
     parser = argparse.ArgumentParser(

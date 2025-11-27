@@ -1,5 +1,8 @@
 
 # imports
+import re
+from urllib.parse import quote as url_quote
+
 from flask import Blueprint, jsonify, request, render_template, redirect, url_for, flash, session, abort
 from flask_login import current_user, login_user, logout_user, login_required
 from WebUI.app import db
@@ -995,8 +998,17 @@ def discover_llm_providers():
 def refresh_llm_provider(provider_name):
     """重新檢查特定 LLM 提供商的健康狀態"""
     try:
+        # 驗證 provider_name 僅包含允許的字元（字母、數字、底線、連字號）
+        if not re.match(r'^[a-zA-Z0-9_-]+$', provider_name):
+            return jsonify({
+                'success': False,
+                'error': '無效的提供商名稱'
+            }), 400
+
+        # 使用 URL 編碼確保安全
+        safe_provider_name = url_quote(provider_name, safe='')
         response = requests.post(
-            f'{MCP_API_URL}/llm/providers/{provider_name}/refresh',
+            f'{MCP_API_URL}/llm/providers/{safe_provider_name}/refresh',
             timeout=10
         )
         if response.status_code == 200:

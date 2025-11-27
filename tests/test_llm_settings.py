@@ -8,10 +8,11 @@
 - MCP API 整合
 """
 
-import pytest
-import sys
 import os
-from unittest.mock import patch, MagicMock
+import sys
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 # 添加 WebUI 目錄到路徑
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -24,9 +25,9 @@ class TestLLMSettingsRoutes:
     def app(self):
         """建立測試應用"""
         from WebUI.app import create_app, db
-        
+
         app = create_app(config_name='testing')
-        
+
         with app.app_context():
             db.create_all()
             yield app
@@ -42,24 +43,24 @@ class TestLLMSettingsRoutes:
         """建立已認證的測試客戶端"""
         from WebUI.app import db
         from WebUI.app.models import User, UserProfile
-        
+
         with app.app_context():
             # 建立測試用戶
             user = User(username='testuser', email='test@example.com')
             user.set_password('testpassword')
             db.session.add(user)
             db.session.flush()
-            
+
             profile = UserProfile(user_id=user.id)
             db.session.add(profile)
             db.session.commit()
-        
+
         # 登入
         client.post('/login', data={
             'username': 'testuser',
             'password': 'testpassword'
         }, follow_redirects=True)
-        
+
         return client
 
     def test_llm_settings_page_requires_login(self, client):
@@ -69,17 +70,19 @@ class TestLLMSettingsRoutes:
         assert response.status_code == 302
         assert 'login' in response.location.lower()
 
-    def test_llm_settings_page_accessible_when_logged_in(self, authenticated_client):
+    def test_llm_settings_page_accessible_when_logged_in(
+            self, authenticated_client):
         """測試登入後可以存取 LLM 設定頁面"""
         response = authenticated_client.get('/llm_settings')
         assert response.status_code == 200
         assert 'LLM 設定'.encode('utf-8') in response.data
 
-    def test_llm_settings_page_contains_required_elements(self, authenticated_client):
+    def test_llm_settings_page_contains_required_elements(
+            self, authenticated_client):
         """測試 LLM 設定頁面包含必要元素"""
         response = authenticated_client.get('/llm_settings')
         assert response.status_code == 200
-        
+
         # 檢查頁面包含必要的元素
         html = response.data.decode('utf-8')
         assert '連線狀態' in html
@@ -102,7 +105,7 @@ class TestLLMSettingsRoutes:
 
         response = client.get('/api/llm/providers')
         assert response.status_code == 200
-        
+
         data = response.get_json()
         assert 'providers' in data
         assert 'ollama' in data['providers']
@@ -127,7 +130,7 @@ class TestLLMSettingsRoutes:
 
         response = client.get('/api/llm/providers/health')
         assert response.status_code == 200
-        
+
         data = response.get_json()
         assert 'providers' in data
         assert 'ollama' in data['providers']
@@ -141,7 +144,7 @@ class TestLLMSettingsRoutes:
 
         response = client.get('/api/llm/providers')
         assert response.status_code == 503
-        
+
         data = response.get_json()
         assert data['mcp_available'] is False
         assert 'error' in data
@@ -149,7 +152,10 @@ class TestLLMSettingsRoutes:
     @patch('WebUI.app.routes.requests.post')
     def test_select_llm_provider_requires_login(self, mock_post, client):
         """測試選擇 LLM 提供商需要登入"""
-        response = client.post('/api/llm/providers/select?provider_name=ollama')
+        response = client.post(
+            '/api/llm/providers/select',
+            json={'provider_name': 'ollama'}
+        )
         # 應該重新導向到登入頁面
         assert response.status_code == 302
 
@@ -164,18 +170,22 @@ class TestLLMSettingsRoutes:
         }
         mock_post.return_value = mock_response
 
-        response = authenticated_client.post('/api/llm/providers/select?provider_name=ollama')
+        response = authenticated_client.post(
+            '/api/llm/providers/select',
+            json={'provider_name': 'ollama'}
+        )
         assert response.status_code == 200
-        
+
         data = response.get_json()
         assert data['provider'] == 'ollama'
 
     @patch('WebUI.app.routes.requests.post')
-    def test_select_llm_provider_missing_param(self, mock_post, authenticated_client):
+    def test_select_llm_provider_missing_param(
+            self, mock_post, authenticated_client):
         """測試選擇 LLM 提供商缺少參數"""
         response = authenticated_client.post('/api/llm/providers/select')
         assert response.status_code == 400
-        
+
         data = response.get_json()
         assert 'error' in data
 
@@ -196,7 +206,7 @@ class TestLLMSettingsRoutes:
 
         response = authenticated_client.post('/api/llm/providers/discover')
         assert response.status_code == 200
-        
+
         data = response.get_json()
         assert data['available_count'] == 1
 
@@ -212,9 +222,11 @@ class TestLLMSettingsRoutes:
         }
         mock_post.return_value = mock_response
 
-        response = authenticated_client.post('/api/llm/providers/ollama/refresh')
+        response = authenticated_client.post(
+            '/api/llm/providers/ollama/refresh'
+        )
         assert response.status_code == 200
-        
+
         data = response.get_json()
         assert data['provider'] == 'ollama'
         assert data['status'] == 'available'
@@ -223,50 +235,58 @@ class TestLLMSettingsRoutes:
         """測試取得 CORS 狀態 API"""
         response = client.get('/api/llm/cors/status')
         assert response.status_code == 200
-        
+
         data = response.get_json()
         assert 'enabled' in data
         assert 'click_count' in data
 
     def test_cors_toggle_requires_login(self, client):
         """測試切換 CORS 需要登入"""
-        response = client.post('/api/llm/cors/toggle',
-                              json={'enabled': True})
+        response = client.post(
+            '/api/llm/cors/toggle',
+            json={'enabled': True}
+        )
         assert response.status_code == 302
 
     def test_cors_toggle_api(self, authenticated_client):
         """測試切換 CORS API - 基於點擊次數（奇數開啟，偶數關閉）"""
         # 第 1 次點擊 (奇數) - 應該開啟
-        response = authenticated_client.post('/api/llm/cors/toggle',
-                                            json={'enabled': True, 'click_count': 1},
-                                            content_type='application/json')
+        response = authenticated_client.post(
+            '/api/llm/cors/toggle',
+            json={'enabled': True, 'click_count': 1},
+            content_type='application/json'
+        )
         assert response.status_code == 200
         data = response.get_json()
         assert data['success'] is True
         assert data['enabled'] is True
         assert data['click_count'] == 1
-        
+
         # 檢查狀態
         response = authenticated_client.get('/api/llm/cors/status')
         assert response.status_code == 200
         data = response.get_json()
         assert data['enabled'] is True
         assert data['click_count'] == 1
-        
+
         # 第 2 次點擊 (偶數) - 應該關閉
-        response = authenticated_client.post('/api/llm/cors/toggle',
-                                            json={'enabled': False, 'click_count': 2},
-                                            content_type='application/json')
+        response = authenticated_client.post(
+            '/api/llm/cors/toggle',
+            json={'enabled': False, 'click_count': 2},
+            content_type='application/json'
+        )
         assert response.status_code == 200
         data = response.get_json()
         assert data['success'] is True
         assert data['enabled'] is False
         assert data['click_count'] == 2
-        
+
         # 第 3 次點擊 (奇數) - 應該再次開啟
-        response = authenticated_client.post('/api/llm/cors/toggle',
-                                            json={'enabled': True, 'click_count': 3},
-                                            content_type='application/json')
+        response = authenticated_client.post(
+            '/api/llm/cors/toggle',
+            json={'enabled': True, 'click_count': 3},
+            content_type='application/json'
+        )
         assert response.status_code == 200
         data = response.get_json()
         assert data['success'] is True
@@ -281,9 +301,9 @@ class TestLLMSettingsIntegration:
     def app(self):
         """建立測試應用"""
         from WebUI.app import create_app, db
-        
+
         app = create_app(config_name='testing')
-        
+
         with app.app_context():
             db.create_all()
             yield app
@@ -303,7 +323,7 @@ class TestLLMSettingsIntegration:
             response = client.get('/api/llm/providers')
             # 可能會失敗（因為 MCP 未運行），但路由應該存在
             assert response.status_code in [200, 503, 500]
-            
+
             response = client.get('/api/llm/providers/health')
             assert response.status_code in [200, 503, 500]
 

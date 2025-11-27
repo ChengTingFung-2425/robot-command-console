@@ -217,6 +217,9 @@ python3 flask_service.py
 - [配置策略](config/README.md) - 配置管理說明
 - [測試指南](docs/features/webui-testing-guide.md) - 測試編寫與執行指南
 
+### 開發指南
+- [Python Lint 指南](docs/development/PYTHON_LINT_GUIDE.md) - 程式碼風格與 lint 修復策略
+
 ## API 版本控制與認證
 
 本專案現在支援標準化的 API 合約和完整的安全功能：

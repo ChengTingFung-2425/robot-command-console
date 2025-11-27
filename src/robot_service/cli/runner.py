@@ -96,8 +96,8 @@ class CLIRunner:
         """非同步執行"""
         logger.info("Starting Robot Service in CLI mode")
         logger.info(f"Configuration: queue_size={args.queue_size}, "
-                   f"workers={args.workers}, poll_interval={args.poll_interval}, "
-                   f"health_check_interval={args.health_check_interval}")
+                    f"workers={args.workers}, poll_interval={args.poll_interval}, "
+                    f"health_check_interval={args.health_check_interval}")
 
         # 建立服務協調器
         self.coordinator = ServiceCoordinator(

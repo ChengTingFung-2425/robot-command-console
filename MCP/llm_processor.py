@@ -23,19 +23,19 @@ class LLMProcessor:
     支援透過 MCP 注入本地 LLM 提供商
     支援網路不可用時自動回退到本地 LLM
     """
-    
+
     # 預設配置常數
     DEFAULT_DURATION_MS = 3000  # 預設持續時間（毫秒）
     DEFAULT_CONFIDENCE = 0.95   # 預設信心度
     INTERNET_CHECK_HOSTS = [
-        ("8.8.8.8", 53),       # Google DNS
-        ("1.1.1.1", 53),       # Cloudflare DNS
-        ("208.67.222.222", 53) # OpenDNS
+        ("8.8.8.8", 53),        # Google DNS
+        ("1.1.1.1", 53),        # Cloudflare DNS
+        ("208.67.222.222", 53)  # OpenDNS
     ]
     INTERNET_CHECK_TIMEOUT = 3  # 網路檢查逾時（秒）
-    
+
     def __init__(
-        self, 
+        self,
         provider_manager: Optional[LLMProviderManager] = None,
         use_local_fallback: bool = True,
         cloud_provider_url: Optional[str] = None
@@ -55,7 +55,7 @@ class LLMProcessor:
         self._last_internet_check = None
         self._internet_available = None
         self._warnings: List[Dict[str, Any]] = []  # 儲存警告訊息
-    
+
     def check_internet_connection(self, timeout: Optional[int] = None) -> bool:
         """
         檢查網路連線狀態
@@ -67,23 +67,23 @@ class LLMProcessor:
             True 如果網路可用，False 如果不可用
         """
         timeout = timeout or self.INTERNET_CHECK_TIMEOUT
-        
+
         for host, port in self.INTERNET_CHECK_HOSTS:
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.settimeout(timeout)
                 result = sock.connect_ex((host, port))
                 sock.close()
-                
+
                 if result == 0:
                     self._internet_available = True
                     return True
             except (socket.error, socket.timeout, OSError):
                 continue
-        
+
         self._internet_available = False
         return False
-    
+
     async def check_internet_connection_async(self, timeout: Optional[int] = None) -> bool:
         """
         非同步檢查網路連線狀態
@@ -96,7 +96,7 @@ class LLMProcessor:
         """
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self.check_internet_connection, timeout)
-    
+
     def add_warning(self, warning_type: str, message: str, details: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         添加警告訊息
@@ -119,7 +119,7 @@ class LLMProcessor:
         self._warnings.append(warning)
         self.logger.warning(f"[{warning_type}] {message}", extra=details or {})
         return warning
-    
+
     def get_warnings(self, clear: bool = False) -> List[Dict[str, Any]]:
         """
         取得所有警告訊息
@@ -134,11 +134,11 @@ class LLMProcessor:
         if clear:
             self._warnings.clear()
         return warnings
-    
+
     def clear_warnings(self) -> None:
         """清除所有警告"""
         self._warnings.clear()
-    
+
     def get_connection_status(self) -> Dict[str, Any]:
         """
         取得連線狀態摘要
@@ -148,18 +148,21 @@ class LLMProcessor:
         """
         local_provider = self.provider_manager.get_provider()
         local_available = local_provider is not None
-        
+
         return {
             "internet_available": self._internet_available,
             "local_llm_available": local_available,
             "local_llm_provider": local_provider.provider_name if local_provider else None,
-            "using_fallback": not self._internet_available and local_available if self._internet_available is not None else None,
+            "using_fallback": (
+                not self._internet_available and local_available
+                if self._internet_available is not None else None
+            ),
             "warnings_count": len(self._warnings)
         }
-    
+
     async def transcribe_audio(
-        self, 
-        audio_bytes: bytes, 
+        self,
+        audio_bytes: bytes,
         audio_format: str = "opus",
         language: str = "zh-TW"
     ) -> Tuple[str, float]:
@@ -184,18 +187,18 @@ class LLMProcessor:
                     self.logger.debug(f"提供商 {provider.provider_name} 不支援語音轉文字，使用模擬結果")
                 except Exception as e:
                     self.logger.warning(f"提供商語音轉文字失敗: {e}，使用模擬結果")
-            
+
             # 模擬結果（當沒有可用提供商或提供商不支援時）
             self.logger.info(f"使用模擬音訊轉錄，格式={audio_format}, 語言={language}")
             transcription = "向前移動三秒"
             confidence = 0.95
-            
+
             return transcription, confidence
-            
+
         except Exception as e:
             self.logger.error(f"音訊轉錄失敗: {e}", exc_info=True)
             raise
-    
+
     async def parse_command(
         self,
         transcription: str,
@@ -221,11 +224,11 @@ class LLMProcessor:
         try:
             provider = None
             using_fallback = False
-            
+
             # 如果優先使用雲端，先檢查網路連線
             if prefer_cloud and self.use_local_fallback:
                 internet_available = await self.check_internet_connection_async()
-                
+
                 if not internet_available:
                     # 網路不可用，添加警告並使用本地 LLM
                     self.add_warning(
@@ -238,10 +241,10 @@ class LLMProcessor:
                     )
                     using_fallback = True
                     self.logger.info("網路不可用，使用本地 LLM 作為回退")
-            
+
             # 取得本地 LLM 提供商
             provider = self.provider_manager.get_provider()
-            
+
             if provider:
                 try:
                     params = await self._llm_parse(transcription, robot_id, provider, model)
@@ -250,7 +253,7 @@ class LLMProcessor:
                         if using_fallback:
                             params["_using_fallback"] = True
                             params["_fallback_provider"] = provider.provider_name
-                        
+
                         command = CommandSpec(
                             type="robot.action",
                             target=CommandTarget(robot_id=robot_id),
@@ -279,10 +282,10 @@ class LLMProcessor:
                         "available_providers": self.provider_manager.list_providers()
                     }
                 )
-            
+
             # 回退到簡單的規則匹配
             params = self._simple_parse(transcription)
-            
+
             if params:
                 params["_parsed_by"] = "rule_based"
                 command = CommandSpec(
@@ -292,9 +295,9 @@ class LLMProcessor:
                     priority=Priority.NORMAL
                 )
                 return command
-            
+
             return None
-            
+
         except Exception as e:
             self.logger.error(f"指令解析失敗: {e}", exc_info=True)
             self.add_warning(
@@ -303,7 +306,7 @@ class LLMProcessor:
                 details={}
             )
             return None
-    
+
     async def _llm_parse(
         self,
         transcription: str,
@@ -330,7 +333,7 @@ class LLMProcessor:
                 raise ValueError("沒有可用的模型")
             model = models[0].id
             self.logger.info(f"使用模型: {model}")
-        
+
         # 建構提示
         prompt = f"""你是一個機器人指令解析助手。請將以下自然語言指令轉換為結構化指令。
 
@@ -355,7 +358,7 @@ class LLMProcessor:
 }}
 
 如果無法解析，返回空物件 {{}}"""
-        
+
         # 呼叫 LLM
         response_text, confidence = await provider.generate(
             prompt=prompt,
@@ -363,29 +366,29 @@ class LLMProcessor:
             temperature=0.3,  # 降低溫度以獲得更確定的結果
             max_tokens=200
         )
-        
+
         self.logger.debug(f"LLM 回應: {response_text}")
-        
+
         # 解析 JSON 回應
         try:
             # 嘗試提取 JSON（處理可能有額外文字的情況）
             json_start = response_text.find('{')
             json_end = response_text.rfind('}') + 1
-            
+
             if json_start >= 0 and json_end > json_start:
                 json_text = response_text[json_start:json_end]
                 params = json.loads(json_text)
-                
+
                 # 驗證必要欄位
                 if params and "action_name" in params and "duration_ms" in params:
                     return params
-            
+
             return None
-        
+
         except json.JSONDecodeError as e:
             self.logger.warning(f"無法解析 LLM 回應為 JSON: {e}")
             return None
-    
+
     def _simple_parse(self, text: str) -> Optional[Dict[str, Any]]:
         """
         簡單的規則式指令解析（示範用）
@@ -397,7 +400,7 @@ class LLMProcessor:
             解析後的參數字典
         """
         text = text.lower()
-        
+
         # 動作對應表
         action_keywords = {
             "向前": "go_forward",
@@ -415,26 +418,26 @@ class LLMProcessor:
             "鞠躬": "bow",
             "跳舞": "dance_two",
         }
-        
+
         # 尋找動作
         action_name = None
         for keyword, action in action_keywords.items():
             if keyword in text:
                 action_name = action
                 break
-        
+
         if not action_name:
             return None
-        
+
         # 提取時間（秒）
         duration_ms = self.DEFAULT_DURATION_MS  # 使用類常數
-        
+
         # 中文數字對應表
         chinese_numbers = {
             '一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
             '六': 6, '七': 7, '八': 8, '九': 9, '十': 10
         }
-        
+
         # 先嘗試匹配中文數字 + 秒
         for chinese, value in chinese_numbers.items():
             if f'{chinese}秒' in text:
@@ -446,7 +449,7 @@ class LLMProcessor:
             if time_match:
                 seconds = int(time_match.group(1))
                 duration_ms = seconds * 1000
-        
+
         return {
             "action_name": action_name,
             "duration_ms": duration_ms

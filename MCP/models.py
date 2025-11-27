@@ -8,7 +8,7 @@ from enum import Enum
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 
 
 class ActorType(str, Enum):
@@ -106,7 +106,7 @@ class CommandRequest(BaseModel):
     command: CommandSpec
     auth: Optional[Dict[str, Any]] = None
     labels: Dict[str, Any] = Field(default_factory=dict)
-    
+
     class Config:
         json_encoders = {
             datetime: lambda v: v.isoformat()
@@ -133,7 +133,7 @@ class CommandResponse(BaseModel):
     command: Dict[str, Any]  # id + status
     result: Optional[CommandResult] = None
     error: Optional[ErrorDetail] = None
-    
+
     class Config:
         json_encoders = {
             datetime: lambda v: v.isoformat()
@@ -147,7 +147,7 @@ class StatusResponse(BaseModel):
     command: Dict[str, Any]  # id + status
     progress: Optional[Dict[str, Any]] = None
     error: Optional[ErrorDetail] = None
-    
+
     class Config:
         json_encoders = {
             datetime: lambda v: v.isoformat()
@@ -174,7 +174,7 @@ class RobotRegistration(BaseModel):
     protocol: Protocol = Protocol.HTTP
     last_heartbeat: datetime = Field(default_factory=datetime.utcnow)
     metadata: Dict[str, Any] = Field(default_factory=dict)
-    
+
     class Config:
         json_encoders = {
             datetime: lambda v: v.isoformat()
@@ -187,7 +187,7 @@ class Heartbeat(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     status: RobotStatus = RobotStatus.ONLINE
     metrics: Optional[Dict[str, Any]] = None
-    
+
     class Config:
         json_encoders = {
             datetime: lambda v: v.isoformat()
@@ -221,7 +221,7 @@ class Event(BaseModel):
     category: EventCategory
     message: str
     context: Dict[str, Any] = Field(default_factory=dict)
-    
+
     class Config:
         json_encoders = {
             datetime: lambda v: v.isoformat()
@@ -254,7 +254,7 @@ class MediaStreamRequest(BaseModel):
     video_format: Optional[StreamFormat] = StreamFormat.MJPEG
     audio_format: Optional[StreamFormat] = StreamFormat.OPUS
     trace_id: str = Field(default_factory=lambda: str(uuid4()))
-    
+
     class Config:
         json_encoders = {
             datetime: lambda v: v.isoformat()
@@ -268,7 +268,7 @@ class AudioCommandRequest(BaseModel):
     audio_format: StreamFormat = StreamFormat.OPUS
     language: str = Field(default="zh-TW")
     trace_id: str = Field(default_factory=lambda: str(uuid4()))
-    
+
     class Config:
         json_encoders = {
             datetime: lambda v: v.isoformat()
@@ -283,7 +283,7 @@ class AudioCommandResponse(BaseModel):
     command: Optional[CommandSpec] = None  # 解析出的指令
     confidence: float = Field(ge=0.0, le=1.0)  # 信心度
     error: Optional[ErrorDetail] = None
-    
+
     class Config:
         json_encoders = {
             datetime: lambda v: v.isoformat()

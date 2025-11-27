@@ -5,17 +5,17 @@ Service Coordinator
 
 import asyncio
 import logging
+import os
+import sys
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Any, Callable, Coroutine, Dict, Optional
 
-from .service_manager import ServiceManager
-
 # 從 common 模組導入共用服務類型
-import sys
-import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from common.service_types import ServiceStatus, ServiceConfig, ServiceState
+from common.service_types import ServiceStatus, ServiceConfig, ServiceState  # noqa: E402
+
+from .service_manager import ServiceManager  # noqa: E402
 
 # 明確重新導出 common 模組的類型，確保向後相容
 __all__ = [

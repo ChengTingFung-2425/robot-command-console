@@ -64,7 +64,7 @@ class LLMProviderBase(ABC):
     LLM 提供商基底抽象類別
     所有本地 LLM 提供商插件必須繼承此類別
     """
-    
+
     def __init__(self, config: ProviderConfig):
         """
         初始化提供商
@@ -74,7 +74,7 @@ class LLMProviderBase(ABC):
         """
         self.config = config
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
-    
+
     @property
     @abstractmethod
     def provider_name(self) -> str:
@@ -85,7 +85,7 @@ class LLMProviderBase(ABC):
             提供商唯一識別名稱
         """
         pass
-    
+
     @property
     @abstractmethod
     def default_port(self) -> int:
@@ -96,7 +96,7 @@ class LLMProviderBase(ABC):
             預設埠號
         """
         pass
-    
+
     @abstractmethod
     async def check_health(self) -> ProviderHealth:
         """
@@ -106,7 +106,7 @@ class LLMProviderBase(ABC):
             健康狀態資訊
         """
         pass
-    
+
     @abstractmethod
     async def list_models(self) -> List[LLMModel]:
         """
@@ -116,7 +116,7 @@ class LLMProviderBase(ABC):
             可用模型列表
         """
         pass
-    
+
     @abstractmethod
     async def generate(
         self,
@@ -140,7 +140,7 @@ class LLMProviderBase(ABC):
             (生成的文字, 信心度) 元組
         """
         pass
-    
+
     async def transcribe_audio(
         self,
         audio_bytes: bytes,
@@ -164,7 +164,7 @@ class LLMProviderBase(ABC):
         raise NotImplementedError(
             f"{self.provider_name} 不支援語音轉文字功能"
         )
-    
+
     def get_api_endpoint(self, path: str = "") -> str:
         """
         取得完整 API 端點 URL
@@ -177,6 +177,6 @@ class LLMProviderBase(ABC):
         """
         base = self.config.api_base or f"http://{self.config.host}:{self.config.port}"
         return f"{base.rstrip('/')}/{path.lstrip('/')}" if path else base
-    
+
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}({self.provider_name}@{self.config.host}:{self.config.port})>"

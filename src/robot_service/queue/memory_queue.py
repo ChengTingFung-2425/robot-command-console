@@ -93,8 +93,8 @@ class MemoryQueue(QueueInterface):
         while True:
             async with self._lock:
                 # 依優先權順序檢查佇列
-                for priority in [MessagePriority.URGENT, MessagePriority.HIGH, 
-                                MessagePriority.NORMAL, MessagePriority.LOW]:
+                for priority in [MessagePriority.URGENT, MessagePriority.HIGH,
+                                 MessagePriority.NORMAL, MessagePriority.LOW]:
                     queue = self._queues[priority]
                     if queue:
                         message = queue.popleft()
@@ -133,7 +133,7 @@ class MemoryQueue(QueueInterface):
         """查看佇列頭部訊息但不取出"""
         async with self._lock:
             for priority in [MessagePriority.URGENT, MessagePriority.HIGH,
-                            MessagePriority.NORMAL, MessagePriority.LOW]:
+                             MessagePriority.NORMAL, MessagePriority.LOW]:
                 queue = self._queues[priority]
                 if queue:
                     return queue[0]

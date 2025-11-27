@@ -424,33 +424,51 @@ Phase 2 規劃的三層架構將在 Phase 3 完整實作：
 
 #### 狀態共享機制
 
+> **✅ 已實作** - 詳見 `src/common/shared_state.py`
+
 ```python
-# 共享狀態管理架構
-class SharedStateManager:
-    """
-    管理 MCP、WebUI、Robot-Console 之間的共享狀態
-    """
-    
-    def __init__(self):
-        self.state_store = LocalStateStore()  # SQLite
-        self.event_bus = LocalEventBus()      # In-memory pub/sub
-    
-    # 機器人狀態（由 Robot-Console 更新，WebUI 讀取）
-    async def update_robot_status(self, robot_id: str, status: dict):
-        await self.state_store.set(f"robot:{robot_id}:status", status)
-        await self.event_bus.publish("robot.status.updated", {
-            "robot_id": robot_id,
-            "status": status
-        })
-    
-    # 指令佇列狀態（由 MCP 更新，WebUI 顯示）
-    async def get_queue_status(self) -> dict:
-        return await self.state_store.get("queue:status")
-    
-    # 用戶設定（WebUI 更新，所有服務讀取）
-    async def get_user_settings(self) -> dict:
-        return await self.state_store.get("user:settings")
+# 使用範例 - 共享狀態管理
+from src.common.shared_state import (
+    SharedStateManager,
+    StateKeys,
+    EventTopics,
+    RobotStatus,
+    QueueStatus,
+)
+
+# 初始化管理器
+manager = SharedStateManager()
+await manager.start()
+
+# 機器人狀態（由 Robot-Console 更新，WebUI 讀取）
+await manager.update_robot_status("robot-001", {
+    "connected": True,
+    "battery_level": 85,
+    "mode": "active"
+})
+
+# 訂閱事件
+async def on_robot_status(event):
+    print(f"Robot {event.data['robot_id']} status updated")
+
+await manager.subscribe(EventTopics.ROBOT_STATUS_UPDATED, on_robot_status)
+
+# 指令佇列狀態（由 MCP 更新，WebUI 顯示）
+await manager.update_queue_status({
+    "pending_count": 5,
+    "processing_count": 2,
+    "is_running": True
+})
+
+# 用戶設定（WebUI 更新，所有服務讀取）
+await manager.update_user_settings({"theme": "dark", "language": "zh-TW"})
+settings = await manager.get_user_settings()
 ```
+
+**核心元件**：
+- `LocalStateStore` (`src/common/state_store.py`) - SQLite 本地狀態存儲，支援 TTL 過期
+- `LocalEventBus` (`src/common/event_bus.py`) - 記憶體內 Pub/Sub 事件匯流排
+- `SharedStateManager` (`src/common/shared_state.py`) - 整合狀態管理器
 
 #### 通訊協定
 
@@ -834,9 +852,9 @@ data_sharing:
 
 **交付物**：
 - [ ] 統一啟動器原型（Electron）
-- [ ] 服務協調器（啟動/停止/健康檢查）
+- [x] 服務協調器（啟動/停止/健康檢查）- 已於 Phase 2 實作
 - [ ] 基礎 LLM 選擇介面
-- [ ] 服務間狀態共享機制
+- [x] 服務間狀態共享機制 - 已實作 `SharedStateManager`
 
 **驗收條件**：
 - [ ] 一鍵啟動所有服務

@@ -10,10 +10,10 @@ import sys
 # 設定 Python 路徑
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import uvicorn
+import uvicorn  # noqa: E402
 
-from MCP.api import app
-from MCP.config import MCPConfig
+from MCP.api import app  # noqa: E402
+from MCP.config import MCPConfig  # noqa: E402
 
 
 def main():
@@ -23,7 +23,7 @@ def main():
         level=MCPConfig.LOG_LEVEL,
         format=MCPConfig.LOG_FORMAT
     )
-    
+
     logger = logging.getLogger(__name__)
     logger.info("=" * 60)
     logger.info("MCP 服務啟動")
@@ -32,7 +32,7 @@ def main():
     logger.info(f"Port: {MCPConfig.API_PORT}")
     logger.info(f"Log Level: {MCPConfig.LOG_LEVEL}")
     logger.info("=" * 60)
-    
+
     # 啟動服務
     uvicorn.run(
         app,

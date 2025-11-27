@@ -9,9 +9,9 @@ import logging
 import sys
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
+from fastapi import APIRouter, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
@@ -22,7 +22,9 @@ from .command_handler import CommandHandler
 from .config import MCPConfig
 from .context_manager import ContextManager
 from .llm_processor import LLMProcessor
+from .llm_provider_manager import LLMProviderManager
 from .logging_monitor import LoggingMonitor
+from .mcp_tool_interface import MCPToolInterface
 from .models import (
     AudioCommandRequest,
     AudioCommandResponse,
@@ -30,11 +32,13 @@ from .models import (
     CommandResponse,
     Event,
     Heartbeat,
-    MediaStreamRequest,
     RobotRegistration,
     RobotStatus,
-    StatusResponse,
 )
+from .plugin_base import PluginConfig
+from .plugin_manager import PluginManager
+from .plugins.commands import AdvancedCommandPlugin, WebUICommandPlugin
+from .plugins.devices import CameraPlugin, SensorPlugin
 from .robot_router import RobotRouter
 
 
@@ -47,6 +51,7 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
         log_record['level'] = record.levelname
         log_record['event'] = record.name
         log_record['service'] = 'mcp-api'
+
 
 # 配置日誌處理器
 log_handler = logging.StreamHandler(sys.stdout)
@@ -105,7 +110,6 @@ app = FastAPI(
 )
 
 # 建立 v1 API router
-from fastapi import APIRouter
 v1_router = APIRouter(prefix="/v1")
 
 
@@ -128,11 +132,13 @@ async def auth_middleware(request: Request, call_next):
     """
     # 不需要認證的端點
     public_paths = ['/health', '/metrics', '/v1/auth/login', '/api/auth/login']
-    
+
     # 檢查是否是公開端點
-    if request.url.path in public_paths or request.url.path.startswith('/docs') or request.url.path.startswith('/openapi'):
+    if (request.url.path in public_paths or
+            request.url.path.startswith('/docs') or
+            request.url.path.startswith('/openapi')):
         return await call_next(request)
-    
+
     # 檢查 Authorization header
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
@@ -141,10 +147,10 @@ async def auth_middleware(request: Request, call_next):
             content='{"error": "UNAUTHORIZED", "message": "Missing or invalid Authorization header"}',
             media_type="application/json"
         )
-    
+
     # 提取 token
     token = auth_header.split(" ")[1]
-    
+
     # 驗證 token
     trace_id = request.headers.get('X-Trace-ID', str(uuid.uuid4()))
     if not await auth_manager.verify_token(token, trace_id=trace_id):
@@ -153,7 +159,7 @@ async def auth_middleware(request: Request, call_next):
             content='{"error": "UNAUTHORIZED", "message": "Invalid or expired token"}',
             media_type="application/json"
         )
-    
+
     # Token 有效，繼續處理請求
     return await call_next(request)
 
@@ -165,7 +171,7 @@ async def track_requests(request: Request, call_next):
     request_id = str(uuid.uuid4())
     correlation_id = request.headers.get('X-Correlation-ID', request_id)
     start_time = datetime.now(timezone.utc)
-    
+
     # 記錄請求開始
     logger.info("Request started", extra={
         'request_id': request_id,
@@ -174,24 +180,24 @@ async def track_requests(request: Request, call_next):
         'path': request.url.path,
         'client': request.client.host if request.client else 'unknown'
     })
-    
+
     # 處理請求
     try:
         response = await call_next(request)
         duration = (datetime.now(timezone.utc) - start_time).total_seconds()
-        
+
         # 記錄 metrics
         REQUEST_COUNT.labels(
             method=request.method,
             endpoint=request.url.path,
             status=response.status_code
         ).inc()
-        
+
         REQUEST_LATENCY.labels(
             method=request.method,
             endpoint=request.url.path
         ).observe(duration)
-        
+
         # 記錄請求完成
         logger.info("Request completed", extra={
             'request_id': request_id,
@@ -201,16 +207,16 @@ async def track_requests(request: Request, call_next):
             'status': response.status_code,
             'duration_seconds': duration
         })
-        
+
         # 添加 headers
         response.headers['X-Request-ID'] = request_id
         response.headers['X-Correlation-ID'] = correlation_id
-        
+
         return response
-        
+
     except Exception as e:
         duration = (datetime.now(timezone.utc) - start_time).total_seconds()
-        
+
         logger.error("Request failed", extra={
             'request_id': request_id,
             'correlation_id': correlation_id,
@@ -219,12 +225,12 @@ async def track_requests(request: Request, call_next):
             'error': str(e),
             'duration_seconds': duration
         }, exc_info=True)
-        
+
         ERROR_COUNT.labels(
             endpoint=request.url.path,
             error_type=type(e).__name__
         ).inc()
-        
+
         # 在異常時也記錄 REQUEST_COUNT 和 REQUEST_LATENCY
         REQUEST_COUNT.labels(
             method=request.method,
@@ -235,7 +241,7 @@ async def track_requests(request: Request, call_next):
             method=request.method,
             endpoint=request.url.path
         ).observe(duration)
-        
+
         raise
 
 
@@ -253,20 +259,13 @@ command_handler = CommandHandler(
 )
 
 # 初始化 MCP 工具介面
-from .mcp_tool_interface import MCPToolInterface
 mcp_tool_interface = MCPToolInterface(command_handler=command_handler)
 
 # 初始化 LLM 提供商管理器和處理器（注入 MCP 工具介面）
-from .llm_provider_manager import LLMProviderManager
 llm_provider_manager = LLMProviderManager(mcp_tool_interface=mcp_tool_interface)
 llm_processor = LLMProcessor(provider_manager=llm_provider_manager)
 
 # 初始化插件管理器
-from .plugin_manager import PluginManager
-from .plugin_base import PluginConfig
-from .plugins.commands import AdvancedCommandPlugin, WebUICommandPlugin
-from .plugins.devices import CameraPlugin, SensorPlugin
-
 plugin_manager = PluginManager()
 
 # 註冊插件
@@ -285,7 +284,7 @@ async def startup_event():
         'log_level': MCPConfig.LOG_LEVEL
     })
     robot_router.start()
-    
+
     # 初始化插件
     try:
         logger.info("開始初始化插件...")
@@ -294,7 +293,7 @@ async def startup_event():
         logger.info(f"插件初始化完成: {success_count}/{len(plugin_results)} 成功")
     except Exception as e:
         logger.error(f"插件初始化失敗: {e}", exc_info=True)
-    
+
     # 自動偵測本地 LLM 提供商
     try:
         logger.info("開始偵測本地 LLM 提供商...")
@@ -303,7 +302,7 @@ async def startup_event():
         logger.info(f"LLM 提供商偵測完成: 發現 {available_count} 個可用提供商")
     except Exception as e:
         logger.error(f"LLM 提供商偵測失敗: {e}", exc_info=True)
-    
+
     logger.info("MCP service started successfully")
 
 
@@ -311,7 +310,7 @@ async def startup_event():
 async def shutdown_event():
     """關閉事件"""
     logger.info("MCP service shutting down")
-    
+
     # 關閉插件
     try:
         logger.info("開始關閉插件...")
@@ -319,7 +318,7 @@ async def shutdown_event():
         logger.info("插件關閉完成")
     except Exception as e:
         logger.error(f"插件關閉失敗: {e}", exc_info=True)
-    
+
     await robot_router.stop()
     logger.info("MCP service shutdown complete")
 
@@ -359,16 +358,16 @@ async def create_command(request: CommandRequest):
             'robot_id': request.robot_id,
             'action': request.action
         })
-        
+
         response = await command_handler.process_command(request)
-        
+
         COMMAND_COUNT.labels(status='success').inc()
-        
+
         logger.info("Command processed successfully", extra={
             'trace_id': request.trace_id,
             'command_id': response.command_id if hasattr(response, 'command_id') else None
         })
-        
+
         return response
     except Exception as e:
         COMMAND_COUNT.labels(status='error').inc()
@@ -376,12 +375,12 @@ async def create_command(request: CommandRequest):
             endpoint='/api/command',
             error_type=type(e).__name__
         ).inc()
-        
+
         logger.error("Command processing failed", extra={
             'trace_id': request.trace_id if hasattr(request, 'trace_id') else None,
             'error': str(e)
         }, exc_info=True)
-        
+
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -401,11 +400,11 @@ async def cancel_command(command_id: str, trace_id: Optional[str] = None):
     """取消指令"""
     if not trace_id:
         trace_id = str(datetime.utcnow().timestamp())
-    
+
     success = await command_handler.cancel_command(command_id, trace_id)
     if not success:
         raise HTTPException(status_code=404, detail="指令不存在或無法取消")
-    
+
     return {"message": "指令已取消", "command_id": command_id}
 
 
@@ -419,20 +418,20 @@ async def register_robot(registration: RobotRegistration):
         'robot_id': registration.robot_id,
         'robot_type': registration.robot_type if hasattr(registration, 'robot_type') else None
     })
-    
+
     success = await robot_router.register_robot(registration)
     if not success:
         logger.error("Robot registration failed", extra={
             'robot_id': registration.robot_id
         })
         raise HTTPException(status_code=500, detail="註冊失敗")
-    
+
     ROBOT_COUNT.labels(status='active').inc()
-    
+
     logger.info("Robot registered successfully", extra={
         'robot_id': registration.robot_id
     })
-    
+
     return {"message": "註冊成功", "robot_id": registration.robot_id}
 
 
@@ -443,20 +442,20 @@ async def unregister_robot(robot_id: str):
     logger.info("Robot unregistration request", extra={
         'robot_id': robot_id
     })
-    
+
     success = await robot_router.unregister_robot(robot_id)
     if not success:
         logger.warning("Robot not found for unregistration", extra={
             'robot_id': robot_id
         })
         raise HTTPException(status_code=404, detail="機器人不存在")
-    
+
     ROBOT_COUNT.labels(status='active').dec()
-    
+
     logger.info("Robot unregistered successfully", extra={
         'robot_id': robot_id
     })
-    
+
     return {"message": "取消註冊成功", "robot_id": robot_id}
 
 
@@ -467,7 +466,7 @@ async def update_heartbeat(heartbeat: Heartbeat):
     success = await robot_router.update_heartbeat(heartbeat)
     if not success:
         raise HTTPException(status_code=404, detail="機器人未註冊")
-    
+
     return {"message": "心跳已更新"}
 
 
@@ -478,7 +477,7 @@ async def get_robot(robot_id: str):
     robot = await robot_router.get_robot(robot_id)
     if not robot:
         raise HTTPException(status_code=404, detail="機器人不存在")
-    
+
     return robot
 
 
@@ -512,12 +511,12 @@ async def subscribe_events(websocket: WebSocket):
     """訂閱事件（WebSocket）"""
     await websocket.accept()
     ACTIVE_WEBSOCKETS.inc()
-    
+
     logger.info("WebSocket connection established", extra={
         'client': websocket.client.host if websocket.client else 'unknown',
         'endpoint': '/api/events/subscribe'
     })
-    
+
     async def send_event(event: Event):
         try:
             await websocket.send_json(event.dict())
@@ -526,9 +525,9 @@ async def subscribe_events(websocket: WebSocket):
                 'error': str(e),
                 'trace_id': event.trace_id
             })
-    
+
     await logging_monitor.subscribe_events(send_event)
-    
+
     try:
         while True:
             # 保持連線
@@ -566,7 +565,7 @@ async def register_user(
     success = await auth_manager.register_user(user_id, username, password, role)
     if not success:
         raise HTTPException(status_code=400, detail="使用者已存在")
-    
+
     return {"message": "註冊成功", "user_id": user_id}
 
 
@@ -577,18 +576,18 @@ async def login(username: str, password: str):
     user_id = await auth_manager.authenticate_user(username, password)
     if not user_id:
         raise HTTPException(status_code=401, detail="帳號或密碼錯誤")
-    
+
     # 取得使用者角色
     user = auth_manager.users.get(user_id)
     role = user.get("role", "viewer") if user else "viewer"
-    
+
     # 建立 Token
     token = await auth_manager.create_token(user_id, role)
-    
+
     # 計算過期時間
     from datetime import timedelta
     expires_at = datetime.now(timezone.utc) + timedelta(hours=MCPConfig.JWT_EXPIRATION_HOURS)
-    
+
     return {
         "token": token,
         "user_id": user_id,
@@ -605,33 +604,33 @@ async def rotate_token(request: Request):
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="缺少或無效的 Authorization header")
-    
+
     current_token = auth_header.split(" ")[1]
-    
+
     # 驗證當前 token
     if not await auth_manager.verify_token(current_token):
         raise HTTPException(status_code=401, detail="Token 無效或已過期")
-    
+
     # 解碼 token 以獲取使用者資訊
     payload = await auth_manager.decode_token(current_token)
     if not payload:
         raise HTTPException(status_code=401, detail="無法解碼 token")
-    
+
     user_id = payload.get("user_id")
     role = payload.get("role", "viewer")
-    
+
     # 建立新 token
     new_token = await auth_manager.create_token(user_id, role)
-    
+
     # 計算過期時間
     from datetime import timedelta
     expires_at = datetime.now(timezone.utc) + timedelta(hours=MCPConfig.JWT_EXPIRATION_HOURS)
-    
+
     logger.info("Token rotated successfully", extra={
         'user_id': user_id,
         'role': role
     })
-    
+
     return {
         "token": new_token,
         "expires_at": expires_at.isoformat()
@@ -645,7 +644,7 @@ async def rotate_token(request: Request):
 async def stream_media(websocket: WebSocket, robot_id: str):
     """媒體串流（WebSocket）"""
     await websocket.accept()
-    
+
     # 檢查機器人是否存在（在增加計數前檢查）
     robot = await robot_router.get_robot(robot_id)
     if not robot:
@@ -654,16 +653,16 @@ async def stream_media(websocket: WebSocket, robot_id: str):
         })
         await websocket.close(code=1008, reason="機器人不存在")
         return
-    
+
     ACTIVE_WEBSOCKETS.inc()
-    
+
     logger.info("Media stream connection established", extra={
         'robot_id': robot_id,
         'client': websocket.client.host if websocket.client else 'unknown'
     })
-    
+
     try:
-        
+
         # 持續推送媒體資料
         while True:
             # 接收來自 WebUI 的控制訊息（如切換格式等）
@@ -673,10 +672,10 @@ async def stream_media(websocket: WebSocket, robot_id: str):
                     'robot_id': robot_id,
                     'data': data
                 })
-            except:
+            except Exception:
                 # 如果沒有訊息，繼續
                 pass
-            
+
             # 這裡應該從機器人端獲取實際的視訊/音訊資料
             # 目前作為示範，發送狀態訊息
             await websocket.send_json({
@@ -684,10 +683,10 @@ async def stream_media(websocket: WebSocket, robot_id: str):
                 "robot_id": robot_id,
                 "timestamp": datetime.now(timezone.utc).isoformat()
             })
-            
+
             # 避免過度發送
             await asyncio.sleep(0.033)  # ~30 FPS
-            
+
     except WebSocketDisconnect:
         logger.info("Media stream disconnected", extra={
             'robot_id': robot_id
@@ -709,27 +708,27 @@ async def process_audio_command(request: AudioCommandRequest):
     try:
         # 解碼 Base64 音訊資料
         audio_bytes = base64.b64decode(request.audio_data)
-        
+
         # 使用 LLM 處理器進行語音辨識
         transcription, confidence = await llm_processor.transcribe_audio(
             audio_bytes=audio_bytes,
             audio_format=request.audio_format,
             language=request.language
         )
-        
+
         # 使用 LLM 解析指令
         command = await llm_processor.parse_command(
             transcription=transcription,
             robot_id=request.robot_id
         )
-        
+
         response = AudioCommandResponse(
             trace_id=request.trace_id,
             transcription=transcription,
             command=command,
             confidence=confidence
         )
-        
+
         # 記錄事件
         await logging_monitor.log_event(
             trace_id=request.trace_id,
@@ -743,9 +742,9 @@ async def process_audio_command(request: AudioCommandRequest):
                 "command": command.dict() if command else None
             }
         )
-        
+
         return response
-        
+
     except Exception as e:
         logger.error(f"處理音訊指令失敗: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -776,16 +775,16 @@ async def invoke_llm_with_tools(
     """
     try:
         trace_id = trace_id or str(uuid.uuid4())
-        
+
         # 取得提供商
         llm_provider = llm_provider_manager.get_provider(provider)
-        
+
         if not llm_provider:
             raise HTTPException(
                 status_code=404,
                 detail=f"提供商不存在或未選擇: {provider or '未指定'}"
             )
-        
+
         # 如果未指定模型，使用第一個可用模型
         if not model:
             models = await llm_provider.list_models()
@@ -796,13 +795,13 @@ async def invoke_llm_with_tools(
                 )
             model = models[0].id
             logger.info(f"自動選擇模型: {model}")
-        
+
         # 加入機器人上下文到提示
         enhanced_prompt = f"使用者對機器人 {robot_id} 說: {prompt}"
-        
+
         # 呼叫 LLM
         logger.info(f"呼叫 LLM: provider={llm_provider.provider_name}, model={model}, use_tools={use_tools}")
-        
+
         response_text, confidence = await llm_provider.generate(
             prompt=enhanced_prompt,
             model=model,
@@ -811,7 +810,7 @@ async def invoke_llm_with_tools(
             use_tools=use_tools,
             trace_id=trace_id
         )
-        
+
         return {
             "trace_id": trace_id,
             "robot_id": robot_id,
@@ -823,7 +822,7 @@ async def invoke_llm_with_tools(
             "tools_used": use_tools,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -837,7 +836,7 @@ async def get_mcp_tools():
     """取得可用的 MCP 工具定義"""
     try:
         tools = mcp_tool_interface.get_tool_definitions()
-        
+
         return {
             "tools": tools,
             "count": len(tools),
@@ -858,7 +857,7 @@ async def list_llm_providers():
     try:
         providers = llm_provider_manager.list_providers()
         selected = llm_provider_manager.get_selected_provider_name()
-        
+
         return {
             "providers": providers,
             "selected": selected,
@@ -875,7 +874,7 @@ async def get_providers_health():
     """取得所有提供商的健康狀態"""
     try:
         health_results = await llm_provider_manager.get_all_provider_health()
-        
+
         # 將 ProviderHealth 物件轉換為字典
         health_dict = {
             name: {
@@ -887,7 +886,7 @@ async def get_providers_health():
             }
             for name, health in health_results.items()
         }
-        
+
         return {
             "providers": health_dict,
             "timestamp": datetime.now(timezone.utc).isoformat()
@@ -903,9 +902,9 @@ async def discover_llm_providers(host: str = "localhost", timeout: int = 5):
     """手動觸發提供商偵測"""
     try:
         logger.info(f"手動觸發 LLM 提供商偵測 (host={host}, timeout={timeout})")
-        
+
         health_results = await llm_provider_manager.discover_providers(host, timeout)
-        
+
         # 轉換為字典格式
         health_dict = {
             name: {
@@ -917,9 +916,9 @@ async def discover_llm_providers(host: str = "localhost", timeout: int = 5):
             }
             for name, health in health_results.items()
         }
-        
+
         available_count = len([h for h in health_results.values() if h.status.value == "available"])
-        
+
         return {
             "discovered": health_dict,
             "available_count": available_count,
@@ -937,12 +936,12 @@ async def select_llm_provider(provider_name: str):
     """選擇要使用的 LLM 提供商"""
     try:
         success = llm_provider_manager.select_provider(provider_name)
-        
+
         if not success:
             raise HTTPException(status_code=404, detail=f"提供商 '{provider_name}' 不存在")
-        
+
         logger.info(f"已切換到 LLM 提供商: {provider_name}")
-        
+
         return {
             "message": "提供商切換成功",
             "provider": provider_name
@@ -960,12 +959,12 @@ async def list_provider_models(provider_name: str):
     """列出特定提供商的可用模型"""
     try:
         provider = llm_provider_manager.get_provider(provider_name)
-        
+
         if not provider:
             raise HTTPException(status_code=404, detail=f"提供商 '{provider_name}' 不存在")
-        
+
         models = await provider.list_models()
-        
+
         # 轉換為字典格式
         models_dict = [
             {
@@ -983,7 +982,7 @@ async def list_provider_models(provider_name: str):
             }
             for model in models
         ]
-        
+
         return {
             "provider": provider_name,
             "models": models_dict,
@@ -1002,10 +1001,10 @@ async def refresh_provider_health(provider_name: str):
     """重新檢查特定提供商的健康狀態"""
     try:
         health = await llm_provider_manager.refresh_provider(provider_name)
-        
+
         if not health:
             raise HTTPException(status_code=404, detail=f"提供商 '{provider_name}' 不存在")
-        
+
         return {
             "provider": provider_name,
             "status": health.status.value,
@@ -1036,10 +1035,10 @@ async def get_connection_status():
     try:
         # 檢查網路連線
         internet_available = await llm_processor.check_internet_connection_async()
-        
+
         # 取得連線狀態摘要
         status = llm_processor.get_connection_status()
-        
+
         return {
             "internet_available": internet_available,
             "local_llm_available": status["local_llm_available"],
@@ -1067,7 +1066,7 @@ async def get_llm_warnings(clear: bool = False):
     """
     try:
         warnings = llm_processor.get_warnings(clear=clear)
-        
+
         return {
             "warnings": warnings,
             "count": len(warnings),
@@ -1084,7 +1083,7 @@ async def clear_llm_warnings():
     """清除所有 LLM 相關警告"""
     try:
         llm_processor.clear_warnings()
-        
+
         return {
             "message": "警告已清除",
             "timestamp": datetime.now(timezone.utc).isoformat()
@@ -1105,7 +1104,7 @@ async def check_internet_connection():
     """
     try:
         is_available = await llm_processor.check_internet_connection_async()
-        
+
         return {
             "internet_available": is_available,
             "timestamp": datetime.now(timezone.utc).isoformat()
@@ -1126,13 +1125,13 @@ async def list_plugins(
     """列出所有插件"""
     try:
         from .plugin_base import PluginType, PluginStatus
-        
+
         # 轉換參數
         ptype = PluginType(plugin_type) if plugin_type else None
         pstatus = PluginStatus(status) if status else None
-        
+
         plugins = plugin_manager.list_plugins(ptype, pstatus)
-        
+
         # 取得詳細資訊
         plugin_details = []
         for name in plugins:
@@ -1147,12 +1146,12 @@ async def list_plugins(
                     "enabled": plugin.config.enabled,
                     "priority": plugin.config.priority
                 })
-        
+
         return {
             "plugins": plugin_details,
             "count": len(plugin_details)
         }
-    
+
     except Exception as e:
         logger.error(f"列出插件失敗: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -1164,12 +1163,12 @@ async def get_plugins_health():
     """取得所有插件的健康狀態"""
     try:
         health_results = await plugin_manager.get_all_plugin_health()
-        
+
         return {
             "plugins": health_results,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
-    
+
     except Exception as e:
         logger.error(f"取得插件健康狀態失敗: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -1181,10 +1180,10 @@ async def get_plugin_commands(plugin_name: str):
     """取得插件支援的指令列表"""
     try:
         commands = plugin_manager.get_supported_commands(plugin_name)
-        
+
         if commands is None:
             raise HTTPException(status_code=404, detail=f"插件不存在: {plugin_name}")
-        
+
         # 取得每個指令的 schema
         command_details = []
         for cmd in commands:
@@ -1193,13 +1192,13 @@ async def get_plugin_commands(plugin_name: str):
                 "name": cmd,
                 "schema": schema
             })
-        
+
         return {
             "plugin": plugin_name,
             "commands": command_details,
             "count": len(commands)
         }
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1218,19 +1217,19 @@ async def execute_plugin_command(
     """透過插件執行指令"""
     try:
         trace_id = trace_id or str(uuid.uuid4())
-        
+
         context = {
             "trace_id": trace_id,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
-        
+
         result = await plugin_manager.execute_command(
             plugin_name=plugin_name,
             command_name=command_name,
             parameters=parameters,
             context=context
         )
-        
+
         return {
             "trace_id": trace_id,
             "plugin": plugin_name,
@@ -1238,7 +1237,7 @@ async def execute_plugin_command(
             "result": result,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
-    
+
     except Exception as e:
         logger.error(f"執行插件指令失敗: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -1250,18 +1249,18 @@ async def get_device_info(device_name: str):
     """取得裝置資訊"""
     try:
         device = plugin_manager.get_device_plugin(device_name)
-        
+
         if not device:
             raise HTTPException(status_code=404, detail=f"裝置不存在: {device_name}")
-        
+
         info = await device.get_device_info()
-        
+
         return {
             "device": device_name,
             "info": info,
             "status": device.status.value
         }
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1278,18 +1277,18 @@ async def read_device_data(
     """讀取裝置資料"""
     try:
         parameters = parameters or {}
-        
+
         data = await plugin_manager.read_device_data(
             plugin_name=device_name,
             **parameters
         )
-        
+
         return {
             "device": device_name,
             "data": data,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
-    
+
     except Exception as e:
         logger.error(f"讀取裝置資料失敗: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

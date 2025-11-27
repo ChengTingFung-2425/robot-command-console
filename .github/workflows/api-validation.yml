@@ -144,15 +144,15 @@ jobs:
       
       - name: 檢查威脅模型文件
         run: |
-          if [ ! -f "docs/threat-model.md" ]; then
-            echo "錯誤: 缺少 docs/threat-model.md"
+          if [ ! -f "docs/security/threat-model.md" ]; then
+            echo "錯誤: 缺少 docs/security/threat-model.md"
             exit 1
           fi
           echo "✓ 威脅模型文件存在"
       
       - name: 檢查安全檢查清單
         run: |
-          if [ ! -f "docs/security-checklist.md" ]; then
+          if [ ! -f "docs/security/security-checklist.md" ]; then
             echo "錯誤: 缺少 docs/security-checklist.md"
             exit 1
           fi

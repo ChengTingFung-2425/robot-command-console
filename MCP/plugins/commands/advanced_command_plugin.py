@@ -27,7 +27,7 @@ class AdvancedCommandPlugin(CommandPluginBase):
     - greet: 打招呼動作
     - complex_navigation: 複雜導航
     """
-    
+
     @property
     def metadata(self) -> PluginMetadata:
         return PluginMetadata(
@@ -60,22 +60,22 @@ class AdvancedCommandPlugin(CommandPluginBase):
                 }
             }
         )
-    
+
     def __init__(self, config: Optional[PluginConfig] = None):
         super().__init__(config)
         self.default_duration = 3000
-    
+
     async def _on_initialize(self) -> bool:
         """初始化插件"""
         self.default_duration = self.config.config.get("default_duration_ms", 3000)
         self.logger.info(f"進階指令插件初始化，預設持續時間: {self.default_duration}ms")
         return True
-    
+
     async def _on_shutdown(self) -> bool:
         """關閉插件"""
         self.logger.info("進階指令插件關閉")
         return True
-    
+
     def get_supported_commands(self) -> List[str]:
         """取得支援的指令列表"""
         return [
@@ -86,7 +86,7 @@ class AdvancedCommandPlugin(CommandPluginBase):
             "inspection",
             "presentation"
         ]
-    
+
     def get_command_schema(self, command_name: str) -> Optional[Dict[str, Any]]:
         """取得指令參數 schema"""
         schemas = {
@@ -144,7 +144,7 @@ class AdvancedCommandPlugin(CommandPluginBase):
             }
         }
         return schemas.get(command_name)
-    
+
     async def execute_command(
         self,
         command_name: str,
@@ -152,19 +152,19 @@ class AdvancedCommandPlugin(CommandPluginBase):
         context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """執行進階指令"""
-        
+
         if command_name not in self.get_supported_commands():
             return {
                 "success": False,
                 "error": f"不支援的指令: {command_name}"
             }
-        
+
         self.logger.info(f"執行進階指令: {command_name}", extra={
             "command": command_name,
             "parameters": parameters,
             "context": context
         })
-        
+
         # 根據指令類型分派
         if command_name == "patrol":
             return await self._execute_patrol(parameters, context)
@@ -178,12 +178,12 @@ class AdvancedCommandPlugin(CommandPluginBase):
             return await self._execute_inspection(parameters, context)
         elif command_name == "presentation":
             return await self._execute_presentation(parameters, context)
-        
+
         return {
             "success": False,
             "error": "未實作的指令"
         }
-    
+
     async def _execute_patrol(
         self,
         parameters: Dict[str, Any],
@@ -192,10 +192,10 @@ class AdvancedCommandPlugin(CommandPluginBase):
         """執行巡邏指令"""
         waypoints = parameters.get("waypoints", [])
         speed = parameters.get("speed", "normal")
-        
+
         # 將巡邏路徑展開為基本動作序列
         actions = []
-        
+
         for i, waypoint in enumerate(waypoints):
             # 移動到路點
             actions.append({
@@ -207,13 +207,13 @@ class AdvancedCommandPlugin(CommandPluginBase):
                     "speed": speed
                 }
             })
-            
+
             # 在路點停留並環顧
             actions.append({
                 "action_name": "turn_360",
                 "duration_ms": 4000
             })
-        
+
         return {
             "success": True,
             "command": "patrol",
@@ -221,7 +221,7 @@ class AdvancedCommandPlugin(CommandPluginBase):
             "waypoint_count": len(waypoints),
             "message": f"巡邏路徑已展開為 {len(actions)} 個動作"
         }
-    
+
     async def _execute_dance(
         self,
         parameters: Dict[str, Any],
@@ -230,7 +230,7 @@ class AdvancedCommandPlugin(CommandPluginBase):
         """執行跳舞指令"""
         style = parameters.get("style", "simple")
         duration_ms = parameters.get("duration_ms", 10000)
-        
+
         # 根據風格選擇動作序列
         if style == "simple":
             actions = [
@@ -251,7 +251,7 @@ class AdvancedCommandPlugin(CommandPluginBase):
             actions = [
                 {"action_name": "dance_two", "duration_ms": duration_ms}
             ]
-        
+
         return {
             "success": True,
             "command": "dance",
@@ -259,7 +259,7 @@ class AdvancedCommandPlugin(CommandPluginBase):
             "style": style,
             "message": f"跳舞動作已展開為 {len(actions)} 個動作"
         }
-    
+
     async def _execute_greet(
         self,
         parameters: Dict[str, Any],
@@ -268,24 +268,24 @@ class AdvancedCommandPlugin(CommandPluginBase):
         """執行打招呼指令"""
         greeting_type = parameters.get("greeting_type", "wave")
         intensity = parameters.get("intensity", "normal")
-        
+
         # 根據類型和強度調整動作
         duration_map = {
             "gentle": 2000,
             "normal": 3000,
             "enthusiastic": 4000
         }
-        
+
         duration_ms = duration_map.get(intensity, 3000)
-        
+
         actions = [
             {"action_name": greeting_type, "duration_ms": duration_ms}
         ]
-        
+
         if intensity == "enthusiastic":
             # 熱情打招呼加上額外動作
             actions.append({"action_name": "wave", "duration_ms": 2000})
-        
+
         return {
             "success": True,
             "command": "greet",
@@ -294,7 +294,7 @@ class AdvancedCommandPlugin(CommandPluginBase):
             "intensity": intensity,
             "message": f"打招呼動作已展開為 {len(actions)} 個動作"
         }
-    
+
     async def _execute_complex_navigation(
         self,
         parameters: Dict[str, Any],
@@ -312,7 +312,7 @@ class AdvancedCommandPlugin(CommandPluginBase):
             ],
             "message": "複雜導航已展開"
         }
-    
+
     async def _execute_inspection(
         self,
         parameters: Dict[str, Any],
@@ -328,7 +328,7 @@ class AdvancedCommandPlugin(CommandPluginBase):
             ],
             "message": "檢查動作已展開"
         }
-    
+
     async def _execute_presentation(
         self,
         parameters: Dict[str, Any],

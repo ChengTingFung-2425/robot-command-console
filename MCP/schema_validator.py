@@ -216,15 +216,15 @@ EVENT_LOG_SCHEMA = {
 
 class SchemaValidator:
     """Schema 驗證器"""
-    
+
     def __init__(self):
         """初始化驗證器"""
         self.command_request_validator = Draft7Validator(COMMAND_REQUEST_SCHEMA)
         self.command_response_validator = Draft7Validator(COMMAND_RESPONSE_SCHEMA)
         self.event_log_validator = Draft7Validator(EVENT_LOG_SCHEMA)
-    
+
     def validate_command_request(
-        self, 
+        self,
         data: Dict[str, Any]
     ) -> Tuple[bool, Optional[str]]:
         """
@@ -239,16 +239,16 @@ class SchemaValidator:
         try:
             # 使用 jsonschema 進行驗證
             self.command_request_validator.validate(data)
-            
+
             # 額外驗證: 確保 timestamp 格式正確
             if "timestamp" in data:
                 try:
                     datetime.fromisoformat(data["timestamp"].replace("Z", "+00:00"))
                 except (ValueError, AttributeError) as e:
                     return False, f"timestamp 格式不正確: {str(e)}"
-            
+
             return True, None
-            
+
         except ValidationError as e:
             error_msg = f"Schema 驗證失敗: {e.message} at {'.'.join(str(p) for p in e.path)}"
             logger.warning(error_msg)
@@ -257,9 +257,9 @@ class SchemaValidator:
             error_msg = f"驗證過程發生錯誤: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return False, error_msg
-    
+
     def validate_command_response(
-        self, 
+        self,
         data: Dict[str, Any]
     ) -> Tuple[bool, Optional[str]]:
         """
@@ -273,16 +273,16 @@ class SchemaValidator:
         """
         try:
             self.command_response_validator.validate(data)
-            
+
             # 額外驗證: 確保 timestamp 格式正確
             if "timestamp" in data:
                 try:
                     datetime.fromisoformat(data["timestamp"].replace("Z", "+00:00"))
                 except (ValueError, AttributeError) as e:
                     return False, f"timestamp 格式不正確: {str(e)}"
-            
+
             return True, None
-            
+
         except ValidationError as e:
             error_msg = f"Schema 驗證失敗: {e.message} at {'.'.join(str(p) for p in e.path)}"
             logger.warning(error_msg)
@@ -291,9 +291,9 @@ class SchemaValidator:
             error_msg = f"驗證過程發生錯誤: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return False, error_msg
-    
+
     def validate_event_log(
-        self, 
+        self,
         data: Dict[str, Any]
     ) -> Tuple[bool, Optional[str]]:
         """
@@ -307,16 +307,16 @@ class SchemaValidator:
         """
         try:
             self.event_log_validator.validate(data)
-            
+
             # 額外驗證: 確保 timestamp 格式正確
             if "timestamp" in data:
                 try:
                     datetime.fromisoformat(data["timestamp"].replace("Z", "+00:00"))
                 except (ValueError, AttributeError) as e:
                     return False, f"timestamp 格式不正確: {str(e)}"
-            
+
             return True, None
-            
+
         except ValidationError as e:
             error_msg = f"Schema 驗證失敗: {e.message} at {'.'.join(str(p) for p in e.path)}"
             logger.warning(error_msg)
@@ -325,10 +325,10 @@ class SchemaValidator:
             error_msg = f"驗證過程發生錯誤: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return False, error_msg
-    
+
     def validate_pydantic_model(
-        self, 
-        model_class, 
+        self,
+        model_class,
         data: Dict[str, Any]
     ) -> Tuple[bool, Optional[str], Optional[Any]]:
         """

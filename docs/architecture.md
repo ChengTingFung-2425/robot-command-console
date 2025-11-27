@@ -165,6 +165,9 @@ python3 run_service_cli.py --queue-size 1000 --workers 5
 
 # Flask 服務模式（測試用）
 APP_TOKEN=xxx PORT=5000 python3 flask_service.py
+
+# 統一啟動器（一鍵啟動所有服務）
+python3 unified_launcher_cli.py
 ```
 
 ### 3. MCP Service (`MCP/`)

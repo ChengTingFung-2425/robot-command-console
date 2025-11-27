@@ -10,11 +10,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
-
-# 工具函式：取得 UTC 時間
-def _utc_now() -> datetime:
-    """取得當前 UTC 時間"""
-    return datetime.now(timezone.utc)
+from .utils import utc_now
 
 
 class ActorType(str, Enum):
@@ -106,7 +102,7 @@ class CommandSpec(BaseModel):
 class CommandRequest(BaseModel):
     """指令請求"""
     trace_id: str = Field(default_factory=lambda: str(uuid4()))
-    timestamp: datetime = Field(default_factory=_utc_now)
+    timestamp: datetime = Field(default_factory=utc_now)
     actor: Actor
     source: Source
     command: CommandSpec
@@ -135,7 +131,7 @@ class CommandResult(BaseModel):
 class CommandResponse(BaseModel):
     """指令回應"""
     trace_id: str
-    timestamp: datetime = Field(default_factory=_utc_now)
+    timestamp: datetime = Field(default_factory=utc_now)
     command: Dict[str, Any]  # id + status
     result: Optional[CommandResult] = None
     error: Optional[ErrorDetail] = None
@@ -149,7 +145,7 @@ class CommandResponse(BaseModel):
 class StatusResponse(BaseModel):
     """狀態查詢回應"""
     trace_id: str
-    timestamp: datetime = Field(default_factory=_utc_now)
+    timestamp: datetime = Field(default_factory=utc_now)
     command: Dict[str, Any]  # id + status
     progress: Optional[Dict[str, Any]] = None
     error: Optional[ErrorDetail] = None
@@ -178,7 +174,7 @@ class RobotRegistration(BaseModel):
     status: RobotStatus = RobotStatus.ONLINE
     endpoint: str = Field(..., min_length=1)
     protocol: Protocol = Protocol.HTTP
-    last_heartbeat: datetime = Field(default_factory=_utc_now)
+    last_heartbeat: datetime = Field(default_factory=utc_now)
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
     class Config:
@@ -190,7 +186,7 @@ class RobotRegistration(BaseModel):
 class Heartbeat(BaseModel):
     """心跳訊息"""
     robot_id: str = Field(..., min_length=1)
-    timestamp: datetime = Field(default_factory=_utc_now)
+    timestamp: datetime = Field(default_factory=utc_now)
     status: RobotStatus = RobotStatus.ONLINE
     metrics: Optional[Dict[str, Any]] = None
 
@@ -222,7 +218,7 @@ class EventCategory(str, Enum):
 class Event(BaseModel):
     """事件"""
     trace_id: str
-    timestamp: datetime = Field(default_factory=_utc_now)
+    timestamp: datetime = Field(default_factory=utc_now)
     severity: EventSeverity
     category: EventCategory
     message: str
@@ -284,7 +280,7 @@ class AudioCommandRequest(BaseModel):
 class AudioCommandResponse(BaseModel):
     """音訊指令回應"""
     trace_id: str
-    timestamp: datetime = Field(default_factory=_utc_now)
+    timestamp: datetime = Field(default_factory=utc_now)
     transcription: str  # 語音轉文字結果
     command: Optional[CommandSpec] = None  # 解析出的指令
     confidence: float = Field(ge=0.0, le=1.0)  # 信心度

@@ -12,12 +12,10 @@ Local Event Bus
 import asyncio
 import fnmatch
 import logging
-import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Coroutine, Dict, List, Optional, Set
-from weakref import WeakSet
 
 from .datetime_utils import utc_now
 

@@ -16,7 +16,7 @@ import sqlite3
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -194,7 +194,6 @@ class LocalStateStore:
         now = utc_now()
         expires_at = None
         if ttl_seconds is not None:
-            from datetime import timedelta
             expires_at = now + timedelta(seconds=ttl_seconds)
 
         try:

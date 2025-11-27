@@ -67,6 +67,8 @@ Server (MCP/WebUI) → Edge (robot_service/electron-app) → Runner (Robot-Conso
 | 資料契約 | `docs/proposal.md`、`docs/contract/*.json` |
 | 架構調整 | `docs/architecture.md` |
 
+### Final step
+generate lesson-learned to the file and if create new , do refer it at suitable doc you read any time
 ---
 
 ## 資料契約摘要

@@ -5,7 +5,7 @@ MCP 指令處理器
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Dict, Optional
 from uuid import uuid4
 

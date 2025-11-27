@@ -3,7 +3,7 @@ MCP 資料模型
 定義指令、機器人、事件等核心資料結構
 """
 
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Optional
 from uuid import uuid4

@@ -1,11 +1,11 @@
 """
 MCP 機器人路由器
-負責管理機器人註冊、?心跳?、路由與負載均衡
+負責管理機器人註冊、心跳、路由與負載均衡
 """
 
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from typing import Any, Dict, List, Optional
 
 from .config import MCPConfig
@@ -16,14 +16,10 @@ from .models import (
     RobotRegistration,
     RobotStatus,
 )
+from .utils import utc_now
 
 
 logger = logging.getLogger(__name__)
-
-
-def _utc_now() -> datetime:
-    """取得當前 UTC 時間"""
-    return datetime.now(timezone.utc)
 
 
 class RobotRouter:
@@ -63,7 +59,7 @@ class RobotRouter:
                 self.robot_locks[robot_id] = asyncio.Lock()
 
             # 更新註冊資訊
-            registration.last_heartbeat = _utc_now()
+            registration.last_heartbeat = utc_now()
             registration.status = RobotStatus.ONLINE
             self.robots[robot_id] = registration
 
@@ -329,7 +325,7 @@ class RobotRouter:
             try:
                 await asyncio.sleep(60)  # 每分鐘檢查一次
 
-                threshold = _utc_now() - timedelta(
+                threshold = utc_now() - timedelta(
                     seconds=MCPConfig.ROBOT_OFFLINE_THRESHOLD_SEC
                 )
 

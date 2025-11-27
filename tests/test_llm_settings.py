@@ -8,14 +8,16 @@
 - MCP API 整合
 """
 
+# Standard library imports
 import os
 import sys
 from unittest.mock import MagicMock, patch
 
-import pytest
-
-# 添加 WebUI 目錄到路徑
+# Path manipulation (before project imports)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+# Third-party imports
+import pytest  # noqa: E402
 
 
 class TestLLMSettingsRoutes:

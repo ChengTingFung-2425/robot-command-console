@@ -558,13 +558,15 @@ def advanced_commands():
         if v and v.adv_command:
             approved[c.name] = v.adv_command.content
 
-    return render_template('advanced_commands.html.j2', 
-                         commands=commands,
-                         filter_status=filter_status,
-                         sort_by=sort_by,
-                         sort_order=sort_order,
-                         author_filter=author_filter,
-                         approved_adv_command_map=approved)
+    return render_template(
+        'advanced_commands.html.j2',
+        commands=commands,
+        filter_status=filter_status,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        author_filter=author_filter,
+        approved_adv_command_map=approved
+    )
 
 # 建立進階指令
 @bp.route('/advanced_commands/create', methods=['GET', 'POST'])
@@ -673,7 +675,7 @@ def edit_advanced_command(cmd_id):
         if bump:
             # create a new version record (adv content) and bump version number
             try:
-                ver = cmd.add_version(content=form.base_commands.data, status='pending', bump=True)
+                cmd.add_version(content=form.base_commands.data, status='pending', bump=True)
                 changes.append(f'版本已增加為 {cmd.version}')
             except Exception:
                 db.session.rollback()
@@ -736,7 +738,7 @@ def audit_advanced_command(cmd_id):
 # ===== LLM 連線狀態與警告 API =====
 
 # MCP API 基礎 URL
-import os
+import os  # noqa: E402
 MCP_API_URL = os.environ.get('MCP_API_URL', 'http://localhost:8000/api')
 
 
@@ -1005,8 +1007,8 @@ def refresh_llm_provider(provider_name):
                 'error': '無效的提供商名稱'
             }), 400
 
-        # 使用 URL 編碼確保安全
-        safe_provider_name = url_quote(provider_name, safe='')
+        # 使用 URL 編碼確保安全（允許底線和連字號，因為已經過正則驗證）
+        safe_provider_name = url_quote(provider_name, safe='_-')
         response = requests.post(
             f'{MCP_API_URL}/llm/providers/{safe_provider_name}/refresh',
             timeout=10
@@ -1043,7 +1045,7 @@ def get_cors_status():
     """取得 CORS 設定狀態"""
     return jsonify({
         'enabled': _cors_enabled,
-        'message': 'CORS 目前已' + ('啟用' if _cors_enabled else '停用')
+        'message': f'CORS 目前已{"啟用" if _cors_enabled else "停用"}'
     })
 
 

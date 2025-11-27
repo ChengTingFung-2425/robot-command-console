@@ -70,7 +70,7 @@ mode: agent
 | API 端點 | `docs/proposal.md`、`openapi.yaml` |
 | 資料契約 | `docs/proposal.md`、`docs/contract/*.json` |
 | 架構調整 | `docs/architecture.md` |
-| 開發實踐 | `docs/development/PYTHON_LINT_GUIDE.md` |
+| 经验总结 | `docs/development/*` |
 
 ### 最終步驟
 完成功能後，將经验总结和项目记忆整理至適當的文件中，並在相關文件中加入參考連結。

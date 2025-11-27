@@ -14,8 +14,9 @@ mode: agent
 | [`docs/architecture.md`](../../../docs/architecture.md) | 目錄結構、Edge/Server 隔離、模組職責 | 🟠 高 |
 | [`docs/plans/MASTER_PLAN.md`](../../../docs/plans/MASTER_PLAN.md) | Phase 0-6 規劃、技術選型 | 🟠 高 |
 | [`docs/PROJECT_MEMORY.md`](../../../docs/PROJECT_MEMORY.md) | 架構決策、共用工具 | 🟡 中 |
-| [`docs/development/PYTHON_LINT_GUIDE.md`](../../../docs/development/PYTHON_LINT_GUIDE.md) | Python 程式碼風格與 lint 修復策略 | 🟡 中 | 此目录可能包含更多经验总结
+| [`docs/development/PYTHON_LINT_GUIDE.md`](../../../docs/development/PYTHON_LINT_GUIDE.md) | Python 程式碼風格與 lint 修復策略 | 🟡 中 | 
 
+> *docs/development目录可能包含更多经验总结*
 > **規格疑義以 `docs/proposal.md` 為準。**
 
 ---

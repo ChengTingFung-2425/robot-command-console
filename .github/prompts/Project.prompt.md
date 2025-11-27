@@ -73,10 +73,11 @@ mode: agent
 | 經驗總結 | `docs/development/*` |
 
 ### 最終步驟
-**完成功能後，將經驗總結和專案記憶整理和記錄至適當的文件中，並在相關文件中加入參考連結。
-"Create a docs/PROJECT_MEMORY.md file and summarize the current task and progress within it."
-"Update docs/PROJECT_MEMORY.md with the details of the changes made in this step."
-"Refer to docs/PROJECT_MEMORY.md for context before proceeding with the real tasks."**
+**完成功能後，將經驗總結和專案記憶整理和記錄至適當的文件中，並在相關文件中加入參考連結。**
+
+- 建立 `docs/PROJECT_MEMORY.md` 檔案，並於其中總結當前任務與進度。
+- 更新 `docs/PROJECT_MEMORY.md`，記錄本步驟所做的變更細節。
+- 在進行實際任務前，先參閱 `docs/PROJECT_MEMORY.md` 以獲取背景資訊。
 
 ---
 

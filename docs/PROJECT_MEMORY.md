@@ -220,6 +220,17 @@ data = model.model_dump()
 當文檔結構變更時（如 `docs/MIGRATION_GUIDE_PHASE2.md` → `docs/phase2/MIGRATION_GUIDE_PHASE2.md`），需同步更新測試文件中的路徑驗證。
 
 ---
+>**Before Anything begin, You should:**
+Refer to docs/PROJECT_MEMORY.md for past memory before proceeding with the real tasks.
+>**After a Step finish, You need to:**
+Update docs/PROJECT_MEMORY.md with the beilf of the changes made, and your lesson learned in this step.
+>**After All step finish, you must:**
+Condense this memory about changes, and keep lesson learn as-is,
+完成功能後，將經驗總結和專案記憶整理和記錄至適當的文件中，並在相關文件中加入參考連結。
+Create a file at docs/development and summarize the current task and progress within it.
+
+
+---
 
 **最後更新**：2025-11-27  
 **版本**：Phase 3.1.2 完成

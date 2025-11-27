@@ -8,8 +8,11 @@
 # 安裝 lint 工具
 pip install flake8 autopep8
 
-# 檢查程式碼
-flake8 src/ MCP/ --max-line-length=120 --ignore=E501,W503
+# 檢查所有 E 和 F 級別問題（必須修復）
+flake8 src/ MCP/ --max-line-length=120 --select=E,F
+
+# 檢查所有問題
+flake8 src/ MCP/ --max-line-length=120
 
 # 自動修復格式問題
 autopep8 --in-place --select=W291,W293 --recursive src/ MCP/
@@ -26,15 +29,18 @@ autopep8 --in-place --select=W291,W293 --recursive src/ MCP/
 | `F821` | 使用未定義的名稱 | 加入正確的 import |
 | `F841` | 變數賦值但未使用 | 移除或使用 `_` 前綴 |
 | `E722` | 使用裸 except | 改用 `except Exception:` |
+| `E501` | 行太長 | 拆分為多行 |
 
-### 中等問題（建議修復）
+### 中等問題（必須修復）
 
 | 代碼 | 說明 | 修復方式 |
 |------|------|----------|
-| `E128` | 續行縮排不正確 | 調整縮排對齊 |
-| `E402` | import 不在檔案頂部 | 重新組織 import 順序 |
+| `E127` | 續行過度縮排 | 調整縮排對齊開括號 |
+| `E128` | 續行縮排不足 | 調整縮排對齊開括號 |
+| `E261` | 行內註解前缺少兩個空格 | 加入兩個空格 |
 | `E305` | 類別/函式後缺少空行 | 加入兩個空行 |
 | `E226` | 運算子周圍缺少空格 | 加入空格 |
+| `E402` | import 不在檔案頂部 | 重新組織或加 `# noqa: E402` |
 
 ### 輕微問題（可自動修復）
 
@@ -42,6 +48,7 @@ autopep8 --in-place --select=W291,W293 --recursive src/ MCP/
 |------|------|----------|
 | `W291` | 行尾空白 | `autopep8 --select=W291` |
 | `W293` | 空白行包含空格 | `autopep8 --select=W293` |
+| `W503` | 二元運算子前換行 | 可忽略（與 W504 互斥） |
 | `W504` | 二元運算子後換行 | 調整換行位置 |
 
 ## 修復策略選項
@@ -106,9 +113,9 @@ autopep8 --in-place --select=W291,W293 --recursive src/ MCP/
 
 **適用場景：** 大多數 PR
 
-## 實際案例
+## 實際案例（Lessons Learned）
 
-### 案例 1: 未使用的 import
+### 案例 1: 未使用的 import (F401)
 
 ```python
 # 錯誤
@@ -118,7 +125,7 @@ from typing import Any, Dict, List, Optional  # List 未使用
 from typing import Any, Dict, Optional
 ```
 
-### 案例 2: 裸 except
+### 案例 2: 裸 except (E722)
 
 ```python
 # 錯誤
@@ -135,7 +142,7 @@ except Exception:
     pass
 ```
 
-### 案例 3: f-string 缺少變數
+### 案例 3: f-string 缺少變數 (F541)
 
 ```python
 # 錯誤
@@ -147,7 +154,7 @@ logger.info("初始化完成")
 logger.info(f"初始化完成: {component_name}")
 ```
 
-### 案例 4: 變數賦值但未使用
+### 案例 4: 變數賦值但未使用 (F841)
 
 ```python
 # 錯誤
@@ -172,18 +179,96 @@ def update_status(status: dict):
     return {**status, "updated_at": now()}
 ```
 
+### 案例 6: 行太長 (E501)
+
+```python
+# 錯誤 - 超過 120 字元
+if request.url.path in public_paths or request.url.path.startswith('/docs') or request.url.path.startswith('/openapi'):
+
+# 正確 - 拆分多行
+if (request.url.path in public_paths or
+        request.url.path.startswith('/docs') or
+        request.url.path.startswith('/openapi')):
+```
+
+### 案例 7: 續行縮排 (E127/E128)
+
+```python
+# 錯誤 - 縮排不對齊
+logger.info(f"Configuration: queue_size={args.queue_size}, "
+           f"workers={args.workers}")  # 縮排不足
+
+# 正確 - 對齊開括號
+logger.info(f"Configuration: queue_size={args.queue_size}, "
+            f"workers={args.workers}")
+```
+
+### 案例 8: 運算子周圍空格 (E226)
+
+```python
+# 錯誤
+response_text += f"{i+1}. {result.get('message')}\n"
+
+# 正確
+response_text += f"{i + 1}. {result.get('message')}\n"
+```
+
+### 案例 9: import 不在檔案頂部 (E402)
+
+當 import 必須在 `sys.path` 修改後才能執行時，使用 `# noqa: E402`：
+
+```python
+import sys
+import os
+
+# 修改路徑
+sys.path.insert(0, os.path.dirname(__file__))
+
+# 這些 import 必須在路徑修改後
+from mymodule import MyClass  # noqa: E402
+```
+
+### 案例 10: 長 import 語句
+
+```python
+# 錯誤 - 超過 120 字元
+from common.datetime_utils import utc_now, utc_now_iso, parse_iso_datetime, format_timestamp, seconds_since  # noqa: E402
+
+# 正確 - 使用多行 import
+from common.datetime_utils import (  # noqa: E402
+    utc_now, utc_now_iso, parse_iso_datetime, format_timestamp, seconds_since
+)
+```
+
+### 案例 11: 類別定義後缺少空行 (E305)
+
+```python
+# 錯誤
+class MyFormatter:
+    def format(self):
+        pass
+# 配置區塊  <-- 只有一個空行
+config = {}
+
+# 正確
+class MyFormatter:
+    def format(self):
+        pass
+
+
+# 配置區塊  <-- 兩個空行
+config = {}
+```
+
 ## 專案特定配置
 
-建議在專案根目錄建立 `.flake8` 或 `setup.cfg`：
+建議在專案根目錄建立 `.flake8`：
 
 ```ini
 [flake8]
 max-line-length = 120
-ignore = E501, W503
 exclude = .git, __pycache__, .venv, build, dist
-per-file-ignores =
-    __init__.py: F401
-    */utils/__init__.py: E402
+# 不建議 ignore，應該修復所有問題
 ```
 
 ## 相關資源
@@ -194,4 +279,5 @@ per-file-ignores =
 
 ## 版本歷史
 
-- **2025-11-27** - 初始版本，基於 PR #122 經驗總結
+- **2025-11-27 v1.1** - 新增 E501, E127, E226, E402 案例，更新為不忽略任何 E 級別問題
+- **2025-11-27 v1.0** - 初始版本，基於 PR #122 經驗總結

@@ -10,10 +10,10 @@ import sys
 # 設定 Python 路徑
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import uvicorn
+import uvicorn  # noqa: E402
 
-from MCP.api import app
-from MCP.config import MCPConfig
+from MCP.api import app  # noqa: E402
+from MCP.config import MCPConfig  # noqa: E402
 
 
 def main():

@@ -113,7 +113,7 @@ class LoggingMonitor:
         })
 
     async def log_event(self, trace_id: str, severity: str, category: str,
-                       message: str, context: Optional[Dict[str, Any]] = None):
+                        message: str, context: Optional[Dict[str, Any]] = None):
         """記錄事件的便利方法"""
         event = Event(
             trace_id=trace_id,

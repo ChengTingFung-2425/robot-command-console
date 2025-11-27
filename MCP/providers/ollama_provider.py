@@ -359,9 +359,9 @@ class OllamaProvider(LLMProviderBase):
                         response_text = "已執行以下操作：\n"
                         for i, result in enumerate(results):
                             if result.get("success"):
-                                response_text += f"{i+1}. {result.get('message', '操作完成')}\n"
+                                response_text += f"{i + 1}. {result.get('message', '操作完成')}\n"
                             else:
-                                response_text += f"{i+1}. 錯誤: {result.get('error', '未知錯誤')}\n"
+                                response_text += f"{i + 1}. 錯誤: {result.get('error', '未知錯誤')}\n"
 
                         return response_text, 0.9
                     else:

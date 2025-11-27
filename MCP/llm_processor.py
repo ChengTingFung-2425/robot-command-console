@@ -28,9 +28,9 @@ class LLMProcessor:
     DEFAULT_DURATION_MS = 3000  # 預設持續時間（毫秒）
     DEFAULT_CONFIDENCE = 0.95   # 預設信心度
     INTERNET_CHECK_HOSTS = [
-        ("8.8.8.8", 53),       # Google DNS
-        ("1.1.1.1", 53),       # Cloudflare DNS
-        ("208.67.222.222", 53) # OpenDNS
+        ("8.8.8.8", 53),        # Google DNS
+        ("1.1.1.1", 53),        # Cloudflare DNS
+        ("208.67.222.222", 53)  # OpenDNS
     ]
     INTERNET_CHECK_TIMEOUT = 3  # 網路檢查逾時（秒）
 
@@ -153,7 +153,10 @@ class LLMProcessor:
             "internet_available": self._internet_available,
             "local_llm_available": local_available,
             "local_llm_provider": local_provider.provider_name if local_provider else None,
-            "using_fallback": not self._internet_available and local_available if self._internet_available is not None else None,
+            "using_fallback": (
+                not self._internet_available and local_available
+                if self._internet_available is not None else None
+            ),
             "warnings_count": len(self._warnings)
         }
 

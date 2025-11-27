@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
+from fastapi import APIRouter, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
@@ -22,7 +22,9 @@ from .command_handler import CommandHandler
 from .config import MCPConfig
 from .context_manager import ContextManager
 from .llm_processor import LLMProcessor
+from .llm_provider_manager import LLMProviderManager
 from .logging_monitor import LoggingMonitor
+from .mcp_tool_interface import MCPToolInterface
 from .models import (
     AudioCommandRequest,
     AudioCommandResponse,
@@ -33,6 +35,10 @@ from .models import (
     RobotRegistration,
     RobotStatus,
 )
+from .plugin_base import PluginConfig
+from .plugin_manager import PluginManager
+from .plugins.commands import AdvancedCommandPlugin, WebUICommandPlugin
+from .plugins.devices import CameraPlugin, SensorPlugin
 from .robot_router import RobotRouter
 
 
@@ -45,6 +51,7 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
         log_record['level'] = record.levelname
         log_record['event'] = record.name
         log_record['service'] = 'mcp-api'
+
 
 # 配置日誌處理器
 log_handler = logging.StreamHandler(sys.stdout)
@@ -103,7 +110,6 @@ app = FastAPI(
 )
 
 # 建立 v1 API router
-from fastapi import APIRouter
 v1_router = APIRouter(prefix="/v1")
 
 
@@ -128,7 +134,9 @@ async def auth_middleware(request: Request, call_next):
     public_paths = ['/health', '/metrics', '/v1/auth/login', '/api/auth/login']
 
     # 檢查是否是公開端點
-    if request.url.path in public_paths or request.url.path.startswith('/docs') or request.url.path.startswith('/openapi'):
+    if (request.url.path in public_paths or
+            request.url.path.startswith('/docs') or
+            request.url.path.startswith('/openapi')):
         return await call_next(request)
 
     # 檢查 Authorization header
@@ -251,20 +259,13 @@ command_handler = CommandHandler(
 )
 
 # 初始化 MCP 工具介面
-from .mcp_tool_interface import MCPToolInterface
 mcp_tool_interface = MCPToolInterface(command_handler=command_handler)
 
 # 初始化 LLM 提供商管理器和處理器（注入 MCP 工具介面）
-from .llm_provider_manager import LLMProviderManager
 llm_provider_manager = LLMProviderManager(mcp_tool_interface=mcp_tool_interface)
 llm_processor = LLMProcessor(provider_manager=llm_provider_manager)
 
 # 初始化插件管理器
-from .plugin_manager import PluginManager
-from .plugin_base import PluginConfig
-from .plugins.commands import AdvancedCommandPlugin, WebUICommandPlugin
-from .plugins.devices import CameraPlugin, SensorPlugin
-
 plugin_manager = PluginManager()
 
 # 註冊插件

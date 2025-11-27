@@ -8,6 +8,7 @@
 |------|------|
 | [MASTER_PLAN.md](plans/MASTER_PLAN.md) | WebUI → Native App 轉換的完整計畫（合併版） |
 | [PHASE3_EDGE_ALL_IN_ONE.md](plans/PHASE3_EDGE_ALL_IN_ONE.md) | Phase 3 ALL-in-One Edge App 詳細規劃 |
+| [phase3/PHASE3_1_STATUS_REPORT.md](phase3/PHASE3_1_STATUS_REPORT.md) | Phase 3.1 分析與優化狀態報告 |
 | [phase2/PHASE2_COMPLETION_SUMMARY.md](phase2/PHASE2_COMPLETION_SUMMARY.md) | Phase 2 完成摘要與成果記錄 |
 | [architecture.md](architecture.md) | 系統架構與目錄結構說明 |
 | [proposal.md](proposal.md) | 專案提案（含 Phase 進度） |
@@ -142,7 +143,7 @@ Phase 3 建立在 Phase 2 完成的基礎上：
 
 ### 子階段規劃
 
-- [ ] **Phase 3.1**：基礎整合（統一啟動器、服務協調、LLM 選擇 UI）
+- [x] **Phase 3.1**：分析與優化（代碼去重、datetime 修復、測試更新）
 - [ ] **Phase 3.2**：功能完善（WebUI 本地版、監控、CLI/TUI）
 - [ ] **Phase 3.3**：雲端整合（同步、共享指令、授權）
 - [ ] **Phase 3.4**：打包與發佈（AppImage、DMG、NSIS、Docker）
@@ -162,5 +163,5 @@ Phase 3 建立在 Phase 2 完成的基礎上：
 
 ---
 
-**最後更新**：2025-11-26  
-**版本**：Phase 2（Phase 3 規劃中）
+**最後更新**：2025-11-27  
+**版本**：Phase 3.1 完成

@@ -577,7 +577,7 @@ def setup_signal_handlers(launcher: UnifiedLauncher, shutdown_event: asyncio.Eve
     """
     設定信號處理器
 
-    Args:
+    參數:
         launcher: 統一啟動器實例
         shutdown_event: 關閉事件物件，用於通知主迴圈停止
     """
@@ -595,10 +595,10 @@ async def main_async(args) -> int:
     """
     非同步主函式
 
-    Args:
+    參數:
         args: argparse 解析後的命令列參數
 
-    Returns:
+    回傳:
         int: 退出碼（0 表示成功，1 表示失敗）
     """
     # 設定日誌

@@ -63,16 +63,16 @@ class CommandHandler:
             # 確保 timestamp 為 ISO8601 格式字串，並驗證格式
             ts = request.timestamp
             if isinstance(ts, datetime):
-                request_dict["timestamp"] = ts.isoformat() + "Z"
+                request_dict["timestamp"] = ts.isoformat()
             elif isinstance(ts, str):
                 try:
                     # 支援 "Z" 結尾的 ISO8601
                     datetime.fromisoformat(ts.replace("Z", "+00:00"))
                     request_dict["timestamp"] = ts
                 except (ValueError, TypeError):
-                    request_dict["timestamp"] = _utc_now().isoformat() + "Z"
+                    request_dict["timestamp"] = _utc_now().isoformat()
             else:
-                request_dict["timestamp"] = _utc_now().isoformat() + "Z"
+                request_dict["timestamp"] = _utc_now().isoformat()
 
             is_valid, error_msg = validator.validate_command_request(request_dict)
             if not is_valid:

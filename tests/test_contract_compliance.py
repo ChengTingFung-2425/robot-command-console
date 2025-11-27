@@ -43,7 +43,7 @@ class TestSchemaValidation(unittest.TestCase):
         """測試有效的 CommandRequest"""
         data = {
             "trace_id": str(uuid4()),
-            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "actor": {
                 "type": "human",
                 "id": "user-123",
@@ -79,7 +79,7 @@ class TestSchemaValidation(unittest.TestCase):
         """測試缺少必要欄位的 CommandRequest"""
         # 缺少 trace_id
         data = {
-            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "actor": {
                 "type": "human",
                 "id": "user-123"
@@ -103,7 +103,7 @@ class TestSchemaValidation(unittest.TestCase):
         """測試無效的 actor type"""
         data = {
             "trace_id": str(uuid4()),
-            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "actor": {
                 "type": "invalid_type",  # 無效類型
                 "id": "user-123"
@@ -126,7 +126,7 @@ class TestSchemaValidation(unittest.TestCase):
         """測試超時時間超出範圍"""
         data = {
             "trace_id": str(uuid4()),
-            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "actor": {
                 "type": "system",
                 "id": "system"
@@ -150,7 +150,7 @@ class TestSchemaValidation(unittest.TestCase):
         """測試有效的成功 CommandResponse"""
         data = {
             "trace_id": str(uuid4()),
-            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "command": {
                 "id": "cmd-123",
                 "status": "succeeded"
@@ -172,7 +172,7 @@ class TestSchemaValidation(unittest.TestCase):
         """測試有效的錯誤 CommandResponse"""
         data = {
             "trace_id": str(uuid4()),
-            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "command": {
                 "id": "cmd-123",
                 "status": "failed"
@@ -195,7 +195,7 @@ class TestSchemaValidation(unittest.TestCase):
         """測試無效的錯誤代碼"""
         data = {
             "trace_id": str(uuid4()),
-            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "command": {
                 "id": "cmd-123",
                 "status": "failed"
@@ -215,7 +215,7 @@ class TestSchemaValidation(unittest.TestCase):
         """測試有效的 EventLog"""
         data = {
             "trace_id": str(uuid4()),
-            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "severity": "INFO",
             "category": "command",
             "message": "指令已接受",
@@ -233,7 +233,7 @@ class TestSchemaValidation(unittest.TestCase):
         """測試缺少訊息的 EventLog"""
         data = {
             "trace_id": str(uuid4()),
-            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "severity": "ERROR",
             "category": "audit",
             # 缺少 message
@@ -328,7 +328,7 @@ class TestContractPropagation(unittest.TestCase):
 
         # 驗證事件符合 schema
         event_dict = event.dict()
-        event_dict["timestamp"] = event.timestamp.isoformat() + "Z"
+        event_dict["timestamp"] = event.timestamp.isoformat()
         event_dict["severity"] = event.severity.value
         event_dict["category"] = event.category.value
 
@@ -358,7 +358,7 @@ class TestErrorContractCompliance(unittest.TestCase):
 
         # 驗證回應符合 schema
         response_dict = response.dict()
-        response_dict["timestamp"] = response.timestamp.isoformat() + "Z"
+        response_dict["timestamp"] = response.timestamp.isoformat()
 
         is_valid, error = validator.validate_command_response(response_dict)
         self.assertTrue(is_valid, f"Response 應該符合 schema，但得到錯誤: {error}")
@@ -382,7 +382,7 @@ class TestErrorContractCompliance(unittest.TestCase):
 
         # 驗證回應符合 schema
         response_dict = response.dict()
-        response_dict["timestamp"] = response.timestamp.isoformat() + "Z"
+        response_dict["timestamp"] = response.timestamp.isoformat()
 
         is_valid, error = validator.validate_command_response(response_dict)
         self.assertTrue(is_valid, f"Response 應該符合 schema，但得到錯誤: {error}")
@@ -406,7 +406,7 @@ class TestErrorContractCompliance(unittest.TestCase):
 
         # 驗證回應符合 schema
         response_dict = response.dict()
-        response_dict["timestamp"] = response.timestamp.isoformat() + "Z"
+        response_dict["timestamp"] = response.timestamp.isoformat()
 
         is_valid, error = validator.validate_command_response(response_dict)
         self.assertTrue(is_valid, f"Response 應該符合 schema，但得到錯誤: {error}")

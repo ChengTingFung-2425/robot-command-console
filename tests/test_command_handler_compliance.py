@@ -95,7 +95,7 @@ class TestCommandHandlerCompliance(unittest.TestCase):
 
         request = CommandRequest(
             trace_id=trace_id,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             actor=Actor(type=ActorType.HUMAN, id="test-user"),
             source=Source.WEBUI,
             command=CommandSpec(
@@ -139,7 +139,7 @@ class TestCommandHandlerCompliance(unittest.TestCase):
         # 首先創建一個有效的請求，然後修改其 dict 來繞過 Pydantic 驗證
         request = CommandRequest(
             trace_id=trace_id,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             actor=Actor(type=ActorType.HUMAN, id="test-user"),
             source=Source.API,
             command=CommandSpec(
@@ -175,7 +175,7 @@ class TestCommandHandlerCompliance(unittest.TestCase):
 
         request = CommandRequest(
             trace_id=trace_id,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             actor=Actor(type=ActorType.HUMAN, id="test-user"),
             source=Source.CLI,
             command=CommandSpec(
@@ -215,7 +215,7 @@ class TestCommandHandlerCompliance(unittest.TestCase):
 
         request = CommandRequest(
             trace_id=trace_id,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             actor=Actor(type=ActorType.HUMAN, id="test-user"),
             source=Source.API,
             command=CommandSpec(
@@ -270,7 +270,7 @@ class TestCommandHandlerCompliance(unittest.TestCase):
 
         request = CommandRequest(
             trace_id=trace_id,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             actor=Actor(type=ActorType.HUMAN, id="viewer-user"),
             source=Source.WEBUI,
             command=CommandSpec(
@@ -314,7 +314,7 @@ class TestCommandHandlerCompliance(unittest.TestCase):
 
         request = CommandRequest(
             trace_id=trace_id,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             actor=Actor(type=ActorType.AI, id="ai-agent-1"),
             source=Source.API,
             command=CommandSpec(
@@ -349,7 +349,7 @@ class TestCommandHandlerCompliance(unittest.TestCase):
         # 使用已存在的 test-user（而非 system）
         request = CommandRequest(
             trace_id=trace_id,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             actor=Actor(type=ActorType.HUMAN, id="test-user"),
             source=Source.SCHEDULER,
             command=CommandSpec(
@@ -386,7 +386,7 @@ class TestCommandHandlerCompliance(unittest.TestCase):
         # 創建無效請求（沒有 token）
         request = CommandRequest(
             trace_id=trace_id,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             actor=Actor(type=ActorType.HUMAN, id="test-user"),
             source=Source.WEBUI,
             command=CommandSpec(
@@ -418,7 +418,7 @@ class TestCommandHandlerCompliance(unittest.TestCase):
         # 驗證符合 schema
         from MCP.schema_validator import validator
         response_dict = response.dict()
-        response_dict["timestamp"] = response.timestamp.isoformat() + "Z"
+        response_dict["timestamp"] = response.timestamp.isoformat()
 
         is_valid, error = validator.validate_command_response(response_dict)
         self.assertTrue(is_valid, f"Response 應該符合 schema，但得到錯誤: {error}")

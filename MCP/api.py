@@ -5,7 +5,6 @@ MCP FastAPI 服務
 
 import asyncio
 import base64
-import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional

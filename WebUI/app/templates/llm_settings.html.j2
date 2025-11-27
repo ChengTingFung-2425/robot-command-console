@@ -599,20 +599,20 @@
         document.getElementById('selected-provider-response-time').textContent = 
             health.response_time_ms ? health.response_time_ms.toFixed(1) + ' ms' : '-';
 
-        // 載入模型列表並更新選擇器
-        loadProviderModels(currentSelectedProvider);
-        
-        // 載入用戶偏好設定
-        loadUserPreferences();
+        // 載入模型列表並更新選擇器，完成後再載入用戶偏好設定
+        loadProviderModels(currentSelectedProvider)
+            .then(function() {
+                loadUserPreferences();
+            });
     }
 
     // 保存的偏好設定
     var savedProviderPreference = null;
     var savedModelPreference = null;
 
-    // 載入用戶偏好設定（在載入模型列表之前載入）
+    // 載入用戶偏好設定（在載入模型列表完成後載入）
     function loadUserPreferences() {
-        fetch('/api/llm/preferences')
+        return fetch('/api/llm/preferences')
             .then(function(response) { return response.json(); })
             .then(function(data) {
                 savedProviderPreference = data.provider;
@@ -668,7 +668,7 @@
         modelSelect.innerHTML = '<option value="">-- 載入中 --</option>';
         modelSelect.disabled = true;
 
-        fetch('/api/llm/providers/' + encodeURIComponent(providerName) + '/models')
+        return fetch('/api/llm/providers/' + encodeURIComponent(providerName) + '/models')
             .then(function(response) { return response.json(); })
             .then(function(data) {
                 modelSelect.innerHTML = '';

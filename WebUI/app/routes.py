@@ -959,6 +959,7 @@ def select_llm_provider():
                     db.session.commit()
                     result['preference_saved'] = True
                 except Exception as e:
+                    db.session.rollback()
                     logging.warning(f'保存 LLM 偏好設定失敗: {str(e)}')
                     result['preference_saved'] = False
 
@@ -995,6 +996,7 @@ def get_llm_preferences():
     except Exception as e:
         logging.error(f'取得 LLM 偏好設定失敗: {str(e)}', exc_info=True)
         return jsonify({
+            'success': False,
             'provider': None,
             'model': None,
             'error': '取得偏好設定失敗'
@@ -1008,11 +1010,25 @@ def save_llm_preferences():
     try:
         data = request.get_json(silent=True) or {}
 
-        # 如果鍵存在於請求中（即使值是 None），則更新
+        # 驗證並更新 provider
         if 'provider' in data:
-            current_user.llm_provider = data.get('provider')
+            provider = data.get('provider')
+            if provider is not None and not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9_-]*$', provider):
+                return jsonify({
+                    'success': False,
+                    'error': '無效的提供商名稱'
+                }), 400
+            current_user.llm_provider = provider
+
+        # 驗證並更新 model
         if 'model' in data:
-            current_user.llm_model = data.get('model')
+            model = data.get('model')
+            if model is not None and len(model) > 128:
+                return jsonify({
+                    'success': False,
+                    'error': '模型名稱過長'
+                }), 400
+            current_user.llm_model = model
 
         db.session.commit()
 
@@ -1103,8 +1119,8 @@ def discover_llm_providers():
 def refresh_llm_provider(provider_name):
     """重新檢查特定 LLM 提供商的健康狀態"""
     try:
-        # 驗證 provider_name 僅包含允許的字元（字母、數字、底線、連字號）
-        if not re.match(r'^[a-zA-Z0-9_-]+$', provider_name):
+        # 驗證 provider_name 僅包含允許的字元（不允許以連字號開頭）
+        if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9_-]*$', provider_name):
             return jsonify({
                 'success': False,
                 'error': '無效的提供商名稱'

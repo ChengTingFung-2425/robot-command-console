@@ -489,6 +489,46 @@ class TestLLMPreferences:
         data = response.get_json()
         assert 'error' in data
 
+    @patch('WebUI.app.routes.requests.get')
+    def test_get_provider_models_connection_error(self, mock_get, client):
+        """測試 MCP 連線失敗時的處理"""
+        from WebUI.app.routes import requests as routes_requests
+        mock_get.side_effect = routes_requests.exceptions.ConnectionError()
+
+        response = client.get('/api/llm/providers/ollama/models')
+        assert response.status_code == 503
+
+        data = response.get_json()
+        assert data['mcp_available'] is False
+        assert 'error' in data
+
+    def test_save_preferences_invalid_provider(self, authenticated_client):
+        """測試保存無效的提供商名稱被拒絕"""
+        response = authenticated_client.post(
+            '/api/llm/preferences',
+            json={'provider': '-invalid-provider'},
+            content_type='application/json'
+        )
+        assert response.status_code == 400
+
+        data = response.get_json()
+        assert data['success'] is False
+        assert 'error' in data
+
+    def test_save_preferences_model_too_long(self, authenticated_client):
+        """測試模型名稱過長被拒絕"""
+        long_model_name = 'a' * 129  # 超過 128 字元限制
+        response = authenticated_client.post(
+            '/api/llm/preferences',
+            json={'model': long_model_name},
+            content_type='application/json'
+        )
+        assert response.status_code == 400
+
+        data = response.get_json()
+        assert data['success'] is False
+        assert 'error' in data
+
 
 class TestUserModelWithLLMPreferences:
     """測試 User 模型的 LLM 偏好欄位"""

@@ -128,9 +128,9 @@ POST /api/llm/providers/select
 Content-Type: application/json
 
 {
-  "provider_name": "ollama",
-  "model_name": "llama2:latest",
-  "save_preference": true
+  "provider_name": "ollama",           // 必填，提供商名稱
+  "model_name": "llama2:latest",       // 選填，指定要使用的模型
+  "save_preference": true              // 選填，預設為 true，是否保存為用戶偏好
 }
 ```
 

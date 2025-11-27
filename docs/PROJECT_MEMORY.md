@@ -291,15 +291,17 @@ token = os.environ.get("APP_TOKEN") or secrets.token_hex(32)
 **原因**：硬編碼的預設 token 在生產環境中是安全風險。使用 `secrets.token_hex()` 生成加密安全的隨機 token。
 
 ---
->**Before Anything begin, You should:**
-Refer to docs/PROJECT_MEMORY.md for past memory before proceeding with the real tasks.
->**After a Step finish, You need to:**
-Update docs/PROJECT_MEMORY.md with the brief of the changes made, and your lesson learned in this step.
->**After All step finish, you must:**
-Condense this memory about changes, and keep lesson learn as-is,
-完成功能後，將經驗總結和專案記憶整理和記錄至適當的文件中，並在相關文件中加入參考連結。
-Create a file at docs/development and summarize the current task and progress within it.
 
+### 開發流程指引
+
+**任務開始前**：參閱 `docs/PROJECT_MEMORY.md` 獲取背景資訊與過去經驗。
+
+**每個步驟完成後**：更新 `docs/PROJECT_MEMORY.md`，記錄變更細節與經驗教訓。
+
+**全部完成後**：
+- 濃縮專案記憶，保留經驗教訓原樣
+- 在 `docs/development/` 建立專題開發指南
+- 在相關文件中加入參考連結
 
 ---
 

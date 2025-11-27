@@ -154,6 +154,7 @@ class ProcessService(ServiceBase):
                 "error": str(e),
                 "service": "unified_launcher"
             }, exc_info=True)
+            await self.stop()
             return False
 
     async def _wait_for_startup(self) -> bool:
@@ -438,12 +439,12 @@ class UnifiedLauncher:
             "service": "unified_launcher"
         })
 
-    async def start_all(self) -> Dict[str, bool]:
+    async def start_all(self) -> Dict[str, Dict[str, Any]]:
         """
         一鍵啟動所有服務
 
-        Returns:
-            服務名稱 -> 是否成功啟動
+        回傳:
+            服務狀態字典，包含每個服務的詳細狀態資訊
         """
         logger.info("Starting all services (一鍵啟動)", extra={
             "service": "unified_launcher"
@@ -476,15 +477,15 @@ class UnifiedLauncher:
             }, exc_info=True)
             raise
 
-    async def stop_all(self, timeout: Optional[float] = None) -> Dict[str, bool]:
+    async def stop_all(self, timeout: Optional[float] = None) -> Dict[str, Dict[str, Any]]:
         """
         一鍵停止所有服務
 
-        Args:
+        參數:
             timeout: 停止超時（秒）
 
-        Returns:
-            服務名稱 -> 是否成功停止
+        回傳:
+            服務狀態字典，包含每個服務的詳細狀態資訊
         """
         logger.info("Stopping all services (一鍵停止)", extra={
             "service": "unified_launcher"
@@ -573,12 +574,11 @@ class UnifiedLauncher:
         return self._running
 
 
-def setup_signal_handlers(launcher: UnifiedLauncher, shutdown_event: asyncio.Event) -> None:
+def setup_signal_handlers(shutdown_event: asyncio.Event) -> None:
     """
     設定信號處理器
 
     參數:
-        launcher: 統一啟動器實例
         shutdown_event: 關閉事件物件，用於通知主迴圈停止
     """
     def signal_handler(signum, _frame):
@@ -588,7 +588,9 @@ def setup_signal_handlers(launcher: UnifiedLauncher, shutdown_event: asyncio.Eve
         shutdown_event.set()
 
     signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    # SIGTERM 在 Windows 上不可用
+    if hasattr(signal, 'SIGTERM'):
+        signal.signal(signal.SIGTERM, signal_handler)
 
 
 async def main_async(args) -> int:
@@ -619,7 +621,7 @@ async def main_async(args) -> int:
 
     # 設定信號處理
     shutdown_event = asyncio.Event()
-    setup_signal_handlers(launcher, shutdown_event)
+    setup_signal_handlers(shutdown_event)
 
     try:
         # 啟動所有服務

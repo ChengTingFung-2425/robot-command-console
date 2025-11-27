@@ -149,7 +149,7 @@ jobs:
           required_docs=(
             "docs/security/threat-model.md"
             "docs/security/security-checklist.md"
-            "docs/features/observability.md"
+            "docs/features/observability-guide.md"
             "docs/architecture.md"
             "docs/proposal.md"
             "openapi.yaml"

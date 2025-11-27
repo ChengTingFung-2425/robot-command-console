@@ -1,5 +1,8 @@
 
 # imports
+import re
+from urllib.parse import quote as url_quote
+
 from flask import Blueprint, jsonify, request, render_template, redirect, url_for, flash, session, abort
 from flask_login import current_user, login_user, logout_user, login_required
 from WebUI.app import db
@@ -555,13 +558,15 @@ def advanced_commands():
         if v and v.adv_command:
             approved[c.name] = v.adv_command.content
 
-    return render_template('advanced_commands.html.j2', 
-                         commands=commands,
-                         filter_status=filter_status,
-                         sort_by=sort_by,
-                         sort_order=sort_order,
-                         author_filter=author_filter,
-                         approved_adv_command_map=approved)
+    return render_template(
+        'advanced_commands.html.j2',
+        commands=commands,
+        filter_status=filter_status,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        author_filter=author_filter,
+        approved_adv_command_map=approved
+    )
 
 # 建立進階指令
 @bp.route('/advanced_commands/create', methods=['GET', 'POST'])
@@ -670,7 +675,7 @@ def edit_advanced_command(cmd_id):
         if bump:
             # create a new version record (adv content) and bump version number
             try:
-                ver = cmd.add_version(content=form.base_commands.data, status='pending', bump=True)
+                cmd.add_version(content=form.base_commands.data, status='pending', bump=True)
                 changes.append(f'版本已增加為 {cmd.version}')
             except Exception:
                 db.session.rollback()
@@ -733,7 +738,7 @@ def audit_advanced_command(cmd_id):
 # ===== LLM 連線狀態與警告 API =====
 
 # MCP API 基礎 URL
-import os
+import os  # noqa: E402
 MCP_API_URL = os.environ.get('MCP_API_URL', 'http://localhost:8000/api')
 
 
@@ -859,6 +864,15 @@ def check_internet():
         }), 500
 
 
+# ===== LLM 設定頁面與提供商管理 =====
+
+@bp.route('/llm_settings', methods=['GET'])
+@login_required
+def llm_settings():
+    """LLM 設定頁面 - 管理本地 LLM 提供商"""
+    return render_template('llm_settings.html.j2')
+
+
 @bp.route('/api/llm/providers', methods=['GET'])
 def get_llm_providers():
     """取得可用的 LLM 提供商列表"""
@@ -882,4 +896,183 @@ def get_llm_providers():
         return jsonify({
             'providers': [],
             'error': '伺服器發生錯誤'
+        }), 500
+
+
+@bp.route('/api/llm/providers/health', methods=['GET'])
+def get_llm_providers_health():
+    """取得所有 LLM 提供商的健康狀態"""
+    try:
+        response = requests.get(f'{MCP_API_URL}/llm/providers/health', timeout=10)
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify({
+                'providers': {},
+                'error': '無法取得提供商健康狀態'
+            }), response.status_code
+    except requests.exceptions.ConnectionError:
+        return jsonify({
+            'providers': {},
+            'mcp_available': False,
+            'error': '無法連線到 MCP API 伺服器'
+        }), 503
+    except Exception as e:
+        logging.error(f'取得 LLM 提供商健康狀態失敗: {str(e)}', exc_info=True)
+        return jsonify({
+            'providers': {},
+            'error': '伺服器發生錯誤'
+        }), 500
+
+
+@bp.route('/api/llm/providers/select', methods=['POST'])
+@login_required
+def select_llm_provider():
+    """選擇要使用的 LLM 提供商"""
+    try:
+        # 支援 JSON body 或 query parameter
+        data = request.get_json(silent=True) or {}
+        provider_name = data.get('provider_name') or request.args.get('provider_name')
+        if not provider_name:
+            return jsonify({
+                'success': False,
+                'error': '缺少 provider_name 參數'
+            }), 400
+        
+        response = requests.post(
+            f'{MCP_API_URL}/llm/providers/select',
+            json={'provider_name': provider_name},
+            timeout=5
+        )
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify({
+                'success': False,
+                'error': '選擇提供商失敗'
+            }), response.status_code
+    except requests.exceptions.ConnectionError:
+        return jsonify({
+            'success': False,
+            'mcp_available': False,
+            'error': '無法連線到 MCP API 伺服器'
+        }), 503
+    except Exception as e:
+        logging.error(f'選擇 LLM 提供商失敗: {str(e)}', exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': '伺服器發生錯誤'
+        }), 500
+
+
+@bp.route('/api/llm/providers/discover', methods=['POST'])
+@login_required
+def discover_llm_providers():
+    """觸發 LLM 提供商偵測"""
+    try:
+        response = requests.post(f'{MCP_API_URL}/llm/providers/discover', timeout=15)
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify({
+                'discovered': {},
+                'available_count': 0,
+                'error': '偵測提供商失敗'
+            }), response.status_code
+    except requests.exceptions.ConnectionError:
+        return jsonify({
+            'discovered': {},
+            'available_count': 0,
+            'mcp_available': False,
+            'error': '無法連線到 MCP API 伺服器'
+        }), 503
+    except Exception as e:
+        logging.error(f'偵測 LLM 提供商失敗: {str(e)}', exc_info=True)
+        return jsonify({
+            'discovered': {},
+            'available_count': 0,
+            'error': '伺服器發生錯誤'
+        }), 500
+
+
+@bp.route('/api/llm/providers/<provider_name>/refresh', methods=['POST'])
+@login_required
+def refresh_llm_provider(provider_name):
+    """重新檢查特定 LLM 提供商的健康狀態"""
+    try:
+        # 驗證 provider_name 僅包含允許的字元（字母、數字、底線、連字號）
+        if not re.match(r'^[a-zA-Z0-9_-]+$', provider_name):
+            return jsonify({
+                'success': False,
+                'error': '無效的提供商名稱'
+            }), 400
+
+        # 使用 URL 編碼確保安全（允許底線和連字號，因為已經過正則驗證）
+        safe_provider_name = url_quote(provider_name, safe='_-')
+        response = requests.post(
+            f'{MCP_API_URL}/llm/providers/{safe_provider_name}/refresh',
+            timeout=10
+        )
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify({
+                'success': False,
+                'error': '重新檢查提供商失敗'
+            }), response.status_code
+    except requests.exceptions.ConnectionError:
+        return jsonify({
+            'success': False,
+            'mcp_available': False,
+            'error': '無法連線到 MCP API 伺服器'
+        }), 503
+    except Exception as e:
+        logging.error(f'重新檢查 LLM 提供商失敗: {str(e)}', exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': '伺服器發生錯誤'
+        }), 500
+
+
+# ===== CORS 設定 API =====
+
+# 儲存 CORS 狀態（在實際應用中應儲存到配置文件或資料庫）
+_cors_enabled = False
+
+
+@bp.route('/api/llm/cors/status', methods=['GET'])
+def get_cors_status():
+    """取得 CORS 設定狀態"""
+    return jsonify({
+        'enabled': _cors_enabled,
+        'message': f'CORS 目前已{"啟用" if _cors_enabled else "停用"}'
+    })
+
+
+@bp.route('/api/llm/cors/toggle', methods=['POST'])
+@login_required
+def toggle_cors():
+    """切換 CORS 設定"""
+    global _cors_enabled
+    try:
+        data = request.get_json(silent=True) or {}
+
+        # 支援指定狀態或切換
+        if 'enabled' in data:
+            _cors_enabled = bool(data['enabled'])
+        else:
+            _cors_enabled = not _cors_enabled
+
+        logging.info(f'CORS 設定已切換為: {_cors_enabled}')
+
+        return jsonify({
+            'success': True,
+            'enabled': _cors_enabled,
+            'message': 'CORS 已' + ('啟用' if _cors_enabled else '停用')
+        })
+    except Exception as e:
+        logging.error(f'切換 CORS 設定失敗: {str(e)}', exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': '切換 CORS 設定失敗'
         }), 500

@@ -131,7 +131,7 @@ logs/*
 
 # Node / Electron
 node_modules/
-package-lock.json
+# Note: package-lock.json is committed to ensure reproducible builds
 dist/
 *.AppImage
 *.deb

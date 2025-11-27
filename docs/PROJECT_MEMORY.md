@@ -294,7 +294,7 @@ token = os.environ.get("APP_TOKEN") or secrets.token_hex(32)
 >**Before Anything begin, You should:**
 Refer to docs/PROJECT_MEMORY.md for past memory before proceeding with the real tasks.
 >**After a Step finish, You need to:**
-Update docs/PROJECT_MEMORY.md with the beilf of the changes made, and your lesson learned in this step.
+Update docs/PROJECT_MEMORY.md with the brief of the changes made, and your lesson learned in this step.
 >**After All step finish, you must:**
 Condense this memory about changes, and keep lesson learn as-is,
 完成功能後，將經驗總結和專案記憶整理和記錄至適當的文件中，並在相關文件中加入參考連結。

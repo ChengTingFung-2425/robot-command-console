@@ -118,14 +118,13 @@ class ProcessService(ServiceBase):
                 "service": "unified_launcher"
             })
 
-            # 啟動進程
+            # 啟動進程（使用 DEVNULL 避免管道緩衝區阻塞）
             self._process = subprocess.Popen(
                 self._config.command,
                 env=env,
                 cwd=cwd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
 
             # 等待服務就緒（透過健康檢查）
@@ -165,11 +164,9 @@ class ProcessService(ServiceBase):
             if process is None or process.poll() is not None:
                 # 進程已退出或不存在
                 if process is not None:
-                    stdout, stderr = process.communicate()
                     logger.error("Process exited during startup", extra={
                         "service": self.name,
                         "exit_code": process.returncode,
-                        "stderr": stderr[:500] if stderr else None
                     })
                 return False
 
@@ -316,7 +313,7 @@ class UnifiedLauncher:
         )
         self._services: Dict[str, ProcessService] = {}
         self._running = False
-        self._shutdown_event = asyncio.Event()
+        self._shutdown_event: Optional[asyncio.Event] = None
 
         # 設定告警回呼
         self._coordinator.set_alert_callback(self._handle_alert)
@@ -443,6 +440,9 @@ class UnifiedLauncher:
         })
 
         self._running = True
+        # 延遲建立 Event 直到確定有事件迴圈運行
+        if self._shutdown_event is None:
+            self._shutdown_event = asyncio.Event()
         self._shutdown_event.clear()
 
         try:
@@ -481,7 +481,8 @@ class UnifiedLauncher:
         })
 
         self._running = False
-        self._shutdown_event.set()
+        if self._shutdown_event is not None:
+            self._shutdown_event.set()
 
         try:
             success = await self._coordinator.stop(timeout=timeout)
@@ -548,6 +549,9 @@ class UnifiedLauncher:
             "service": "unified_launcher"
         })
 
+        # 確保 shutdown event 已建立
+        if self._shutdown_event is None:
+            self._shutdown_event = asyncio.Event()
         await self._shutdown_event.wait()
 
         logger.info("UnifiedLauncher shutting down", extra={

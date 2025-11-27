@@ -3,18 +3,14 @@
 驗證一鍵啟動所有服務與健康檢查功能
 """
 
-import asyncio
 import sys
-import os
 import unittest
 from pathlib import Path
-from typing import Any, Dict, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
 
 # 添加 src 目錄到路徑
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
-import pytest
+import pytest  # noqa: E402
 
 
 class TestUnifiedLauncherExists:

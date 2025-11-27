@@ -11,6 +11,7 @@ Phase 3.1 核心功能：
 import asyncio
 import logging
 import os
+import secrets
 import signal
 import subprocess
 import sys
@@ -71,6 +72,7 @@ class ProcessService(ServiceBase):
         self._config = config
         self._process: Optional[subprocess.Popen] = None
         self._running = False
+        self._http_session: Optional[aiohttp.ClientSession] = None
 
     @property
     def name(self) -> str:
@@ -83,6 +85,18 @@ class ProcessService(ServiceBase):
     @property
     def is_running(self) -> bool:
         return self._running and self._process is not None and self._process.poll() is None
+
+    async def _get_http_session(self) -> aiohttp.ClientSession:
+        """取得或建立 HTTP 客戶端會話（重複使用以提高效能）"""
+        if self._http_session is None or self._http_session.closed:
+            self._http_session = aiohttp.ClientSession()
+        return self._http_session
+
+    async def _close_http_session(self) -> None:
+        """關閉 HTTP 客戶端會話"""
+        if self._http_session and not self._http_session.closed:
+            await self._http_session.close()
+            self._http_session = None
 
     async def start(self) -> bool:
         """啟動服務進程"""
@@ -146,26 +160,28 @@ class ProcessService(ServiceBase):
         timeout = self._config.startup_timeout_seconds
 
         while (datetime.now(timezone.utc) - start_time).total_seconds() < timeout:
-            # 檢查進程是否仍在運行
-            if self._process.poll() is not None:
-                # 進程已退出
-                stdout, stderr = self._process.communicate()
-                logger.error("Process exited during startup", extra={
-                    "service": self.name,
-                    "exit_code": self._process.returncode,
-                    "stderr": stderr[:500] if stderr else None
-                })
+            # 檢查進程是否仍在運行（防止競態條件）
+            process = self._process
+            if process is None or process.poll() is not None:
+                # 進程已退出或不存在
+                if process is not None:
+                    stdout, stderr = process.communicate()
+                    logger.error("Process exited during startup", extra={
+                        "service": self.name,
+                        "exit_code": process.returncode,
+                        "stderr": stderr[:500] if stderr else None
+                    })
                 return False
 
-            # 嘗試健康檢查
+            # 嘗試健康檢查（使用共用會話以提高效能）
             try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(
-                        self._config.health_url,
-                        timeout=aiohttp.ClientTimeout(total=2)
-                    ) as response:
-                        if response.status == 200:
-                            return True
+                session = await self._get_http_session()
+                async with session.get(
+                    self._config.health_url,
+                    timeout=aiohttp.ClientTimeout(total=2)
+                ) as response:
+                    if response.status == 200:
+                        return True
             except Exception:
                 # 服務尚未就緒，繼續等待
                 pass
@@ -176,6 +192,9 @@ class ProcessService(ServiceBase):
 
     async def stop(self, timeout: Optional[float] = None) -> bool:
         """停止服務進程"""
+        # 關閉 HTTP 會話
+        await self._close_http_session()
+
         if not self._process:
             self._running = False
             return True
@@ -227,24 +246,24 @@ class ProcessService(ServiceBase):
             }
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    self._config.health_url,
-                    timeout=aiohttp.ClientTimeout(total=self._config.health_check_timeout_seconds)
-                ) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        return {
-                            "status": "healthy",
-                            "response": data,
-                            "port": self._config.port
-                        }
-                    else:
-                        return {
-                            "status": "unhealthy",
-                            "message": f"Health check returned status {response.status}",
-                            "port": self._config.port
-                        }
+            session = await self._get_http_session()
+            async with session.get(
+                self._config.health_url,
+                timeout=aiohttp.ClientTimeout(total=self._config.health_check_timeout_seconds)
+            ) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return {
+                        "status": "healthy",
+                        "response": data,
+                        "port": self._config.port
+                    }
+                else:
+                    return {
+                        "status": "unhealthy",
+                        "message": f"Health check returned status {response.status}",
+                        "port": self._config.port
+                    }
         except asyncio.TimeoutError:
             return {
                 "status": "unhealthy",
@@ -321,6 +340,16 @@ class UnifiedLauncher:
 
     def _get_default_services(self) -> List[ProcessServiceConfig]:
         """取得預設服務配置"""
+        # 使用環境變數或生成安全的隨機 token
+        app_token = os.environ.get("APP_TOKEN")
+        if not app_token:
+            app_token = secrets.token_hex(32)
+            logger.warning(
+                "APP_TOKEN not set, using generated token. "
+                "Set APP_TOKEN environment variable for production.",
+                extra={"service": "unified_launcher"}
+            )
+
         return [
             # Flask API 服務
             ProcessServiceConfig(
@@ -331,7 +360,7 @@ class UnifiedLauncher:
                 health_url="http://127.0.0.1:5000/health",
                 working_dir=self._base_dir,
                 env={
-                    "APP_TOKEN": os.environ.get("APP_TOKEN", "dev-token"),
+                    "APP_TOKEN": app_token,
                     "PORT": "5000",
                 },
                 startup_timeout_seconds=15.0,

@@ -1036,7 +1036,6 @@ def refresh_llm_provider(provider_name):
 
 # 儲存 CORS 狀態（在實際應用中應儲存到配置文件或資料庫）
 _cors_enabled = False
-_cors_click_count = 0
 
 
 @bp.route('/api/llm/cors/status', methods=['GET'])
@@ -1044,7 +1043,6 @@ def get_cors_status():
     """取得 CORS 設定狀態"""
     return jsonify({
         'enabled': _cors_enabled,
-        'click_count': _cors_click_count,
         'message': 'CORS 目前已' + ('啟用' if _cors_enabled else '停用')
     })
 
@@ -1052,30 +1050,23 @@ def get_cors_status():
 @bp.route('/api/llm/cors/toggle', methods=['POST'])
 @login_required
 def toggle_cors():
-    """切換 CORS 設定（基於點擊次數：奇數次開啟，偶數次關閉）"""
-    global _cors_enabled, _cors_click_count
+    """切換 CORS 設定"""
+    global _cors_enabled
     try:
         data = request.get_json(silent=True) or {}
-        
-        # 更新點擊次數
-        if 'click_count' in data:
-            _cors_click_count = int(data['click_count'])
-        else:
-            _cors_click_count += 1
-        
-        # 基於點擊次數決定狀態：奇數次開啟，偶數次關閉
+
+        # 支援指定狀態或切換
         if 'enabled' in data:
             _cors_enabled = bool(data['enabled'])
         else:
-            _cors_enabled = (_cors_click_count % 2 == 1)
-        
-        logging.info(f'CORS 設定已切換為: {_cors_enabled} (點擊次數: {_cors_click_count})')
-        
+            _cors_enabled = not _cors_enabled
+
+        logging.info(f'CORS 設定已切換為: {_cors_enabled}')
+
         return jsonify({
             'success': True,
             'enabled': _cors_enabled,
-            'click_count': _cors_click_count,
-            'message': 'CORS 已' + ('啟用' if _cors_enabled else '停用') + f' (第 {_cors_click_count} 次點擊)'
+            'message': 'CORS 已' + ('啟用' if _cors_enabled else '停用')
         })
     except Exception as e:
         logging.error(f'切換 CORS 設定失敗: {str(e)}', exc_info=True)

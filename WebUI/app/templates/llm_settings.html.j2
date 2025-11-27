@@ -210,7 +210,6 @@
     var currentSelectedProvider = null;
     var providersData = {};
     var corsEnabled = false;
-    var corsClickCount = 0;  // 追蹤點擊次數
 
     // 初始化
     document.addEventListener('DOMContentLoaded', function() {
@@ -225,26 +224,25 @@
             .then(function(response) { return response.json(); })
             .then(function(data) {
                 corsEnabled = data.enabled || false;
-                corsClickCount = data.click_count || 0;
-                updateCorsCard(corsEnabled, corsClickCount);
+                updateCorsCard(corsEnabled);
             })
             .catch(function(err) {
                 // CORS API 可能不存在，顯示未知狀態
-                updateCorsCard(null, 0);
+                updateCorsCard(null);
             });
     }
     
     // 更新 CORS 狀態卡片
-    function updateCorsCard(enabled, clickCount) {
+    function updateCorsCard(enabled) {
         var corsCard = document.getElementById('cors-status-card');
         var corsText = document.getElementById('cors-status-text');
         
         if (enabled === true) {
             corsCard.className = 'well text-center status-available';
-            corsText.textContent = '已啟用 (點擊: ' + clickCount + ')';
+            corsText.textContent = '已啟用';
         } else if (enabled === false) {
             corsCard.className = 'well text-center status-unavailable';
-            corsText.textContent = '已停用 (點擊: ' + clickCount + ')';
+            corsText.textContent = '已停用';
         } else {
             corsCard.className = 'well text-center status-error';
             corsText.textContent = '未知';
@@ -254,12 +252,8 @@
     /**
      * 切換 CORS 設定
      * 
-     * 使用點擊次數控制切換邏輯（依用戶需求實作）：
-     * - 奇數次點擊 (1, 3, 5...) → 開啟 CORS
-     * - 偶數次點擊 (2, 4, 6...) → 關閉 CORS
-     * 
-     * 注意：為避免快速連續點擊造成的競態條件，
-     * 按鈕在請求期間會被禁用。
+     * 簡單的開關切換：點擊時切換當前狀態
+     * 為避免快速連續點擊造成的競態條件，按鈕在請求期間會被禁用
      */
     var corsToggleInProgress = false;
     window.toggleCors = function() {
@@ -273,35 +267,25 @@
         var corsCard = document.getElementById('cors-status-card');
         corsCard.disabled = true;
 
-        var expectedClickCount = corsClickCount + 1;
-        // 奇數次點擊 (1, 3, 5...) 開啟 CORS，偶數次點擊 (2, 4, 6...) 關閉 CORS
-        var newState = (expectedClickCount % 2 === 1);
+        // 簡單切換：取反當前狀態
+        var newState = !corsEnabled;
 
         fetch('/api/llm/cors/toggle', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ enabled: newState, click_count: expectedClickCount })
+            body: JSON.stringify({ enabled: newState })
         })
         .then(function(response) { return response.json(); })
         .then(function(data) {
             if (data.success) {
-                // 使用伺服器回傳的狀態同步
                 corsEnabled = data.enabled;
-                corsClickCount = data.click_count || expectedClickCount;
-                updateCorsCard(corsEnabled, corsClickCount);
-                showAlert('success', 'CORS 已' + (corsEnabled ? '啟用' : '停用') + ' (第 ' + corsClickCount + ' 次點擊)');
+                updateCorsCard(corsEnabled);
+                showAlert('success', 'CORS 已' + (corsEnabled ? '啟用' : '停用'));
             } else {
-                // 失敗時同步伺服器狀態（如果有）
-                if (typeof data.click_count !== 'undefined') {
-                    corsClickCount = data.click_count;
-                }
-                updateCorsCard(corsEnabled, corsClickCount);
                 showAlert('danger', '切換 CORS 設定失敗');
             }
         })
         .catch(function(err) {
-            // 請求失敗時不變更狀態
-            updateCorsCard(corsEnabled, corsClickCount);
             showAlert('danger', '切換 CORS 設定時發生錯誤');
             console.error(err);
         })

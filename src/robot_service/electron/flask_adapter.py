@@ -98,7 +98,9 @@ class TokenValidator:
 
         for valid_token in self._tokens:
             try:
-                if hmac.compare_digest(token, valid_token):
+                # hmac.compare_digest 需要相同長度的字串
+                if len(token) == len(valid_token) and \
+                   hmac.compare_digest(token, valid_token):
                     return True
             except (TypeError, ValueError):
                 continue

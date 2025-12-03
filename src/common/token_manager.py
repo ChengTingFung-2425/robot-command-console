@@ -312,12 +312,18 @@ class TokenManager:
         with self._lock:
             # 檢查當前 Token
             if self._current_token is not None:
-                if hmac.compare_digest(token, self._current_token):
-                    if self._current_info and not self._current_info.is_expired():
-                        return True
-                    else:
-                        logger.warning("Current token expired")
-                        return False
+                try:
+                    # hmac.compare_digest 需要相同長度的字串
+                    if len(token) == len(self._current_token) and \
+                       hmac.compare_digest(token, self._current_token):
+                        if self._current_info and not self._current_info.is_expired():
+                            return True
+                        else:
+                            logger.warning("Current token expired")
+                            return False
+                except (TypeError, ValueError):
+                    # 長度不同或類型錯誤
+                    pass
 
             # 檢查寬限期內的舊 Token
             token_hash = self._hash_token(token)

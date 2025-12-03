@@ -212,8 +212,24 @@ class TokenManager {
     // 增加輪替計數
     this.rotationCount++;
 
-    // 生成新 Token（內部會歸檔舊 Token）
-    const { token, info } = this.generateToken();
+    // 歸檔舊 Token
+    this._archiveCurrentToken();
+
+    // 直接生成新 Token（避免透過 generateToken 重複歸檔）
+    const token = crypto.randomBytes(this.tokenLength).toString('hex');
+    const tokenId = this._generateTokenId();
+    const expiresAt = this._calculateExpiry();
+
+    const info = {
+      tokenId: tokenId,
+      createdAt: new Date(),
+      expiresAt: expiresAt,
+      isActive: true,
+      rotationCount: this.rotationCount,
+    };
+
+    this.currentToken = token;
+    this.currentInfo = info;
 
     // 記錄輪替事件
     const event = {
@@ -262,13 +278,22 @@ class TokenManager {
 
     // 檢查當前 Token
     if (this.currentToken !== null) {
-      if (crypto.timingSafeEqual(Buffer.from(token), Buffer.from(this.currentToken))) {
-        if (this.currentInfo && !this._isExpired(this.currentInfo)) {
-          return true;
-        } else {
-          this._log('warn', 'token_expired', 'Current token expired');
-          return false;
+      try {
+        // 確保長度相同再進行時間安全比較
+        const tokenBuf = Buffer.from(token);
+        const currentBuf = Buffer.from(this.currentToken);
+        if (tokenBuf.length === currentBuf.length && 
+            crypto.timingSafeEqual(tokenBuf, currentBuf)) {
+          if (this.currentInfo && !this._isExpired(this.currentInfo)) {
+            return true;
+          } else {
+            this._log('warn', 'token_expired', 'Current token expired');
+            return false;
+          }
         }
+      } catch (e) {
+        // 長度不同或其他錯誤
+        this._log('debug', 'token_compare_error', 'Token comparison error', { error: e.message });
       }
     }
 

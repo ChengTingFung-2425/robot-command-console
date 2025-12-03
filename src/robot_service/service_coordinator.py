@@ -444,7 +444,10 @@ class ServiceCoordinator:
 
     async def start_service(self, service_name: str) -> bool:
         """
-        啟動單個服務
+        啟動單個服務，包含啟動異常恢復邏輯
+
+        當服務啟動失敗時，如果配置了啟動重試（startup_retry_enabled），
+        會自動進行指定次數（max_startup_retry_attempts）的重試嘗試。
 
         Args:
             service_name: 服務名稱
@@ -469,6 +472,85 @@ class ServiceCoordinator:
             })
             return True
 
+        # 重置啟動重試計數
+        state.startup_retry_count = 0
+
+        # 第一次啟動嘗試
+        success = await self._do_start_service(service_name)
+
+        # 如果啟動失敗且配置了啟動重試，則進行重試
+        if not success and state.config.startup_retry_enabled:
+            max_retries = state.config.max_startup_retry_attempts
+            retry_delay = state.config.startup_retry_delay_seconds
+
+            while state.startup_retry_count < max_retries:
+                state.startup_retry_count += 1
+
+                logger.info("Attempting startup recovery", extra={
+                    "service_name": service_name,
+                    "retry_attempt": state.startup_retry_count,
+                    "max_retries": max_retries,
+                    "retry_delay": retry_delay,
+                    "service": "service_coordinator"
+                })
+
+                # 發送啟動重試告警
+                await self._send_alert(
+                    "服務啟動失敗，正在重試",
+                    f"{service_name} 啟動失敗，正在進行第 {state.startup_retry_count}/{max_retries} 次重試",
+                    {
+                        "alert_type": "startup_retry",
+                        "service": service_name,
+                        "retry_attempt": state.startup_retry_count,
+                        "last_error": state.last_error
+                    }
+                )
+
+                # 等待重試延遲
+                await asyncio.sleep(retry_delay)
+
+                # 重新嘗試啟動
+                success = await self._do_start_service(service_name)
+
+                if success:
+                    logger.info("Startup recovery succeeded", extra={
+                        "service_name": service_name,
+                        "retry_attempt": state.startup_retry_count,
+                        "service": "service_coordinator"
+                    })
+                    break
+
+            # 如果重試後仍然失敗，發送最終告警
+            if not success:
+                await self._send_alert(
+                    "服務啟動失敗，重試次數已用盡",
+                    f"{service_name} 在 {max_retries} 次重試後仍然無法啟動",
+                    {
+                        "alert_type": "startup_failed",
+                        "service": service_name,
+                        "total_attempts": state.startup_retry_count + 1,
+                        "last_error": state.last_error
+                    }
+                )
+
+        return success
+
+    async def _do_start_service(self, service_name: str) -> bool:
+        """
+        執行實際的服務啟動操作
+
+        這是內部方法，負責執行單次服務啟動嘗試。
+        不包含重試邏輯，由 start_service 方法處理重試。
+
+        Args:
+            service_name: 服務名稱
+
+        Returns:
+            是否成功啟動
+        """
+        service = self._services[service_name]
+        state = self._states[service_name]
+
         old_status = state.status
         state.status = ServiceStatus.STARTING
         await self._notify_state_change(service_name, old_status, ServiceStatus.STARTING)
@@ -489,6 +571,10 @@ class ServiceCoordinator:
                 state.status = ServiceStatus.RUNNING
                 state.started_at = datetime.now(timezone.utc)
                 state.restart_attempts = 0
+                # 注意：此處故意不重置 startup_retry_count
+                # 與 restart_attempts（健康檢查失敗後的重啟計數）不同，
+                # startup_retry_count 記錄的是當次啟動過程的重試次數，
+                # 用於監控和告警追蹤，應保留以供外部查詢
                 state.last_error = None
                 await self._notify_state_change(service_name, old_status, ServiceStatus.RUNNING)
 
@@ -1037,6 +1123,7 @@ class ServiceCoordinator:
                 "is_running": service.is_running,
                 "enabled": state.config.enabled,
                 "restart_attempts": state.restart_attempts,
+                "startup_retry_count": state.startup_retry_count,
                 "consecutive_failures": state.consecutive_failures,
                 "last_health_check": state.last_health_check.isoformat() if state.last_health_check else None,
                 "last_error": state.last_error,

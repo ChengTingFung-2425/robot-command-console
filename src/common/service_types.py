@@ -32,6 +32,10 @@ class ServiceConfig:
     health_check_interval_seconds: float = 30.0
     startup_timeout_seconds: float = 5.0
     warmup_seconds: float = 2.0
+    # 啟動異常恢復相關配置
+    startup_retry_enabled: bool = True
+    max_startup_retry_attempts: int = 3
+    startup_retry_delay_seconds: float = 1.0
     extra_config: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -45,3 +49,5 @@ class ServiceState:
     last_health_check: Optional[datetime] = None
     last_error: Optional[str] = None
     started_at: Optional[datetime] = None
+    # 啟動重試計數
+    startup_retry_count: int = 0

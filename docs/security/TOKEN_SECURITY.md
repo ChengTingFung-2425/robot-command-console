@@ -243,7 +243,6 @@ const manager = new TokenManager({
 
 - [architecture.md](architecture.md) - 系統架構
 - [PHASE3_EDGE_ALL_IN_ONE.md](plans/PHASE3_EDGE_ALL_IN_ONE.md) - Phase 3 規劃
-- [MCP/auth_manager.py](../MCP/auth_manager.py) - MCP 認證管理
 
 ---
 

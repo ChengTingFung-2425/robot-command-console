@@ -7,7 +7,6 @@ import sys
 import os
 import unittest
 import time
-from datetime import timedelta
 
 # 添加 src 目錄到路徑
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -16,10 +15,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 from common.token_manager import (  # noqa: E402
     TokenManager,
     TokenInfo,
-    TokenRotationEvent,
     get_edge_token_manager,
     reset_edge_token_manager,
 )
+from robot_service.electron.flask_adapter import TokenValidator  # noqa: E402
 
 
 class TestTokenGeneration(unittest.TestCase):
@@ -289,10 +288,10 @@ class TestTokenSecurityFeatures(unittest.TestCase):
 
     def test_token_is_cryptographically_secure(self):
         """測試 Token 是加密安全的"""
-        manager = TokenManager(token_length=32)
-
         tokens = set()
         for _ in range(100):
+            # 使用獨立的 TokenManager 實例避免記憶體累積
+            manager = TokenManager(token_length=32)
             token, _ = manager.generate_token()
             tokens.add(token)
 
@@ -319,6 +318,99 @@ class TestTokenSecurityFeatures(unittest.TestCase):
 
         # 內部應該使用雜湊，而不是原始 Token
         self.assertNotIn(old_token, str(manager._previous_tokens))
+
+
+class TestTokenValidator(unittest.TestCase):
+    """測試 TokenValidator 類別"""
+
+    def test_validate_primary_token(self):
+        """測試驗證主要 Token"""
+        validator = TokenValidator("primary_token_123")
+        self.assertTrue(validator.validate("primary_token_123"))
+        self.assertFalse(validator.validate("wrong_token"))
+
+    def test_validate_empty_token(self):
+        """測試驗證空 Token"""
+        validator = TokenValidator("primary_token_123")
+        self.assertFalse(validator.validate(""))
+        self.assertFalse(validator.validate(None))
+
+    def test_add_token(self):
+        """測試添加額外 Token"""
+        validator = TokenValidator("primary_token")
+        validator.add_token("secondary_token")
+
+        self.assertTrue(validator.validate("primary_token"))
+        self.assertTrue(validator.validate("secondary_token"))
+        self.assertEqual(validator.token_count, 2)
+
+    def test_add_duplicate_token(self):
+        """測試添加重複 Token"""
+        validator = TokenValidator("primary_token")
+        validator.add_token("primary_token")
+
+        # 不應該增加重複 Token
+        self.assertEqual(validator.token_count, 1)
+
+    def test_remove_token(self):
+        """測試移除 Token"""
+        validator = TokenValidator("primary_token")
+        validator.add_token("secondary_token")
+
+        result = validator.remove_token("secondary_token")
+        self.assertTrue(result)
+        self.assertEqual(validator.token_count, 1)
+        self.assertFalse(validator.validate("secondary_token"))
+
+    def test_cannot_remove_last_token(self):
+        """測試無法移除最後一個 Token"""
+        validator = TokenValidator("only_token")
+
+        result = validator.remove_token("only_token")
+        self.assertFalse(result)
+        self.assertEqual(validator.token_count, 1)
+
+    def test_update_primary_token_keep_old(self):
+        """測試更新主要 Token 並保留舊 Token"""
+        validator = TokenValidator("old_primary")
+        validator.update_primary_token("new_primary", keep_old=True)
+
+        # 新舊 Token 都應該有效
+        self.assertTrue(validator.validate("new_primary"))
+        self.assertTrue(validator.validate("old_primary"))
+        self.assertEqual(validator.token_count, 2)
+
+    def test_update_primary_token_discard_old(self):
+        """測試更新主要 Token 並丟棄舊 Token"""
+        validator = TokenValidator("old_primary")
+        validator.update_primary_token("new_primary", keep_old=False)
+
+        self.assertTrue(validator.validate("new_primary"))
+        self.assertFalse(validator.validate("old_primary"))
+        self.assertEqual(validator.token_count, 1)
+
+    def test_timing_safe_comparison(self):
+        """測試時間安全的比較"""
+        validator = TokenValidator("secure_token_12345")
+
+        # 驗證正確 Token
+        self.assertTrue(validator.validate("secure_token_12345"))
+
+        # 驗證不同長度的錯誤 Token（應該安全處理）
+        self.assertFalse(validator.validate("short"))
+        self.assertFalse(validator.validate("very_long_token_that_is_different"))
+
+    def test_multiple_tokens_validation(self):
+        """測試多 Token 驗證情境"""
+        validator = TokenValidator("token_1")
+        validator.add_token("token_2")
+        validator.add_token("token_3")
+
+        self.assertTrue(validator.validate("token_1"))
+        self.assertTrue(validator.validate("token_2"))
+        self.assertTrue(validator.validate("token_3"))
+        self.assertFalse(validator.validate("token_4"))
+        self.assertEqual(validator.token_count, 3)
 
 
 if __name__ == '__main__':

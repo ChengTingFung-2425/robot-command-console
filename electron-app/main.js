@@ -128,9 +128,23 @@ async function rotateAppToken(reason = 'scheduled') {
     rotationCount: info.rotationCount,
   });
   
-  // 通知 Flask 服務更新 Token（透過環境變數重啟或 API）
-  // 注意：目前的實作中，Flask 服務需要重啟才能使用新 Token
-  // 未來可以實作動態 Token 更新機制
+  // 重啟 Flask 服務以使用新 Token
+  // Flask 服務透過環境變數 APP_TOKEN 接收 token，因此需要重啟
+  logJSON('info', 'flask_restart_for_token', 'Restarting Flask service with new token');
+  try {
+    await stopService('flask');
+    // 短暫等待確保服務完全停止
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await startService('flask');
+    const healthy = await checkServiceHealth('flask');
+    if (!healthy) {
+      logJSON('warn', 'flask_restart_health_failed', 'Flask service restarted but health check failed');
+    }
+  } catch (error) {
+    logJSON('error', 'flask_restart_failed', 'Failed to restart Flask service after token rotation', {
+      error: error.message
+    });
+  }
   
   // 通知渲染進程
   if (mainWindow && mainWindow.webContents) {

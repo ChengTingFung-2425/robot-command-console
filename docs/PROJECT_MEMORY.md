@@ -20,6 +20,7 @@
 | **開發指南** | [development/](development/) |
 | **功能文件** | [features/](features/) |
 | **安全文件** | [security/TOKEN_SECURITY.md](security/TOKEN_SECURITY.md) |
+| **Phase 3 文件** | [phase3/PHASE3_1_STATUS_REPORT.md](phase3/PHASE3_1_STATUS_REPORT.md)、[phase3/TEST_PLAN_PHASE3_1.md](phase3/TEST_PLAN_PHASE3_1.md) |
 
 ---
 
@@ -187,6 +188,43 @@ def rotate_token(self):
 2. 使用雜湊存儲舊 Token 以避免明文儲存
 3. 定期清理過期的舊 Token 以防止記憶體洩漏
 4. 輪替事件應通知所有相關訂閱者
+
+### Flask 配置遷移（2.3+）
+
+```python
+# ⚠️ Flask 2.3 已棄用
+app.config['JSON_AS_ASCII'] = False
+
+# ✅ Flask 2.3+ 建議
+app.json.ensure_ascii = False
+```
+
+**原因**：Flask 2.3 更新了 JSON 配置方式。
+
+### SQLAlchemy 2.0 遷移
+
+```python
+# ⚠️ SQLAlchemy 1.x 風格（將棄用）
+user = User.query.get(user_id)
+
+# ✅ SQLAlchemy 2.0 風格
+user = db.session.get(User, user_id)
+```
+
+**原因**：`Query.get()` 在 SQLAlchemy 2.0 中已被標記為遺留 API。
+
+### datetime_utils 使用統一化
+
+```python
+# ❌ 直接使用 datetime.now(timezone.utc)
+timestamp = datetime.now(timezone.utc).isoformat()
+
+# ✅ 使用共用 datetime_utils
+from src.common.datetime_utils import utc_now_iso
+timestamp = utc_now_iso()
+```
+
+**原因**：統一時間處理，減少代碼重複，便於未來維護。
 
 ---
 

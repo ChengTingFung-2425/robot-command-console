@@ -38,7 +38,7 @@ class OllamaProvider(LLMProviderBase):
     def set_mcp_tool_interface(self, tool_interface):
         """
         設定 MCP 工具介面
-        
+
         Args:
             tool_interface: MCPToolInterface 實例
         """
@@ -56,7 +56,7 @@ class OllamaProvider(LLMProviderBase):
     async def check_health(self) -> ProviderHealth:
         """
         檢查 Ollama 服務健康狀態
-        
+
         Returns:
             健康狀態資訊
         """
@@ -128,7 +128,7 @@ class OllamaProvider(LLMProviderBase):
     async def list_models(self) -> List[LLMModel]:
         """
         列出 Ollama 可用模型
-        
+
         Returns:
             模型列表
         """
@@ -195,7 +195,7 @@ class OllamaProvider(LLMProviderBase):
     ) -> Tuple[str, float]:
         """
         使用 Ollama 生成文字
-        
+
         Args:
             prompt: 輸入提示
             model: 使用的模型名稱
@@ -204,7 +204,7 @@ class OllamaProvider(LLMProviderBase):
             **kwargs: 其他參數
                 use_tools: 是否使用 MCP 工具（預設 False）
                 trace_id: 追蹤 ID
-            
+
         Returns:
             (生成的文字, 信心度) 元組
         """
@@ -277,7 +277,7 @@ class OllamaProvider(LLMProviderBase):
     ) -> Tuple[str, float]:
         """
         使用工具進行生成（function calling）
-        
+
         Args:
             prompt: 輸入提示
             model: 模型名稱
@@ -285,7 +285,7 @@ class OllamaProvider(LLMProviderBase):
             max_tokens: 最大 token 數
             trace_id: 追蹤 ID
             **kwargs: 其他參數
-            
+
         Returns:
             (生成的文字, 信心度) 元組
         """

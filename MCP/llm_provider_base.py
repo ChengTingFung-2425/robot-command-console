@@ -68,7 +68,7 @@ class LLMProviderBase(ABC):
     def __init__(self, config: ProviderConfig):
         """
         初始化提供商
-        
+
         Args:
             config: 提供商配置
         """
@@ -80,7 +80,7 @@ class LLMProviderBase(ABC):
     def provider_name(self) -> str:
         """
         提供商名稱
-        
+
         Returns:
             提供商唯一識別名稱
         """
@@ -91,7 +91,7 @@ class LLMProviderBase(ABC):
     def default_port(self) -> int:
         """
         預設服務埠號
-        
+
         Returns:
             預設埠號
         """
@@ -101,7 +101,7 @@ class LLMProviderBase(ABC):
     async def check_health(self) -> ProviderHealth:
         """
         檢查提供商健康狀態
-        
+
         Returns:
             健康狀態資訊
         """
@@ -111,7 +111,7 @@ class LLMProviderBase(ABC):
     async def list_models(self) -> List[LLMModel]:
         """
         列出可用的模型
-        
+
         Returns:
             可用模型列表
         """
@@ -128,14 +128,14 @@ class LLMProviderBase(ABC):
     ) -> Tuple[str, float]:
         """
         生成文字
-        
+
         Args:
             prompt: 輸入提示
             model: 使用的模型 ID
             temperature: 溫度參數
             max_tokens: 最大生成 token 數
             **kwargs: 其他提供商特定參數
-            
+
         Returns:
             (生成的文字, 信心度) 元組
         """
@@ -149,15 +149,15 @@ class LLMProviderBase(ABC):
     ) -> Tuple[str, float]:
         """
         將音訊轉換為文字（選用功能）
-        
+
         Args:
             audio_bytes: 音訊資料
             audio_format: 音訊格式
             language: 語言代碼
-            
+
         Returns:
             (轉錄文字, 信心度) 元組
-            
+
         Raises:
             NotImplementedError: 如果提供商不支援語音辨識
         """
@@ -168,10 +168,10 @@ class LLMProviderBase(ABC):
     def get_api_endpoint(self, path: str = "") -> str:
         """
         取得完整 API 端點 URL
-        
+
         Args:
             path: API 路徑
-            
+
         Returns:
             完整 URL
         """

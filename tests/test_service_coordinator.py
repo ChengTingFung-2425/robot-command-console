@@ -12,12 +12,12 @@ from typing import Any, Dict, Optional
 # 添加 src 目錄到路徑
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from robot_service.service_coordinator import (
+from robot_service.service_coordinator import (  # noqa: E402
     ServiceCoordinator,
     ServiceBase,
     QueueService,
 )
-from common.service_types import ServiceStatus, ServiceConfig
+from common.service_types import ServiceStatus, ServiceConfig  # noqa: E402
 
 
 class MockService(ServiceBase):

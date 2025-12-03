@@ -102,7 +102,7 @@ jobs:
       - name: 安裝依賴
         run: |
           pip install -r requirements.txt
-          pip install pytest pytest-asyncio aiohttp pydantic httpx
+          pip install pytest pytest-asyncio aiohttp pydantic httpx requests
 
       - name: 執行所有測試
         run: |
@@ -246,7 +246,7 @@ jobs:
       - name: 安裝依賴
         run: |
           pip install -r requirements.txt
-          pip install pytest pytest-asyncio aiohttp pydantic httpx
+          pip install pytest pytest-asyncio aiohttp pydantic httpx requests
 
       - name: 執行安全測試
         run: |

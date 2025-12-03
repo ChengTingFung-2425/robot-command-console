@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class MCPToolInterface:
     """
     MCP 工具介面
-    
+
     將 MCP 功能包裝為結構化的工具定義，
     可注入到支援 function calling 的 LLM 提供商
     """
@@ -22,7 +22,7 @@ class MCPToolInterface:
     def __init__(self, command_handler=None):
         """
         初始化 MCP 工具介面
-        
+
         Args:
             command_handler: MCP 指令處理器實例
         """
@@ -32,7 +32,7 @@ class MCPToolInterface:
     def get_tool_definitions(self) -> List[Dict[str, Any]]:
         """
         取得 MCP 工具定義列表（OpenAI function calling 格式）
-        
+
         Returns:
             工具定義列表
         """
@@ -286,7 +286,7 @@ class MCPToolInterface:
     def get_ollama_tool_definitions(self) -> List[Dict[str, Any]]:
         """
         取得 Ollama 格式的工具定義
-        
+
         Returns:
             Ollama 工具定義列表
         """
@@ -311,12 +311,12 @@ class MCPToolInterface:
     ) -> Dict[str, Any]:
         """
         執行工具呼叫
-        
+
         Args:
             tool_name: 工具名稱
             arguments: 工具參數
             trace_id: 追蹤 ID
-            
+
         Returns:
             執行結果
         """

@@ -7,15 +7,15 @@ import sys
 import os
 import unittest
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 from uuid import uuid4
 
 # 添加 MCP 目錄到路徑
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from MCP.auth_manager import AuthManager
-from MCP.logging_monitor import LoggingMonitor
-from MCP.secret_storage import (
+from MCP.auth_manager import AuthManager  # noqa: E402
+from MCP.logging_monitor import LoggingMonitor  # noqa: E402
+from MCP.secret_storage import (  # noqa: E402
     EnvironmentSecretStorage,
     FileSecretStorage,
     KeychainSecretStorage,
@@ -23,8 +23,8 @@ from MCP.secret_storage import (
     ChainedSecretStorage,
     create_default_storage
 )
-import tempfile
-import shutil
+import tempfile  # noqa: E402
+import shutil  # noqa: E402
 
 
 class TestTokenRotation(unittest.TestCase):

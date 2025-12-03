@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class SensorPlugin(DevicePluginBase):
     """
     感測器裝置插件
-    
+
     支援多種感測器：
     - 超音波距離感測器
     - IMU（慣性測量單元）
@@ -106,12 +106,12 @@ class SensorPlugin(DevicePluginBase):
     async def read_data(self, **kwargs) -> Dict[str, Any]:
         """
         讀取感測器資料
-        
+
         Args:
             **kwargs: 可選參數
                 sensor_type: 指定感測器類型
                 samples: 讀取樣本數
-                
+
         Returns:
             感測器資料
         """
@@ -271,10 +271,10 @@ class SensorPlugin(DevicePluginBase):
     async def calibrate(self, sensor_type: str) -> Dict[str, Any]:
         """
         校準感測器
-        
+
         Args:
             sensor_type: 感測器類型
-            
+
         Returns:
             校準結果
         """

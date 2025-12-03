@@ -7,7 +7,7 @@
 import json
 import logging
 import threading
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 from flask import current_app
 
 logger = logging.getLogger(__name__)
@@ -60,9 +60,10 @@ class MQTTClientManager:
             
         try:
             # 動態導入 AWS IoT SDK（避免在未安裝時出錯）
+            # mqtt5 在 publish() 方法中使用
             try:
                 from awsiot import mqtt5_client_builder
-                from awscrt import mqtt5
+                from awscrt import mqtt5  # noqa: F401 - 確認模組可用
                 self.use_aws_iot = True
             except ImportError:
                 logger.warning("AWS IoT SDK 未安裝，無法使用 MQTT 功能")
@@ -135,8 +136,8 @@ class MQTTClientManager:
             
             # 發布訊息
             publish_future = self.client.publish(publish_packet)
-            publish_result = publish_future.result(timeout=timeout)
-            
+            publish_future.result(timeout=timeout)  # 等待發布完成
+
             logger.info(f"訊息已發布到主題 {topic}: {message}")
             return True
             

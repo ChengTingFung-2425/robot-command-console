@@ -10,10 +10,9 @@ import os
 # 將專案根目錄加入 Python 路徑
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import asyncio
-import base64
-import json
-from datetime import datetime
+import asyncio  # noqa: E402
+import base64  # noqa: E402
+import json  # noqa: E402
 
 
 async def demo_audio_command_processing():
@@ -118,7 +117,7 @@ async def demo_audio_command_processing():
         confidence=0.95
     )
     
-    print(f"  音訊指令回應:")
+    print("  音訊指令回應:")
     print(f"    轉錄: {audio_response.transcription}")
     print(f"    指令: {audio_response.command.params['action_name']}")
     print(f"    信心度: {audio_response.confidence * 100:.1f}%")
@@ -141,7 +140,7 @@ async def demo_audio_command_processing():
         ensure_ascii=False, 
         default=datetime_handler
     )
-    print(f"  JSON 輸出:")
+    print("  JSON 輸出:")
     print("  " + "\n  ".join(response_json.split("\n")))
     print()
     

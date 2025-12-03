@@ -229,10 +229,10 @@ class SchemaValidator:
     ) -> Tuple[bool, Optional[str]]:
         """
         驗證 CommandRequest
-        
+
         Args:
             data: 要驗證的資料
-            
+
         Returns:
             (is_valid, error_message)
         """
@@ -264,10 +264,10 @@ class SchemaValidator:
     ) -> Tuple[bool, Optional[str]]:
         """
         驗證 CommandResponse
-        
+
         Args:
             data: 要驗證的資料
-            
+
         Returns:
             (is_valid, error_message)
         """
@@ -298,10 +298,10 @@ class SchemaValidator:
     ) -> Tuple[bool, Optional[str]]:
         """
         驗證 EventLog
-        
+
         Args:
             data: 要驗證的資料
-            
+
         Returns:
             (is_valid, error_message)
         """
@@ -333,11 +333,11 @@ class SchemaValidator:
     ) -> Tuple[bool, Optional[str], Optional[Any]]:
         """
         使用 Pydantic 模型驗證資料
-        
+
         Args:
             model_class: Pydantic 模型類別
             data: 要驗證的資料
-            
+
         Returns:
             (is_valid, error_message, model_instance)
         """

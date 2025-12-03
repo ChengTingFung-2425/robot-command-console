@@ -1,9 +1,9 @@
-
 # imports
 import logging
 
 # logger 實例
 logger = logging.getLogger('webui')
+
 
 # functions
 def log_event(event, level='info'):

@@ -79,13 +79,17 @@ class PubSubClient:
                     
                     # Validate actions is a list
                     if not isinstance(actions, list):
-                        logging.error("Invalid 'actions' format in payload: expected list, got %s", type(actions).__name__)
+                        logging.error(
+                            "Invalid 'actions' format in payload: expected list, got %s",
+                            type(actions).__name__
+                        )
                         return
-                    
+
                     # Warn if actions array is very large (may impact performance)
                     if len(actions) > MAX_RECOMMENDED_ACTIONS:
                         logging.warning(
-                            "Actions array size (%d) exceeds recommended maximum (%d). Consider breaking into smaller batches.",
+                            "Actions array size (%d) exceeds recommended max (%d). "
+                            "Consider breaking into smaller batches.",
                             len(actions), MAX_RECOMMENDED_ACTIONS
                         )
                     

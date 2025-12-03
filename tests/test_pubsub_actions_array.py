@@ -283,7 +283,7 @@ class TestPubSubActionsArray(unittest.TestCase):
         # 驗證：應該記錄警告訊息
         mock_logging.warning.assert_called_once()
         warning_call = mock_logging.warning.call_args[0][0]
-        self.assertIn("exceeds recommended maximum", warning_call)
+        self.assertIn("exceeds recommended max", warning_call)
 
         # 驗證：仍然應該處理動作
         self.mock_executor.add_actions_to_queue.assert_called_once_with(large_actions)

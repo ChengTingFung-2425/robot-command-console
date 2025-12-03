@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class PluginManager:
     """
     插件管理器
-    
+
     負責：
     - 註冊和載入插件
     - 初始化和關閉插件
@@ -43,11 +43,11 @@ class PluginManager:
     ) -> bool:
         """
         註冊插件
-        
+
         Args:
             plugin_class: 插件類別
             config: 插件配置
-            
+
         Returns:
             是否成功註冊
         """
@@ -81,7 +81,7 @@ class PluginManager:
     async def initialize_all(self) -> Dict[str, bool]:
         """
         初始化所有插件
-        
+
         Returns:
             插件名稱到初始化結果的對映
         """
@@ -114,7 +114,7 @@ class PluginManager:
     async def shutdown_all(self) -> Dict[str, bool]:
         """
         關閉所有插件
-        
+
         Returns:
             插件名稱到關閉結果的對映
         """
@@ -137,10 +137,10 @@ class PluginManager:
     def get_plugin(self, plugin_name: str) -> Optional[PluginBase]:
         """
         取得插件實例
-        
+
         Args:
             plugin_name: 插件名稱
-            
+
         Returns:
             插件實例，若不存在則返回 None
         """
@@ -149,10 +149,10 @@ class PluginManager:
     def get_command_plugin(self, plugin_name: str) -> Optional[CommandPluginBase]:
         """
         取得指令插件實例
-        
+
         Args:
             plugin_name: 插件名稱
-            
+
         Returns:
             指令插件實例，若不存在則返回 None
         """
@@ -161,10 +161,10 @@ class PluginManager:
     def get_device_plugin(self, plugin_name: str) -> Optional[DevicePluginBase]:
         """
         取得裝置插件實例
-        
+
         Args:
             plugin_name: 插件名稱
-            
+
         Returns:
             裝置插件實例，若不存在則返回 None
         """
@@ -177,11 +177,11 @@ class PluginManager:
     ) -> List[str]:
         """
         列出插件
-        
+
         Args:
             plugin_type: 篩選插件類型
             status: 篩選插件狀態
-            
+
         Returns:
             插件名稱列表
         """
@@ -209,13 +209,13 @@ class PluginManager:
     ) -> Dict[str, Any]:
         """
         透過插件執行指令
-        
+
         Args:
             plugin_name: 插件名稱
             command_name: 指令名稱
             parameters: 指令參數
             context: 執行上下文
-            
+
         Returns:
             執行結果
         """
@@ -252,11 +252,11 @@ class PluginManager:
     ) -> Dict[str, Any]:
         """
         從裝置插件讀取資料
-        
+
         Args:
             plugin_name: 插件名稱
             **kwargs: 讀取參數
-            
+
         Returns:
             裝置資料
         """
@@ -289,7 +289,7 @@ class PluginManager:
     async def get_all_plugin_health(self) -> Dict[str, Dict[str, Any]]:
         """
         取得所有插件的健康狀態
-        
+
         Returns:
             插件名稱到健康狀態的對映
         """
@@ -312,10 +312,10 @@ class PluginManager:
     def get_supported_commands(self, plugin_name: str) -> Optional[List[str]]:
         """
         取得插件支援的指令列表
-        
+
         Args:
             plugin_name: 插件名稱
-            
+
         Returns:
             指令列表，若插件不存在則返回 None
         """
@@ -333,11 +333,11 @@ class PluginManager:
     ) -> Optional[Dict[str, Any]]:
         """
         取得指令的參數 schema
-        
+
         Args:
             plugin_name: 插件名稱
             command_name: 指令名稱
-            
+
         Returns:
             參數 schema
         """

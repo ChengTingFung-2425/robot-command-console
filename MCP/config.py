@@ -60,7 +60,7 @@ class MCPConfig:
     def get_secret_storage(cls):
         """
         獲取秘密儲存實例
-        
+
         Returns:
             SecretStorage 實例
         """

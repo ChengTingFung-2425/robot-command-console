@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class AdvancedCommandPlugin(CommandPluginBase):
     """
     進階指令插件
-    
+
     處理複雜的機器人動作序列，如：
     - patrol: 巡邏動作
     - dance: 跳舞動作

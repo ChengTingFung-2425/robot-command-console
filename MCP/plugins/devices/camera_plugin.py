@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class CameraPlugin(DevicePluginBase):
     """
     攝影機裝置插件
-    
+
     提供攝影機功能：
     - 拍照
     - 視訊串流
@@ -113,12 +113,12 @@ class CameraPlugin(DevicePluginBase):
     async def read_data(self, **kwargs) -> Dict[str, Any]:
         """
         讀取攝影機資料（拍照）
-        
+
         Args:
             **kwargs: 可選參數
                 format: 圖片格式（jpeg, png）
                 quality: 圖片品質（1-100）
-                
+
         Returns:
             包含圖片資料的字典
         """
@@ -199,14 +199,14 @@ class CameraPlugin(DevicePluginBase):
     async def adjust_settings(self, settings: Dict[str, Any]) -> Dict[str, Any]:
         """
         調整攝影機設定
-        
+
         Args:
             settings: 設定字典
                 resolution: 解析度
                 fps: 幀率
                 brightness: 亮度
                 contrast: 對比度
-                
+
         Returns:
             調整結果
         """

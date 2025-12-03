@@ -4,7 +4,6 @@ User Engagement & Gamification utilities.
 Handles point awards, achievement tracking, and level management.
 """
 
-from datetime import datetime
 from typing import Optional, List
 from WebUI.app import db
 from WebUI.app.models import User, UserProfile, Achievement, UserAchievement

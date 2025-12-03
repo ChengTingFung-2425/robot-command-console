@@ -364,7 +364,7 @@ Phase 2 開始演進為 Server-Edge-Runner 三層架構，Phase 3 將完整實�
 - [ ] 共享 LLM 分析服務（大數據優化）
 
 **子階段**：
-- [x] Phase 3.1：基礎整合（統一啟動器、服務協調、LLM 選擇 UI）✅ 已完成
+- [x] Phase 3.1：基礎整合（統一啟動器、服務協調、LLM 選擇 UI）
 - [ ] Phase 3.2：功能完善（WebUI 本地版、監控、CLI/TUI）
 - [ ] Phase 3.3：雲端整合（同步、共享指令、授權）
 - [ ] Phase 3.4：打包與發佈（AppImage、DMG、NSIS、Docker）

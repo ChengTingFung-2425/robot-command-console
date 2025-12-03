@@ -192,14 +192,14 @@ def rotate_token(self):
 ### Flask 配置遷移（2.3+）
 
 ```python
-# ⚠️ Flask 2.3 已棄用
+# ⚠️ 舊版本配置方式（Flask 2.3+ 已棄用）
 app.config['JSON_AS_ASCII'] = False
 
-# ✅ Flask 2.3+ 建議
+# ✅ Flask 2.3+ 建議使用
 app.json.ensure_ascii = False
 ```
 
-**原因**：Flask 2.3 更新了 JSON 配置方式。
+**原因**：Flask 2.3 更新了 JSON 配置方式，舊的配置鍵將被移除。
 
 ### SQLAlchemy 2.0 遷移
 

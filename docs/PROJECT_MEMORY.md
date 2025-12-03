@@ -290,6 +290,51 @@ token = os.environ.get("APP_TOKEN") or secrets.token_hex(32)
 
 **原因**：硬編碼的預設 token 在生產環境中是安全風險。使用 `secrets.token_hex()` 生成加密安全的隨機 token。
 
+### 基本指令執行流程貫通（Phase 3.1.7）
+
+#### 指令處理器設計
+
+```python
+# ✅ 正確：使用分派器模式解耦指令處理和執行
+processor = CommandProcessor(action_dispatcher=my_dispatcher)
+
+# ✅ 正確：支援多種指令格式
+def _extract_actions(self, payload):
+    # 格式 1: {"actions": ["go_forward", "stand"]}
+    # 格式 2: {"action_name": "go_forward"}
+    # 格式 3: {"command": {"params": {"action_name": "go_forward"}}}
+    # 格式 4: {"base_commands": [{"command": "go_forward"}]}
+    # 格式 5: {"toolName": "go_forward"}  # 向後相容
+```
+
+**原因**：分派器模式允許在不同環境中靈活配置執行邏輯（ActionExecutor、MQTT、模擬器）。
+
+#### 動作驗證
+
+```python
+# ✅ 驗證動作在有效清單中
+VALID_ACTIONS = {
+    "back_fast", "bow", "chest", "dance_two", ..., "wing_chun"
+}
+
+if action_name not in VALID_ACTIONS:
+    logger.warning(f"Invalid action: {action_name}")
+```
+
+**原因**：防止無效動作導致執行錯誤，保持與 Robot-Console/action_executor.py 同步。
+
+#### 資料流完整性
+
+```
+WebUI/API → ServiceManager → Queue → QueueHandler → CommandProcessor → ActionDispatcher → Robot-Console
+```
+
+| 組件 | 檔案 | 職責 |
+|------|------|------|
+| CommandProcessor | `src/robot_service/command_processor.py` | 解析指令、驗證動作、分派執行 |
+| ServiceManager | `src/robot_service/service_manager.py` | 佇列管理、處理器協調 |
+| QueueHandler | `src/robot_service/queue/handler.py` | 訊息消費、重試處理 |
+
 ---
 
 ### 開發流程指引
@@ -305,5 +350,5 @@ token = os.environ.get("APP_TOKEN") or secrets.token_hex(32)
 
 ---
 
-**最後更新**：2025-11-27  
-**版本**：Phase 3.1.3 完成（統一啟動器）
+**最後更新**：2025-12-03  
+**版本**：Phase 3.1.7 進行中（基本指令執行流程貫通）

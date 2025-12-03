@@ -3,11 +3,12 @@ Service Manager
 服務管理器，協調佇列與指令處理
 """
 
-import asyncio
 import logging
-from typing import Any, Dict, Optional
+import threading
+from typing import Any, Callable, Dict, List, Optional
 
 from .queue import Message, MessagePriority, MemoryQueue, QueueHandler
+from .command_processor import CommandProcessor
 
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,10 @@ class ServiceManager:
         self.max_workers = max_workers
         self.poll_interval = poll_interval
         self._started = False
+
+        # 初始化 CommandProcessor（使用預設分派器）
+        self._command_processor = CommandProcessor()
+        self._processor_lock = threading.Lock()
 
         logger.info("ServiceManager initialized", extra={
             "queue_max_size": queue_max_size,
@@ -150,7 +155,9 @@ class ServiceManager:
 
     async def _default_processor(self, message: Message) -> bool:
         """
-        預設訊息處理器（stub）
+        預設訊息處理器
+
+        使用 CommandProcessor 處理指令訊息，將指令轉換為動作並分派執行。
 
         Args:
             message: 要處理的訊息
@@ -165,17 +172,32 @@ class ServiceManager:
             "service": "robot_service"
         })
 
-        # TODO: 整合實際的指令處理邏輯
-        # 範例：
-        # from robot_command_processor import process_command
-        # result = await process_command(message.payload)
-        # return result.success
-        #
-        # 或參考文件：docs/custom-processor-guide.md
-        # 目前只是 stub，直接返回成功
-        await asyncio.sleep(0.1)  # 模擬處理時間
+        # 使用已初始化的 CommandProcessor 處理指令
+        return await self._command_processor.process(message)
 
-        return True
+    def set_action_dispatcher(
+        self,
+        dispatcher: Callable[[str, List[str]], bool]
+    ) -> None:
+        """
+        設定動作分派函式
+
+        當需要將動作實際發送到機器人時，使用此方法注入分派邏輯。
+        注意：此方法應在服務啟動前呼叫，以避免處理中斷。
+
+        Args:
+            dispatcher: 分派函式，接受 (robot_id, actions) 並返回成功與否
+        """
+        with self._processor_lock:
+            if self._started:
+                logger.warning("Changing dispatcher while service is running", extra={
+                    "service": "robot_service"
+                })
+
+            self._command_processor = CommandProcessor(action_dispatcher=dispatcher)
+            logger.info("Action dispatcher configured", extra={
+                "service": "robot_service"
+            })
 
     async def health_check(self) -> Dict[str, Any]:
         """健康檢查"""

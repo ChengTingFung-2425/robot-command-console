@@ -14,6 +14,9 @@ __all__ = [
     "ServiceState",
     "QueueService",
     "CLIRunner",
+    "CommandProcessor",
+    "create_action_executor_dispatcher",
+    "create_mqtt_dispatcher",
 ]
 
 from .queue.handler import QueueHandler
@@ -22,6 +25,11 @@ from .service_coordinator import (
     ServiceCoordinator,
     ServiceBase,
     QueueService,
+)
+from .command_processor import (
+    CommandProcessor,
+    create_action_executor_dispatcher,
+    create_mqtt_dispatcher,
 )
 # 從 common 模組導入共用服務類型
 from common.service_types import ServiceStatus, ServiceConfig, ServiceState

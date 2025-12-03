@@ -9,7 +9,7 @@ import os
 import unittest
 
 # 添加 src 目錄到路徑
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
 from common.state_store import LocalStateStore  # noqa: E402
 from common.event_bus import LocalEventBus, Event  # noqa: E402

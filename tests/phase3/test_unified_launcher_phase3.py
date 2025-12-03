@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 # 添加 src 目錄到路徑
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
 
 import pytest  # noqa: E402
 
@@ -18,12 +18,12 @@ class TestUnifiedLauncherExists:
 
     def test_unified_launcher_module_exists(self):
         """確認 unified_launcher.py 存在"""
-        launcher_path = Path(__file__).parent.parent / 'src' / 'robot_service' / 'unified_launcher.py'
+        launcher_path = Path(__file__).parent.parent.parent / 'src' / 'robot_service' / 'unified_launcher.py'
         assert launcher_path.exists(), "unified_launcher.py 不存在"
 
     def test_unified_launcher_cli_exists(self):
         """確認 unified_launcher_cli.py 存在"""
-        cli_path = Path(__file__).parent.parent / 'unified_launcher_cli.py'
+        cli_path = Path(__file__).parent.parent.parent / 'unified_launcher_cli.py'
         assert cli_path.exists(), "unified_launcher_cli.py 不存在"
 
 
@@ -202,7 +202,7 @@ class TestUnifiedLauncherModuleContent:
     @pytest.fixture
     def launcher_content(self):
         """讀取 unified_launcher.py 內容"""
-        launcher_path = Path(__file__).parent.parent / 'src' / 'robot_service' / 'unified_launcher.py'
+        launcher_path = Path(__file__).parent.parent.parent / 'src' / 'robot_service' / 'unified_launcher.py'
         return launcher_path.read_text(encoding='utf-8')
 
     def test_has_start_all_method(self, launcher_content):
@@ -248,7 +248,7 @@ class TestUnifiedLauncherCLI:
     @pytest.fixture
     def cli_content(self):
         """讀取 unified_launcher_cli.py 內容"""
-        cli_path = Path(__file__).parent.parent / 'unified_launcher_cli.py'
+        cli_path = Path(__file__).parent.parent.parent / 'unified_launcher_cli.py'
         return cli_path.read_text(encoding='utf-8')
 
     def test_cli_imports_main(self, cli_content):

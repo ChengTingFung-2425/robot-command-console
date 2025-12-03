@@ -19,8 +19,8 @@ from typing import Any, Dict, List
 from unittest.mock import MagicMock
 
 # 添加路徑
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
 from robot_service.queue import Message, MessagePriority  # noqa: E402
 from robot_service.command_processor import (  # noqa: E402

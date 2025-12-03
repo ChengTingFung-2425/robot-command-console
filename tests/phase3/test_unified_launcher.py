@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 # 添加 src 到路徑
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
 
 
 class TestServiceCoordinatorDesign:
@@ -16,27 +16,27 @@ class TestServiceCoordinatorDesign:
 
     def test_electron_main_js_exists(self):
         """確認 main.js 存在"""
-        main_js_path = Path(__file__).parent.parent / 'electron-app' / 'main.js'
+        main_js_path = Path(__file__).parent.parent.parent / 'electron-app' / 'main.js'
         assert main_js_path.exists(), "electron-app/main.js 不存在"
 
     def test_electron_preload_js_exists(self):
         """確認 preload.js 存在"""
-        preload_path = Path(__file__).parent.parent / 'electron-app' / 'preload.js'
+        preload_path = Path(__file__).parent.parent.parent / 'electron-app' / 'preload.js'
         assert preload_path.exists(), "electron-app/preload.js 不存在"
 
     def test_electron_renderer_exists(self):
         """確認 renderer 目錄存在"""
-        renderer_path = Path(__file__).parent.parent / 'electron-app' / 'renderer'
+        renderer_path = Path(__file__).parent.parent.parent / 'electron-app' / 'renderer'
         assert renderer_path.is_dir(), "electron-app/renderer/ 目錄不存在"
 
     def test_renderer_index_html_exists(self):
         """確認 index.html 存在"""
-        index_path = Path(__file__).parent.parent / 'electron-app' / 'renderer' / 'index.html'
+        index_path = Path(__file__).parent.parent.parent / 'electron-app' / 'renderer' / 'index.html'
         assert index_path.exists(), "electron-app/renderer/index.html 不存在"
 
     def test_renderer_js_exists(self):
         """確認 renderer.js 存在"""
-        renderer_js_path = Path(__file__).parent.parent / 'electron-app' / 'renderer' / 'renderer.js'
+        renderer_js_path = Path(__file__).parent.parent.parent / 'electron-app' / 'renderer' / 'renderer.js'
         assert renderer_js_path.exists(), "electron-app/renderer/renderer.js 不存在"
 
 
@@ -46,7 +46,7 @@ class TestMainJsStructure:
     @pytest.fixture
     def main_js_content(self):
         """讀取 main.js 內容"""
-        main_js_path = Path(__file__).parent.parent / 'electron-app' / 'main.js'
+        main_js_path = Path(__file__).parent.parent.parent / 'electron-app' / 'main.js'
         return main_js_path.read_text(encoding='utf-8')
 
     def test_service_coordinator_defined(self, main_js_content):
@@ -117,7 +117,7 @@ class TestPreloadJsStructure:
     @pytest.fixture
     def preload_content(self):
         """讀取 preload.js 內容"""
-        preload_path = Path(__file__).parent.parent / 'electron-app' / 'preload.js'
+        preload_path = Path(__file__).parent.parent.parent / 'electron-app' / 'preload.js'
         return preload_path.read_text(encoding='utf-8')
 
     def test_electron_api_exposed(self, preload_content):
@@ -151,7 +151,7 @@ class TestRendererHtmlStructure:
     @pytest.fixture
     def html_content(self):
         """讀取 index.html 內容"""
-        html_path = Path(__file__).parent.parent / 'electron-app' / 'renderer' / 'index.html'
+        html_path = Path(__file__).parent.parent.parent / 'electron-app' / 'renderer' / 'index.html'
         return html_path.read_text(encoding='utf-8')
 
     def test_unified_launcher_title(self, html_content):
@@ -189,7 +189,7 @@ class TestRendererJsStructure:
     @pytest.fixture
     def renderer_content(self):
         """讀取 renderer.js 內容"""
-        renderer_path = Path(__file__).parent.parent / 'electron-app' / 'renderer' / 'renderer.js'
+        renderer_path = Path(__file__).parent.parent.parent / 'electron-app' / 'renderer' / 'renderer.js'
         return renderer_path.read_text(encoding='utf-8')
 
     def test_unified_launcher_comment(self, renderer_content):
@@ -237,7 +237,7 @@ class TestFlaskServiceIntegration:
 
     def test_flask_service_py_exists(self):
         """確認 flask_service.py 存在"""
-        flask_service_path = Path(__file__).parent.parent / 'flask_service.py'
+        flask_service_path = Path(__file__).parent.parent.parent / 'flask_service.py'
         assert flask_service_path.exists(), "flask_service.py 不存在"
 
     def test_flask_adapter_can_import(self):
@@ -306,12 +306,12 @@ class TestPythonServiceCoordinator:
 
     def test_service_coordinator_file_exists(self):
         """確認 service_coordinator.py 存在"""
-        coordinator_path = Path(__file__).parent.parent / 'src' / 'robot_service' / 'service_coordinator.py'
+        coordinator_path = Path(__file__).parent.parent.parent / 'src' / 'robot_service' / 'service_coordinator.py'
         assert coordinator_path.exists(), "service_coordinator.py 不存在"
 
     def test_cli_runner_uses_coordinator(self):
         """確認 CLI runner 使用 ServiceCoordinator"""
-        runner_path = Path(__file__).parent.parent / 'src' / 'robot_service' / 'cli' / 'runner.py'
+        runner_path = Path(__file__).parent.parent.parent / 'src' / 'robot_service' / 'cli' / 'runner.py'
         content = runner_path.read_text(encoding='utf-8')
         assert 'ServiceCoordinator' in content, "CLI runner 未使用 ServiceCoordinator"
         assert 'QueueService' in content, "CLI runner 未使用 QueueService"

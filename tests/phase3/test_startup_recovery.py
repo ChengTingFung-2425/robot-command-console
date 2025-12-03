@@ -10,7 +10,8 @@ import unittest
 from typing import Any, Dict, Optional
 
 # 添加 src 目錄到路徑
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from robot_service.service_coordinator import (  # noqa: E402
     ServiceCoordinator,
@@ -19,7 +20,7 @@ from robot_service.service_coordinator import (  # noqa: E402
 from common.service_types import ServiceStatus, ServiceConfig  # noqa: E402
 
 # 從 test_service_coordinator 導入 MockService（避免重複定義）
-from tests.test_service_coordinator import MockService  # noqa: E402
+from tests.phase3.test_service_coordinator import MockService  # noqa: E402
 
 
 class FlakeyService(ServiceBase):

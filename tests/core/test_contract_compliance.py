@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 # 添加 MCP 目錄到路徑
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from MCP.schema_validator import validator, SchemaValidator  # noqa: E402
 from MCP.models import (  # noqa: E402

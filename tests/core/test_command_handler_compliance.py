@@ -12,7 +12,7 @@ from uuid import uuid4
 from unittest.mock import AsyncMock, MagicMock
 
 # 添加 MCP 目錄到路徑
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from MCP.command_handler import CommandHandler  # noqa: E402
 from MCP.auth_manager import AuthManager  # noqa: E402

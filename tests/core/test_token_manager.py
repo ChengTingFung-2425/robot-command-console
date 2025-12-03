@@ -9,7 +9,7 @@ import unittest
 import time
 
 # 添加 src 目錄到路徑
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from common.token_manager import (  # noqa: E402

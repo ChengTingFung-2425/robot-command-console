@@ -290,6 +290,32 @@ token = os.environ.get("APP_TOKEN") or secrets.token_hex(32)
 
 **原因**：硬編碼的預設 token 在生產環境中是安全風險。使用 `secrets.token_hex()` 生成加密安全的隨機 token。
 
+#### 服務啟動異常恢復邏輯（Phase 3）
+
+當子服務啟動失敗時，系統會自動進行重試：
+
+```python
+# ✅ 配置服務啟動重試
+config = ServiceConfig(
+    name="my_service",
+    service_type="MyService",
+    startup_retry_enabled=True,       # 啟用啟動重試
+    max_startup_retry_attempts=3,     # 最大重試次數
+    startup_retry_delay_seconds=1.0,  # 重試間隔
+)
+
+# 服務狀態追蹤
+state.startup_retry_count  # 當前重試次數
+```
+
+**設計考量**：
+1. **自動恢復**：啟動失敗後自動重試，減少人工介入
+2. **配置靈活**：可針對不同服務設定不同的重試策略
+3. **告警機制**：每次重試和最終失敗都會觸發告警
+4. **狀態追蹤**：透過 `get_services_status()` 可查看重試次數
+
+**相關測試**：`tests/test_startup_recovery.py`
+
 ### 基本指令執行流程貫通（Phase 3.1.7）
 
 #### 指令處理器設計
@@ -351,4 +377,4 @@ WebUI/API → ServiceManager → Queue → QueueHandler → CommandProcessor →
 ---
 
 **最後更新**：2025-12-03  
-**版本**：Phase 3.1.7 進行中（基本指令執行流程貫通）
+**版本**：Phase 3.1.7 進行中（啟動異常恢復邏輯已實作）

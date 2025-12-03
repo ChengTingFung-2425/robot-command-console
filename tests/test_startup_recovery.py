@@ -18,6 +18,9 @@ from robot_service.service_coordinator import (  # noqa: E402
 )
 from common.service_types import ServiceStatus, ServiceConfig  # noqa: E402
 
+# 從 test_service_coordinator 導入 MockService（避免重複定義）
+from tests.test_service_coordinator import MockService  # noqa: E402
+
 
 class FlakeyService(ServiceBase):
     """
@@ -446,8 +449,7 @@ class TestStartupRecoveryIntegration(unittest.TestCase):
         async def test():
             coordinator = ServiceCoordinator(health_check_interval=60.0)
 
-            # 正常服務
-            from tests.test_service_coordinator import MockService
+            # 正常服務（使用頂部導入的 MockService）
             normal_service = MockService("normal_service")
 
             # 不穩定服務
@@ -483,7 +485,7 @@ class TestStartupRecoveryIntegration(unittest.TestCase):
         async def test():
             coordinator = ServiceCoordinator(health_check_interval=60.0)
 
-            from tests.test_service_coordinator import MockService
+            # 使用頂部導入的 MockService
             normal_service = MockService("normal_service")
 
             always_fail = FlakeyService("always_fail", failures_before_success=100)

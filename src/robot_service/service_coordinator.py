@@ -571,7 +571,10 @@ class ServiceCoordinator:
                 state.status = ServiceStatus.RUNNING
                 state.started_at = datetime.now(timezone.utc)
                 state.restart_attempts = 0
-                # 保留 startup_retry_count 以便追蹤本次啟動過程中的重試次數
+                # 注意：此處故意不重置 startup_retry_count
+                # 與 restart_attempts（健康檢查失敗後的重啟計數）不同，
+                # startup_retry_count 記錄的是當次啟動過程的重試次數，
+                # 用於監控和告警追蹤，應保留以供外部查詢
                 state.last_error = None
                 await self._notify_state_change(service_name, old_status, ServiceStatus.RUNNING)
 

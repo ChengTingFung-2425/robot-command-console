@@ -351,4 +351,4 @@ WebUI/API → ServiceManager → Queue → QueueHandler → CommandProcessor →
 ---
 
 **最後更新**：2025-12-03  
-**版本**：Phase 3.2 進行中（基本指令執行流程貫通）
+**版本**：Phase 3.1.7 進行中（基本指令執行流程貫通）

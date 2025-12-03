@@ -4,6 +4,7 @@ Service Manager
 """
 
 import logging
+import threading
 from typing import Any, Callable, Dict, List, Optional
 
 from .queue import Message, MessagePriority, MemoryQueue, QueueHandler
@@ -43,6 +44,10 @@ class ServiceManager:
         self.max_workers = max_workers
         self.poll_interval = poll_interval
         self._started = False
+
+        # 初始化 CommandProcessor（使用預設分派器）
+        self._command_processor = CommandProcessor()
+        self._processor_lock = threading.Lock()
 
         logger.info("ServiceManager initialized", extra={
             "queue_max_size": queue_max_size,
@@ -167,10 +172,7 @@ class ServiceManager:
             "service": "robot_service"
         })
 
-        # 使用 CommandProcessor 處理指令
-        if not hasattr(self, '_command_processor'):
-            self._command_processor = CommandProcessor()
-
+        # 使用已初始化的 CommandProcessor 處理指令
         return await self._command_processor.process(message)
 
     def set_action_dispatcher(
@@ -181,14 +183,24 @@ class ServiceManager:
         設定動作分派函式
 
         當需要將動作實際發送到機器人時，使用此方法注入分派邏輯。
+        注意：此方法應在服務啟動前呼叫，以避免處理中斷。
 
         Args:
             dispatcher: 分派函式，接受 (robot_id, actions) 並返回成功與否
+
+        Raises:
+            RuntimeError: 如果在服務運行中嘗試更改分派器
         """
-        self._command_processor = CommandProcessor(action_dispatcher=dispatcher)
-        logger.info("Action dispatcher configured", extra={
-            "service": "robot_service"
-        })
+        with self._processor_lock:
+            if self._started:
+                logger.warning("Changing dispatcher while service is running", extra={
+                    "service": "robot_service"
+                })
+
+            self._command_processor = CommandProcessor(action_dispatcher=dispatcher)
+            logger.info("Action dispatcher configured", extra={
+                "service": "robot_service"
+            })
 
     async def health_check(self) -> Dict[str, Any]:
         """健康檢查"""

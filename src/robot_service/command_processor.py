@@ -14,7 +14,8 @@ from .queue import Message
 logger = logging.getLogger(__name__)
 
 # 有效的基礎動作列表（與 Robot-Console/action_executor.py 同步）
-VALID_ACTIONS = {
+# 使用 frozenset 防止意外修改
+VALID_ACTIONS = frozenset({
     "back_fast", "bow", "chest", "dance_eight", "dance_five", "dance_four",
     "dance_nine", "dance_seven", "dance_six", "dance_ten", "dance_three", "dance_two",
     "go_forward", "kung_fu", "left_kick", "left_move_fast", "left_shot_fast",
@@ -22,7 +23,7 @@ VALID_ACTIONS = {
     "right_uppercut", "sit_ups", "squat", "squat_up", "stand", "stand_up_back",
     "stand_up_front", "stepping", "stop", "turn_left", "turn_right", "twist",
     "wave", "weightlifting", "wing_chun"
-}
+})
 
 
 class CommandProcessor:

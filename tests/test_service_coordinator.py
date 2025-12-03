@@ -94,6 +94,10 @@ class TestServiceConfig(unittest.TestCase):
         self.assertEqual(config.health_check_interval_seconds, 30.0)
         self.assertEqual(config.startup_timeout_seconds, 5.0)
         self.assertEqual(config.warmup_seconds, 2.0)
+        # 啟動異常恢復相關配置
+        self.assertTrue(config.startup_retry_enabled)
+        self.assertEqual(config.max_startup_retry_attempts, 3)
+        self.assertEqual(config.startup_retry_delay_seconds, 1.0)
 
 
 class TestServiceCoordinator(unittest.TestCase):

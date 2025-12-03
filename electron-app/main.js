@@ -2,10 +2,18 @@ const { app, BrowserWindow, ipcMain, Notification } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const crypto = require('crypto');
+const { getTokenManager } = require('./token-manager');
 
 let mainWindow = null;
 let appToken = null;
 let healthCheckInterval = null;
+let tokenRotationInterval = null;
+
+// Token 管理器配置
+const TOKEN_CONFIG = {
+  rotationCheckIntervalMs: 3600000,  // 每小時檢查一次是否需要輪替
+  rotationThresholdHours: 2,  // 剩餘 2 小時時進行輪替
+};
 
 // 服務協調器配置常數
 const COORDINATOR_CONFIG = {
@@ -99,9 +107,65 @@ function sendHealthAlert(title, body, context = {}) {
   }
 }
 
-// 生成應用生命週期內有效的 token
+// 生成應用生命週期內有效的 token（使用 TokenManager）
 function generateToken() {
-  return crypto.randomBytes(32).toString('hex');
+  const tokenManager = getTokenManager();
+  const { token } = tokenManager.generateToken();
+  return token;
+}
+
+// 輪替 Token 並通知背景服務
+async function rotateAppToken(reason = 'scheduled') {
+  const tokenManager = getTokenManager();
+  const { token: newToken, info } = tokenManager.rotateToken(reason);
+  
+  // 更新全域 appToken
+  appToken = newToken;
+  
+  logJSON('info', 'app_token_rotated', 'Application token rotated', {
+    tokenId: info.tokenId,
+    reason: reason,
+    rotationCount: info.rotationCount,
+  });
+  
+  // 通知 Flask 服務更新 Token（透過環境變數重啟或 API）
+  // 注意：目前的實作中，Flask 服務需要重啟才能使用新 Token
+  // 未來可以實作動態 Token 更新機制
+  
+  // 通知渲染進程
+  if (mainWindow && mainWindow.webContents) {
+    mainWindow.webContents.send('token-rotated', {
+      tokenId: info.tokenId,
+      expiresAt: info.expiresAt,
+    });
+  }
+  
+  return { token: newToken, info };
+}
+
+// 檢查並自動輪替 Token
+async function checkAndRotateToken() {
+  const tokenManager = getTokenManager();
+  
+  if (tokenManager.isRotationNeeded(TOKEN_CONFIG.rotationThresholdHours)) {
+    logJSON('info', 'auto_token_rotation', 'Automatic token rotation triggered');
+    await rotateAppToken('auto_expiry');
+  }
+}
+
+// 啟動定期 Token 輪替檢查
+function startTokenRotationCheck() {
+  if (tokenRotationInterval) {
+    clearInterval(tokenRotationInterval);
+  }
+  
+  logJSON('info', 'token_rotation_check_start', 'Starting periodic token rotation checks', {
+    interval_ms: TOKEN_CONFIG.rotationCheckIntervalMs,
+  });
+  
+  tokenRotationInterval = setInterval(async () => {
+    await checkAndRotateToken();
+  }, TOKEN_CONFIG.rotationCheckIntervalMs);
 }
 
 // 取得服務狀態摘要
@@ -564,6 +628,65 @@ ipcMain.handle('check-health', async (event, serviceKey) => {
   }
 });
 
+// ========== Token 管理 IPC Handlers ==========
+
+// IPC 處理：獲取 Token 資訊
+ipcMain.handle('get-token-info', () => {
+  const tokenManager = getTokenManager();
+  return tokenManager.getTokenInfo();
+});
+
+// IPC 處理：輪替 Token
+ipcMain.handle('rotate-token', async (event, reason = 'manual') => {
+  logJSON('info', 'ipc_rotate_token', 'IPC request to rotate token', { reason });
+  try {
+    const { info } = await rotateAppToken(reason);
+    return { 
+      success: true, 
+      tokenInfo: {
+        tokenId: info.tokenId,
+        expiresAt: info.expiresAt,
+        rotationCount: info.rotationCount,
+      }
+    };
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
+});
+
+// IPC 處理：獲取 Token 管理器狀態
+ipcMain.handle('get-token-status', () => {
+  const tokenManager = getTokenManager();
+  return tokenManager.getStatus();
+});
+
+// IPC 處理：獲取 Token 輪替歷史
+ipcMain.handle('get-token-rotation-history', () => {
+  const tokenManager = getTokenManager();
+  return tokenManager.getRotationHistory();
+});
+
+// IPC 處理：檢查是否需要 Token 輪替
+ipcMain.handle('is-token-rotation-needed', (event, thresholdHours = 1.0) => {
+  const tokenManager = getTokenManager();
+  return tokenManager.isRotationNeeded(thresholdHours);
+});
+
+// IPC 處理：使 Token 失效（安全事件時使用）
+ipcMain.handle('invalidate-token', async () => {
+  logJSON('warn', 'ipc_invalidate_token', 'IPC request to invalidate all tokens');
+  const tokenManager = getTokenManager();
+  tokenManager.invalidateToken();
+  appToken = null;
+  
+  // 停止服務以確保安全
+  await stopAllServices();
+  
+  return { success: true, message: 'All tokens invalidated and services stopped' };
+});
+
+// ========== 應用生命週期 ==========
+
 // 應用啟動
 app.whenReady().then(async () => {
   logJSON('info', 'app_ready', 'Unified Launcher ready, initializing services');
@@ -574,6 +697,7 @@ app.whenReady().then(async () => {
     
     createWindow();
     startPeriodicHealthCheck();
+    startTokenRotationCheck();
     
     logJSON('info', 'app_initialized', 'Unified Launcher initialized successfully');
   } catch (error) {
@@ -604,6 +728,11 @@ app.on('before-quit', (event) => {
     if (healthCheckInterval) {
       clearInterval(healthCheckInterval);
       logJSON('info', 'health_check_stopped', 'Stopped periodic health checks');
+    }
+    
+    if (tokenRotationInterval) {
+      clearInterval(tokenRotationInterval);
+      logJSON('info', 'token_rotation_check_stopped', 'Stopped periodic token rotation checks');
     }
     
     // 停止所有服務後再退出

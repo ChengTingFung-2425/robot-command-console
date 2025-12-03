@@ -128,7 +128,58 @@ POST /api/llm/providers/select
 Content-Type: application/json
 
 {
-  "provider_name": "ollama"
+  "provider_name": "ollama",           // 必填，提供商名稱
+  "model_name": "llama2:latest",       // 選填，指定要使用的模型
+  "save_preference": true              // 選填，預設為 true，是否保存為用戶偏好
+}
+```
+
+回應：
+```json
+{
+  "message": "提供商切換成功",
+  "provider": "ollama",
+  "preference_saved": true
+}
+```
+
+### 取得用戶 LLM 偏好設定
+```http
+GET /api/llm/preferences
+```
+
+回應：
+```json
+{
+  "provider": "ollama",
+  "model": "llama2:latest",
+  "success": true
+}
+```
+
+### 保存用戶 LLM 偏好設定
+```http
+POST /api/llm/preferences
+Content-Type: application/json
+
+{
+  "provider": "ollama",    // 選填參數
+  "model": "llama2:latest" // 選填參數
+}
+```
+
+> **說明：**
+> - `provider` 與 `model` 皆為選填參數，可僅提供其中之一或皆不提供。
+> - 若未提供某欄位，則該欄位不會被更新。
+> - 若提供 `null` 值，則可用於清除偏好設定。
+
+回應：
+```json
+{
+  "success": true,
+  "provider": "ollama",
+  "model": "llama2:latest",
+  "message": "LLM 偏好設定已保存"
 }
 ```
 

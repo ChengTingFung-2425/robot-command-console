@@ -19,6 +19,9 @@ class User(UserMixin, db.Model):
     # UI preferences
     ui_duration_unit = db.Column(db.String(8), default='s')  # 's' or 'ms'
     ui_verify_collapsed = db.Column(db.Boolean, default=False)
+    # LLM preferences
+    llm_provider = db.Column(db.String(64), nullable=True)  # preferred LLM provider (e.g., 'ollama', 'lmstudio')
+    llm_model = db.Column(db.String(128), nullable=True)  # preferred LLM model (e.g., 'llama2:latest')
     robots = db.relationship('Robot', backref='owner', lazy='dynamic')
 
     def set_password(self, password: str) -> None:

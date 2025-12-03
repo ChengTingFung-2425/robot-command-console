@@ -636,8 +636,8 @@ class SharedStateManager:
         bus_health = await self._event_bus.health_check()
 
         is_healthy = (
-            store_health.get("status") == "healthy" and
-            bus_health.get("status") in ["healthy", "stopped"]
+            store_health.get("status") == "healthy"
+            and bus_health.get("status") in ["healthy", "stopped"]
         )
 
         return {

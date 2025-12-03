@@ -928,24 +928,56 @@ def get_llm_providers_health():
 @bp.route('/api/llm/providers/select', methods=['POST'])
 @login_required
 def select_llm_provider():
-    """選擇要使用的 LLM 提供商"""
+    """選擇要使用的 LLM 提供商並保存用戶偏好"""
     try:
         # 支援 JSON body 或 query parameter
         data = request.get_json(silent=True) or {}
         provider_name = data.get('provider_name') or request.args.get('provider_name')
+        model_name = data.get('model_name') or request.args.get('model_name')
+        save_preference = data.get('save_preference', True)
+
         if not provider_name:
             return jsonify({
                 'success': False,
                 'error': '缺少 provider_name 參數'
             }), 400
-        
+
+        # provider_name 格式驗證
+        if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9_-]*$', provider_name):
+            return jsonify({
+                'success': False,
+                'error': 'provider_name 格式不正確'
+            }), 400
+
+        # model_name 長度驗證
+        if model_name is not None and len(model_name) > 128:
+            return jsonify({
+                'success': False,
+                'error': 'model_name 長度不可超過 128 字元'
+            }), 400
+
         response = requests.post(
             f'{MCP_API_URL}/llm/providers/select',
             json={'provider_name': provider_name},
             timeout=5
         )
         if response.status_code == 200:
-            return jsonify(response.json())
+            result = response.json()
+
+            # 保存用戶偏好設定
+            if save_preference:
+                try:
+                    current_user.llm_provider = provider_name
+                    if model_name:
+                        current_user.llm_model = model_name
+                    db.session.commit()
+                    result['preference_saved'] = True
+                except Exception as e:
+                    db.session.rollback()
+                    logging.warning(f'保存 LLM 偏好設定失敗: {str(e)}')
+                    result['preference_saved'] = False
+
+            return jsonify(result)
         else:
             return jsonify({
                 'success': False,
@@ -961,6 +993,107 @@ def select_llm_provider():
         logging.error(f'選擇 LLM 提供商失敗: {str(e)}', exc_info=True)
         return jsonify({
             'success': False,
+            'error': '伺服器發生錯誤'
+        }), 500
+
+
+@bp.route('/api/llm/preferences', methods=['GET'])
+@login_required
+def get_llm_preferences():
+    """取得用戶的 LLM 偏好設定"""
+    try:
+        return jsonify({
+            'provider': current_user.llm_provider,
+            'model': current_user.llm_model,
+            'success': True
+        })
+    except Exception as e:
+        logging.error(f'取得 LLM 偏好設定失敗: {str(e)}', exc_info=True)
+        return jsonify({
+            'success': False,
+            'provider': None,
+            'model': None,
+            'error': '取得偏好設定失敗'
+        }), 500
+
+
+@bp.route('/api/llm/preferences', methods=['POST'])
+@login_required
+def save_llm_preferences():
+    """保存用戶的 LLM 偏好設定"""
+    try:
+        data = request.get_json(silent=True) or {}
+
+        # 驗證並更新 provider
+        if 'provider' in data:
+            provider = data.get('provider')
+            if provider is not None and not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9_-]*$', provider):
+                return jsonify({
+                    'success': False,
+                    'error': '無效的提供商名稱'
+                }), 400
+            current_user.llm_provider = provider
+
+        # 驗證並更新 model
+        if 'model' in data:
+            model = data.get('model')
+            if model is not None and len(model) > 128:
+                return jsonify({
+                    'success': False,
+                    'error': '模型名稱過長'
+                }), 400
+            current_user.llm_model = model
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'provider': current_user.llm_provider,
+            'model': current_user.llm_model,
+            'message': 'LLM 偏好設定已保存'
+        })
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f'保存 LLM 偏好設定失敗: {str(e)}', exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': '保存偏好設定失敗'
+        }), 500
+
+
+@bp.route('/api/llm/providers/<provider_name>/models', methods=['GET'])
+def get_provider_models(provider_name):
+    """取得特定提供商的可用模型列表"""
+    try:
+        # 驗證 provider_name 僅包含允許的字元（不允許以連字號開頭）
+        if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9_-]*$', provider_name):
+            return jsonify({
+                'models': [],
+                'error': '無效的提供商名稱'
+            }), 400
+
+        safe_provider_name = url_quote(provider_name, safe='_-')
+        response = requests.get(
+            f'{MCP_API_URL}/llm/providers/{safe_provider_name}/models',
+            timeout=10
+        )
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify({
+                'models': [],
+                'error': '取得模型列表失敗'
+            }), response.status_code
+    except requests.exceptions.ConnectionError:
+        return jsonify({
+            'models': [],
+            'mcp_available': False,
+            'error': '無法連線到 MCP API 伺服器'
+        }), 503
+    except Exception as e:
+        logging.error(f'取得提供商模型列表失敗: {str(e)}', exc_info=True)
+        return jsonify({
+            'models': [],
             'error': '伺服器發生錯誤'
         }), 500
 
@@ -1000,8 +1133,8 @@ def discover_llm_providers():
 def refresh_llm_provider(provider_name):
     """重新檢查特定 LLM 提供商的健康狀態"""
     try:
-        # 驗證 provider_name 僅包含允許的字元（字母、數字、底線、連字號）
-        if not re.match(r'^[a-zA-Z0-9_-]+$', provider_name):
+        # 驗證 provider_name 僅包含允許的字元（不允許以連字號開頭）
+        if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9_-]*$', provider_name):
             return jsonify({
                 'success': False,
                 'error': '無效的提供商名稱'

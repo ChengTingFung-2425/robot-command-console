@@ -96,10 +96,17 @@
     <div class="panel-body">
         <div class="row">
             <div class="col-md-6">
-                <h4>模型列表</h4>
-                <ul id="selected-provider-models" class="list-group">
-                    <!-- 動態填充 -->
-                </ul>
+                <h4>模型選擇</h4>
+                <div class="form-group">
+                    <label for="model-select">選擇模型：</label>
+                    <select id="model-select" class="form-control">
+                        <option value="">-- 載入中 --</option>
+                    </select>
+                </div>
+                <button type="button" class="btn btn-success" id="save-model-btn" onclick="saveModelPreference()">
+                    <span class="glyphicon glyphicon-save"></span> 保存偏好
+                </button>
+                <span id="save-status" class="text-muted" style="margin-left: 10px;"></span>
             </div>
             <div class="col-md-6">
                 <h4>提供商資訊</h4>
@@ -110,6 +117,8 @@
                     <dd id="selected-provider-version">-</dd>
                     <dt>回應時間</dt>
                     <dd id="selected-provider-response-time">-</dd>
+                    <dt>已保存偏好</dt>
+                    <dd id="saved-preference-text">-</dd>
                 </dl>
             </div>
         </div>
@@ -590,28 +599,162 @@
         document.getElementById('selected-provider-response-time').textContent = 
             health.response_time_ms ? health.response_time_ms.toFixed(1) + ' ms' : '-';
 
-        // 模型列表（使用安全的 DOM 操作）
-        var modelsList = document.getElementById('selected-provider-models');
-        modelsList.innerHTML = '';
-
-        if (health.available_models && health.available_models.length > 0) {
-            health.available_models.forEach(function(model) {
-                var li = document.createElement('li');
-                li.className = 'list-group-item';
-                var icon = document.createElement('span');
-                icon.className = 'glyphicon glyphicon-cog';
-                icon.setAttribute('aria-hidden', 'true');
-                li.appendChild(icon);
-                li.appendChild(document.createTextNode(' ' + model));
-                modelsList.appendChild(li);
+        // 載入模型列表並更新選擇器，完成後再載入用戶偏好設定
+        loadProviderModels(currentSelectedProvider)
+            .then(function() {
+                loadUserPreferences();
             });
-        } else {
-            var li = document.createElement('li');
-            li.className = 'list-group-item text-muted';
-            li.textContent = '沒有可用的模型';
-            modelsList.appendChild(li);
+    }
+
+    // 保存的偏好設定
+    var savedProviderPreference = null;
+    var savedModelPreference = null;
+
+    // 載入用戶偏好設定（在載入模型列表完成後載入）
+    function loadUserPreferences() {
+        return fetch('/api/llm/preferences')
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                savedProviderPreference = data.provider;
+                savedModelPreference = data.model;
+                
+                // 更新顯示
+                var prefText = document.getElementById('saved-preference-text');
+                if (data.provider) {
+                    var text = data.provider;
+                    if (data.model) {
+                        text += ' / ' + data.model;
+                    }
+                    prefText.textContent = text;
+                } else {
+                    prefText.textContent = '尚未設定';
+                }
+
+                // 如果模型選擇器已載入，嘗試設定選中的模型
+                applySavedModelToSelect();
+            })
+            .catch(function(err) {
+                console.error('載入偏好設定失敗:', err);
+            });
+    }
+
+    // 統一的模型選擇應用邏輯
+    function applySavedModelToSelect() {
+        var modelSelect = document.getElementById('model-select');
+        if (!savedModelPreference || !modelSelect || modelSelect.disabled) {
+            return;
+        }
+        
+        // 檢查保存的模型是否存在於選項中
+        var modelExists = false;
+        for (var i = 0; i < modelSelect.options.length; i++) {
+            if (modelSelect.options[i].value === savedModelPreference) {
+                modelExists = true;
+                break;
+            }
+        }
+        
+        if (modelExists) {
+            modelSelect.value = savedModelPreference;
+        } else if (savedModelPreference) {
+            // 保存的模型不存在於選項中，顯示警告
+            console.warn('保存的模型 "' + savedModelPreference + '" 不再可用');
         }
     }
+
+    // 載入提供商的模型列表
+    function loadProviderModels(providerName) {
+        var modelSelect = document.getElementById('model-select');
+        modelSelect.innerHTML = '<option value="">-- 載入中 --</option>';
+        modelSelect.disabled = true;
+
+        return fetch('/api/llm/providers/' + encodeURIComponent(providerName) + '/models')
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                modelSelect.innerHTML = '';
+                
+                if (data.models && data.models.length > 0) {
+                    // 添加預設選項
+                    var defaultOpt = document.createElement('option');
+                    defaultOpt.value = '';
+                    defaultOpt.textContent = '-- 選擇模型 --';
+                    modelSelect.appendChild(defaultOpt);
+                    
+                    data.models.forEach(function(model) {
+                        var option = document.createElement('option');
+                        option.value = model.id || model.name;
+                        option.textContent = model.name + (model.size ? ' (' + model.size + ')' : '');
+                        modelSelect.appendChild(option);
+                    });
+                    modelSelect.disabled = false;
+                    
+                    // 使用統一的邏輯應用保存的模型偏好
+                    applySavedModelToSelect();
+                } else {
+                    var noModelOpt = document.createElement('option');
+                    noModelOpt.value = '';
+                    noModelOpt.textContent = '-- 沒有可用的模型 --';
+                    modelSelect.appendChild(noModelOpt);
+                }
+            })
+            .catch(function(err) {
+                console.error('載入模型失敗:', err);
+                modelSelect.innerHTML = '<option value="">-- 載入失敗 --</option>';
+            });
+    }
+
+    // 保存模型偏好設定
+    window.saveModelPreference = function() {
+        var modelSelect = document.getElementById('model-select');
+        var selectedModel = modelSelect.value;
+        var saveBtn = document.getElementById('save-model-btn');
+        var saveStatus = document.getElementById('save-status');
+        
+        saveBtn.disabled = true;
+        saveStatus.textContent = '保存中...';
+
+        fetch('/api/llm/preferences', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                provider: currentSelectedProvider,
+                model: selectedModel || null
+            })
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.success) {
+                savedProviderPreference = data.provider;
+                savedModelPreference = data.model;
+                
+                // 更新顯示
+                var prefText = document.getElementById('saved-preference-text');
+                var text = data.provider || '';
+                if (data.model) {
+                    text += ' / ' + data.model;
+                }
+                prefText.textContent = text || '尚未設定';
+                
+                saveStatus.textContent = '已保存';
+                showAlert('success', 'LLM 偏好設定已保存');
+            } else {
+                saveStatus.textContent = '保存失敗';
+                showAlert('danger', data.error || '保存偏好設定失敗');
+            }
+        })
+        .catch(function(err) {
+            console.error('保存偏好設定失敗:', err);
+            saveStatus.textContent = '保存失敗';
+            showAlert('danger', '保存偏好設定時發生錯誤');
+        })
+        .finally(function() {
+            saveBtn.disabled = false;
+            // 3 秒後清除狀態文字
+            setTimeout(function() {
+                saveStatus.textContent = '';
+            }, 3000);
+        });
+    };
 
     // 顯示提示訊息（使用安全的 DOM 操作避免 XSS）
     function showAlert(type, message) {

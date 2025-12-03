@@ -60,9 +60,10 @@ class MQTTClientManager:
             
         try:
             # 動態導入 AWS IoT SDK（避免在未安裝時出錯）
+            # mqtt5 在 publish() 方法中使用（見第 130 行）
             try:
-                from awsiot import mqtt5_client_builder  # noqa: F401
-                from awscrt import mqtt5  # noqa: F401
+                from awsiot import mqtt5_client_builder
+                from awscrt import mqtt5  # noqa: F401 - 確認模組可用
                 self.use_aws_iot = True
             except ImportError:
                 logger.warning("AWS IoT SDK 未安裝，無法使用 MQTT 功能")

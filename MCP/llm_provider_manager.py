@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class LLMProviderManager:
     """
     LLM 提供商管理器
-    
+
     負責：
     - 自動偵測本地 LLM 服務
     - 管理提供商實例
@@ -43,7 +43,7 @@ class LLMProviderManager:
     ):
         """
         初始化提供商管理器
-        
+
         Args:
             custom_providers: 自訂提供商類別列表（用於擴充）
             mcp_tool_interface: MCP 工具介面，用於注入到提供商
@@ -65,11 +65,11 @@ class LLMProviderManager:
     ) -> Dict[str, ProviderHealth]:
         """
         自動偵測可用的本地 LLM 提供商
-        
+
         Args:
             host: 掃描的主機位址
             timeout: 每個提供商的檢查逾時時間（秒）
-            
+
         Returns:
             提供商名稱到健康狀態的對映
         """
@@ -125,10 +125,10 @@ class LLMProviderManager:
     ) -> ProviderHealth:
         """
         檢查提供商健康狀態並註冊可用的提供商
-        
+
         Args:
             provider: 提供商實例
-            
+
         Returns:
             健康狀態
         """
@@ -163,7 +163,7 @@ class LLMProviderManager:
     ) -> None:
         """
         手動註冊提供商
-        
+
         Args:
             provider: 提供商實例
             set_as_default: 是否設為預設提供商
@@ -182,7 +182,7 @@ class LLMProviderManager:
     def set_mcp_tool_interface(self, tool_interface):
         """
         設定 MCP 工具介面並注入到所有已註冊的提供商
-        
+
         Args:
             tool_interface: MCPToolInterface 實例
         """
@@ -198,10 +198,10 @@ class LLMProviderManager:
     def get_provider(self, provider_name: Optional[str] = None) -> Optional[LLMProviderBase]:
         """
         取得提供商實例
-        
+
         Args:
             provider_name: 提供商名稱，若未指定則返回當前選擇的提供商
-            
+
         Returns:
             提供商實例，若不存在則返回 None
         """
@@ -216,10 +216,10 @@ class LLMProviderManager:
     def select_provider(self, provider_name: str) -> bool:
         """
         選擇要使用的提供商
-        
+
         Args:
             provider_name: 提供商名稱
-            
+
         Returns:
             是否選擇成功
         """
@@ -234,7 +234,7 @@ class LLMProviderManager:
     def get_selected_provider_name(self) -> Optional[str]:
         """
         取得當前選擇的提供商名稱
-        
+
         Returns:
             提供商名稱，若未選擇則返回 None
         """
@@ -243,7 +243,7 @@ class LLMProviderManager:
     def list_providers(self) -> List[str]:
         """
         列出所有已註冊的提供商
-        
+
         Returns:
             提供商名稱列表
         """
@@ -252,7 +252,7 @@ class LLMProviderManager:
     async def get_all_provider_health(self) -> Dict[str, ProviderHealth]:
         """
         取得所有已註冊提供商的健康狀態
-        
+
         Returns:
             提供商名稱到健康狀態的對映
         """
@@ -278,10 +278,10 @@ class LLMProviderManager:
     async def refresh_provider(self, provider_name: str) -> Optional[ProviderHealth]:
         """
         重新檢查特定提供商的健康狀態
-        
+
         Args:
             provider_name: 提供商名稱
-            
+
         Returns:
             健康狀態，若提供商不存在則返回 None
         """
@@ -309,7 +309,7 @@ class LLMProviderManager:
     async def _try_fallback_provider(self) -> bool:
         """
         嘗試切換到另一個可用的提供商
-        
+
         Returns:
             是否成功切換
         """

@@ -392,11 +392,11 @@ class CommandHandler:
     ) -> CommandResponse:
         """
         處理指令規格（用於工具呼叫）
-        
+
         Args:
             command_spec: CommandSpec 物件
             trace_id: 追蹤 ID（選用）
-            
+
         Returns:
             CommandResponse
         """

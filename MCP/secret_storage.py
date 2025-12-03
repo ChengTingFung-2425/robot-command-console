@@ -20,10 +20,10 @@ class SecretStorage(ABC):
     def get_secret(self, key: str) -> Optional[str]:
         """
         獲取秘密
-        
+
         Args:
             key: 秘密的鍵
-            
+
         Returns:
             秘密值，如果不存在則返回 None
         """
@@ -33,11 +33,11 @@ class SecretStorage(ABC):
     def set_secret(self, key: str, value: str) -> bool:
         """
         設定秘密
-        
+
         Args:
             key: 秘密的鍵
             value: 秘密值
-            
+
         Returns:
             成功返回 True，失敗返回 False
         """
@@ -47,10 +47,10 @@ class SecretStorage(ABC):
     def delete_secret(self, key: str) -> bool:
         """
         刪除秘密
-        
+
         Args:
             key: 秘密的鍵
-            
+
         Returns:
             成功返回 True，失敗返回 False
         """
@@ -60,7 +60,7 @@ class SecretStorage(ABC):
     def list_secrets(self) -> list[str]:
         """
         列出所有秘密鍵
-        
+
         Returns:
             秘密鍵列表
         """
@@ -100,7 +100,7 @@ class FileSecretStorage(SecretStorage):
     """
     檔案型秘密儲存
     將秘密儲存在加密的 JSON 檔案中
-    
+
     注意：此實作使用簡單的 JSON 儲存，不包含加密
     生產環境應使用加密檔案或外部秘密管理服務
     """
@@ -108,7 +108,7 @@ class FileSecretStorage(SecretStorage):
     def __init__(self, file_path: str = None):
         """
         初始化檔案儲存
-        
+
         Args:
             file_path: 秘密檔案路徑，預設為 ~/.robot-console/secrets.json
         """
@@ -188,7 +188,7 @@ class FileSecretStorage(SecretStorage):
 class KeychainSecretStorage(SecretStorage):
     """
     macOS Keychain 秘密儲存（Stub 實作）
-    
+
     注意：這是一個 stub 實作，用於展示介面
     實際使用需要安裝 keyring 套件並實作完整功能
     """
@@ -196,7 +196,7 @@ class KeychainSecretStorage(SecretStorage):
     def __init__(self, service_name: str = "robot-console"):
         """
         初始化 Keychain 儲存
-        
+
         Args:
             service_name: Keychain 服務名稱
         """
@@ -233,7 +233,7 @@ class KeychainSecretStorage(SecretStorage):
 class DPAPISecretStorage(SecretStorage):
     """
     Windows DPAPI 秘密儲存（Stub 實作）
-    
+
     注意：這是一個 stub 實作，用於展示介面
     實際使用需要安裝 pywin32 套件並實作完整功能
     """
@@ -241,7 +241,7 @@ class DPAPISecretStorage(SecretStorage):
     def __init__(self, storage_path: str = None):
         """
         初始化 DPAPI 儲存
-        
+
         Args:
             storage_path: 加密資料儲存路徑
         """
@@ -290,7 +290,7 @@ class ChainedSecretStorage(SecretStorage):
     def __init__(self, storages: list[SecretStorage]):
         """
         初始化鏈式儲存
-        
+
         Args:
             storages: 秘密儲存後端列表，按優先級排序
         """
@@ -359,11 +359,11 @@ class ChainedSecretStorage(SecretStorage):
 def create_default_storage() -> SecretStorage:
     """
     建立預設的秘密儲存
-    
+
     使用鏈式儲存，優先順序：
     1. 環境變數（唯讀）
     2. 檔案儲存（讀寫）
-    
+
     Returns:
         預設的秘密儲存實例
     """

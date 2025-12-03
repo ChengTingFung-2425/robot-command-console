@@ -111,9 +111,9 @@ async def auth_middleware(request: Request, call_next):
     public_paths = ['/health', '/metrics', '/v1/auth/login', '/api/auth/login']
 
     # 檢查是否是公開端點
-    if (request.url.path in public_paths or
-            request.url.path.startswith('/docs') or
-            request.url.path.startswith('/openapi')):
+    if (request.url.path in public_paths
+            or request.url.path.startswith('/docs')
+            or request.url.path.startswith('/openapi')):
         return await call_next(request)
 
     # 檢查 Authorization header
@@ -741,7 +741,7 @@ async def invoke_llm_with_tools(
 ):
     """
     使用 LLM 處理指令，並啟用 MCP 工具呼叫
-    
+
     Args:
         prompt: 使用者輸入
         robot_id: 目標機器人 ID
@@ -1005,7 +1005,7 @@ async def refresh_provider_health(provider_name: str):
 async def get_connection_status():
     """
     取得 LLM 連線狀態
-    
+
     Returns:
         包含網路狀態、本地 LLM 狀態和回退狀態的資訊
     """
@@ -1034,10 +1034,10 @@ async def get_connection_status():
 async def get_llm_warnings(clear: bool = False):
     """
     取得 LLM 相關警告訊息
-    
+
     Args:
         clear: 是否在取得後清除警告
-        
+
     Returns:
         警告列表
     """
@@ -1075,7 +1075,7 @@ async def clear_llm_warnings():
 async def check_internet_connection():
     """
     檢查網路連線狀態
-    
+
     Returns:
         網路連線狀態
     """

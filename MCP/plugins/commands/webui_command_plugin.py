@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class WebUICommandPlugin(CommandPluginBase):
     """
     WebUI 指令插件
-    
+
     處理 WebUI 特定的指令，如：
     - emergency_stop: 緊急停止
     - video_stream_control: 視訊串流控制

@@ -42,7 +42,7 @@ class LLMProcessor:
     ):
         """
         初始化 LLM 處理器
-        
+
         Args:
             provider_manager: LLM 提供商管理器，用於管理本地 LLM 提供商
             use_local_fallback: 當網路不可用時是否自動使用本地 LLM
@@ -59,10 +59,10 @@ class LLMProcessor:
     def check_internet_connection(self, timeout: Optional[int] = None) -> bool:
         """
         檢查網路連線狀態
-        
+
         Args:
             timeout: 逾時時間（秒）
-            
+
         Returns:
             True 如果網路可用，False 如果不可用
         """
@@ -87,10 +87,10 @@ class LLMProcessor:
     async def check_internet_connection_async(self, timeout: Optional[int] = None) -> bool:
         """
         非同步檢查網路連線狀態
-        
+
         Args:
             timeout: 逾時時間（秒）
-            
+
         Returns:
             True 如果網路可用，False 如果不可用
         """
@@ -100,12 +100,12 @@ class LLMProcessor:
     def add_warning(self, warning_type: str, message: str, details: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         添加警告訊息
-        
+
         Args:
             warning_type: 警告類型（如 'internet_unavailable', 'local_llm_error'）
             message: 警告訊息
             details: 額外細節
-            
+
         Returns:
             警告物件
         """
@@ -123,10 +123,10 @@ class LLMProcessor:
     def get_warnings(self, clear: bool = False) -> List[Dict[str, Any]]:
         """
         取得所有警告訊息
-        
+
         Args:
             clear: 是否清除警告
-            
+
         Returns:
             警告列表
         """
@@ -142,7 +142,7 @@ class LLMProcessor:
     def get_connection_status(self) -> Dict[str, Any]:
         """
         取得連線狀態摘要
-        
+
         Returns:
             連線狀態資訊
         """
@@ -168,12 +168,12 @@ class LLMProcessor:
     ) -> Tuple[str, float]:
         """
         將音訊轉換為文字
-        
+
         Args:
             audio_bytes: 音訊資料（位元組）
             audio_format: 音訊格式
             language: 語言代碼
-            
+
         Returns:
             (轉錄文字, 信心度) 的元組
         """
@@ -210,14 +210,14 @@ class LLMProcessor:
         """
         使用 LLM 解析指令（透過本地提供商或規則式）
         支援網路不可用時自動回退到本地 LLM
-        
+
         Args:
             transcription: 轉錄的文字
             robot_id: 目標機器人 ID
             context: 額外的上下文資訊
             model: 使用的模型名稱（選用）
             prefer_cloud: 是否優先使用雲端 LLM（如果可用）
-            
+
         Returns:
             解析後的指令規格，如果無法解析則返回 None
         """
@@ -316,13 +316,13 @@ class LLMProcessor:
     ) -> Optional[Dict[str, Any]]:
         """
         使用本地 LLM 提供商解析指令
-        
+
         Args:
             transcription: 轉錄的文字
             robot_id: 目標機器人 ID
             provider: LLM 提供商實例
             model: 使用的模型名稱
-            
+
         Returns:
             解析後的參數字典
         """
@@ -392,10 +392,10 @@ class LLMProcessor:
     def _simple_parse(self, text: str) -> Optional[Dict[str, Any]]:
         """
         簡單的規則式指令解析（示範用）
-        
+
         Args:
             text: 要解析的文字
-            
+
         Returns:
             解析後的參數字典
         """

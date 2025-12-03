@@ -64,7 +64,7 @@ class PluginBase(ABC):
     def __init__(self, config: Optional[PluginConfig] = None):
         """
         初始化插件
-        
+
         Args:
             config: 插件配置
         """
@@ -78,7 +78,7 @@ class PluginBase(ABC):
     def metadata(self) -> PluginMetadata:
         """
         插件元資料
-        
+
         Returns:
             PluginMetadata 物件
         """
@@ -97,7 +97,7 @@ class PluginBase(ABC):
     async def initialize(self) -> bool:
         """
         初始化插件
-        
+
         Returns:
             是否成功初始化
         """
@@ -123,7 +123,7 @@ class PluginBase(ABC):
     async def shutdown(self) -> bool:
         """
         關閉插件
-        
+
         Returns:
             是否成功關閉
         """
@@ -145,7 +145,7 @@ class PluginBase(ABC):
     async def _on_initialize(self) -> bool:
         """
         插件初始化實作
-        
+
         Returns:
             是否成功
         """
@@ -155,7 +155,7 @@ class PluginBase(ABC):
     async def _on_shutdown(self) -> bool:
         """
         插件關閉實作
-        
+
         Returns:
             是否成功
         """
@@ -164,7 +164,7 @@ class PluginBase(ABC):
     async def health_check(self) -> Dict[str, Any]:
         """
         健康檢查
-        
+
         Returns:
             健康狀態資訊
         """
@@ -194,12 +194,12 @@ class CommandPluginBase(PluginBase):
     ) -> Dict[str, Any]:
         """
         執行指令
-        
+
         Args:
             command_name: 指令名稱
             parameters: 指令參數
             context: 執行上下文
-            
+
         Returns:
             執行結果
         """
@@ -209,7 +209,7 @@ class CommandPluginBase(PluginBase):
     def get_supported_commands(self) -> List[str]:
         """
         取得支援的指令列表
-        
+
         Returns:
             指令名稱列表
         """
@@ -218,10 +218,10 @@ class CommandPluginBase(PluginBase):
     def get_command_schema(self, command_name: str) -> Optional[Dict[str, Any]]:
         """
         取得指令的參數 schema
-        
+
         Args:
             command_name: 指令名稱
-            
+
         Returns:
             參數 schema（JSON Schema 格式）
         """
@@ -239,7 +239,7 @@ class DevicePluginBase(PluginBase):
     def device_type(self) -> str:
         """
         裝置類型
-        
+
         Returns:
             裝置類型（如 camera, sensor, motor）
         """
@@ -249,10 +249,10 @@ class DevicePluginBase(PluginBase):
     async def read_data(self, **kwargs) -> Dict[str, Any]:
         """
         讀取裝置資料
-        
+
         Args:
             **kwargs: 讀取參數
-            
+
         Returns:
             裝置資料
         """
@@ -261,11 +261,11 @@ class DevicePluginBase(PluginBase):
     async def write_data(self, data: Dict[str, Any], **kwargs) -> bool:
         """
         寫入裝置資料（選用，並非所有裝置都支援）
-        
+
         Args:
             data: 要寫入的資料
             **kwargs: 寫入參數
-            
+
         Returns:
             是否成功
         """
@@ -275,7 +275,7 @@ class DevicePluginBase(PluginBase):
     async def get_device_info(self) -> Dict[str, Any]:
         """
         取得裝置資訊
-        
+
         Returns:
             裝置資訊
         """
@@ -284,7 +284,7 @@ class DevicePluginBase(PluginBase):
     async def start_stream(self) -> bool:
         """
         啟動串流（選用）
-        
+
         Returns:
             是否成功
         """
@@ -295,7 +295,7 @@ class DevicePluginBase(PluginBase):
     async def stop_stream(self) -> bool:
         """
         停止串流（選用）
-        
+
         Returns:
             是否成功
         """

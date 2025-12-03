@@ -94,10 +94,10 @@ class AuthManager:
     async def decode_token(self, token: str) -> Optional[Dict[str, Any]]:
         """
         解碼 Token 並返回 payload
-        
+
         Args:
             token: JWT token
-            
+
         Returns:
             Token payload，如果無效則返回 None
         """
@@ -225,7 +225,7 @@ class AuthManager:
     def _hash_password(self, password: str) -> str:
         """
         雜湊密碼（使用 bcrypt，自動產生隨機鹽值）
-        
+
         bcrypt 限制密碼長度最多 72 bytes，超過會自動截斷
         """
         # bcrypt 限制密碼長度為 72 bytes
@@ -235,7 +235,7 @@ class AuthManager:
     def _verify_password(self, password: str, password_hash: str) -> bool:
         """
         驗證密碼（使用 bcrypt）
-        
+
         需要與 _hash_password 使用相同的截斷邏輯
         """
         # bcrypt 限制密碼長度為 72 bytes

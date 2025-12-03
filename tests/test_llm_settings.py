@@ -192,6 +192,35 @@ class TestLLMSettingsRoutes:
         assert 'error' in data
 
     @patch('WebUI.app.routes.requests.post')
+    def test_select_llm_provider_invalid_format(
+            self, mock_post, authenticated_client):
+        """測試選擇 LLM 提供商格式不正確"""
+        response = authenticated_client.post(
+            '/api/llm/providers/select',
+            json={'provider_name': '-invalid'}
+        )
+        assert response.status_code == 400
+
+        data = response.get_json()
+        assert data['success'] is False
+        assert 'error' in data
+
+    @patch('WebUI.app.routes.requests.post')
+    def test_select_llm_provider_model_too_long(
+            self, mock_post, authenticated_client):
+        """測試選擇 LLM 提供商模型名稱過長"""
+        long_model = 'a' * 129
+        response = authenticated_client.post(
+            '/api/llm/providers/select',
+            json={'provider_name': 'ollama', 'model_name': long_model}
+        )
+        assert response.status_code == 400
+
+        data = response.get_json()
+        assert data['success'] is False
+        assert 'error' in data
+
+    @patch('WebUI.app.routes.requests.post')
     def test_discover_llm_providers_api(self, mock_post, authenticated_client):
         """測試偵測 LLM 提供商 API"""
         mock_response = MagicMock()

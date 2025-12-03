@@ -942,6 +942,20 @@ def select_llm_provider():
                 'error': '缺少 provider_name 參數'
             }), 400
 
+        # provider_name 格式驗證
+        if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9_-]*$', provider_name):
+            return jsonify({
+                'success': False,
+                'error': 'provider_name 格式不正確'
+            }), 400
+
+        # model_name 長度驗證
+        if model_name is not None and len(model_name) > 128:
+            return jsonify({
+                'success': False,
+                'error': 'model_name 長度不可超過 128 字元'
+            }), 400
+
         response = requests.post(
             f'{MCP_API_URL}/llm/providers/select',
             json={'provider_name': provider_name},

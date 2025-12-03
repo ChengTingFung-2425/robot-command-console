@@ -163,10 +163,15 @@ POST /api/llm/preferences
 Content-Type: application/json
 
 {
-  "provider": "ollama",
-  "model": "llama2:latest"
+  "provider": "ollama",    // 選填參數
+  "model": "llama2:latest" // 選填參數
 }
 ```
+
+> **說明：**
+> - `provider` 與 `model` 皆為選填參數，可僅提供其中之一或皆不提供。
+> - 若未提供某欄位，則該欄位不會被更新。
+> - 若提供 `null` 值，則可用於清除偏好設定。
 
 回應：
 ```json

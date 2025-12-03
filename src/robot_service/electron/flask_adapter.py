@@ -1,14 +1,20 @@
 """
 Flask Adapter
 將 robot_service 適配為 Flask 應用，供 Electron 使用
+
+安全通信特性：
+- Bearer Token 認證
+- Token 輪替支援（寬限期）
+- 時間安全的 Token 比較
 """
 
 import asyncio
+import hmac
 import logging
 import os
 import sys
 from functools import wraps
-from typing import Optional
+from typing import List, Optional
 
 from flask import Flask, g, jsonify, request
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
@@ -18,9 +24,99 @@ from ..service_manager import ServiceManager
 from ..utils import utc_now, utc_now_iso, CustomJsonFormatter
 
 
+class TokenValidator:
+    """
+    Token 驗證器
+
+    支援多 Token 驗證，用於 Token 輪替期間的寬限期驗證。
+    """
+
+    def __init__(self, primary_token: str):
+        """
+        初始化驗證器
+
+        Args:
+            primary_token: 主要 Token
+        """
+        self._tokens: List[str] = [primary_token]
+        self._logger = logging.getLogger(__name__)
+
+    def add_token(self, token: str) -> None:
+        """
+        添加額外的有效 Token（用於輪替期間）
+
+        Args:
+            token: 要添加的 Token
+        """
+        if token and token not in self._tokens:
+            self._tokens.append(token)
+            self._logger.info('Additional token registered for validation')
+
+    def remove_token(self, token: str) -> bool:
+        """
+        移除 Token
+
+        Args:
+            token: 要移除的 Token
+
+        Returns:
+            是否成功移除
+        """
+        if token in self._tokens and len(self._tokens) > 1:
+            self._tokens.remove(token)
+            return True
+        return False
+
+    def update_primary_token(self, new_token: str, keep_old: bool = True) -> None:
+        """
+        更新主要 Token
+
+        Args:
+            new_token: 新的主要 Token
+            keep_old: 是否保留舊 Token（用於寬限期）
+        """
+        if keep_old and self._tokens:
+            # 將新 Token 放在最前面
+            self._tokens.insert(0, new_token)
+        else:
+            self._tokens = [new_token]
+
+    def validate(self, token: str) -> bool:
+        """
+        驗證 Token
+
+        使用時間安全的比較以防止時序攻擊。
+
+        Args:
+            token: 要驗證的 Token
+
+        Returns:
+            Token 是否有效
+        """
+        if not token:
+            return False
+
+        for valid_token in self._tokens:
+            try:
+                # hmac.compare_digest 需要相同長度的字串
+                if len(token) == len(valid_token) and \
+                   hmac.compare_digest(token, valid_token):
+                    return True
+            except (TypeError, ValueError):
+                continue
+
+        return False
+
+    @property
+    def token_count(self) -> int:
+        """當前有效的 Token 數量"""
+        return len(self._tokens)
+
+
 def create_flask_app(
     service_manager: Optional[ServiceManager] = None,
     app_token: Optional[str] = None,
+    token_validator: Optional[TokenValidator] = None,
 ) -> Flask:
     """
     建立 Flask 應用
@@ -28,6 +124,7 @@ def create_flask_app(
     Args:
         service_manager: 服務管理器實例，若無則建立新的
         app_token: 認證 token，若無則從環境變數讀取
+        token_validator: Token 驗證器實例，若無則建立預設的
 
     Returns:
         Flask 應用實例
@@ -60,6 +157,11 @@ def create_flask_app(
     if not APP_TOKEN:
         logger.error('APP_TOKEN not configured')
         sys.exit(1)
+
+    # Token 驗證器（支援輪替期間的多 Token 驗證）
+    if token_validator is None:
+        token_validator = TokenValidator(APP_TOKEN)
+    app.config['TOKEN_VALIDATOR'] = token_validator
 
     # Prometheus Metrics
     REQUEST_COUNT = Counter(
@@ -145,7 +247,11 @@ def create_flask_app(
 
     # Token 驗證裝飾器
     def require_token(f):
-        """驗證 Authorization header 中的 Bearer token"""
+        """
+        驗證 Authorization header 中的 Bearer token
+
+        使用 TokenValidator 進行驗證，支援 Token 輪替期間的多 Token 驗證。
+        """
         @wraps(f)
         def decorated_function(*args, **kwargs):
             auth_header = request.headers.get('Authorization')
@@ -167,7 +273,8 @@ def create_flask_app(
                 if scheme.lower() != 'bearer':
                     raise ValueError('Invalid scheme')
 
-                if token != APP_TOKEN:
+                # 使用 TokenValidator 進行時間安全的驗證
+                if not token_validator.validate(token):
                     logger.warning('Invalid token')
                     ERROR_COUNT.labels(
                         endpoint=request.endpoint or 'unknown',

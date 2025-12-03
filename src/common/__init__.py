@@ -47,6 +47,13 @@ from .shared_state import (
     RobotStatus,
     QueueStatus,
 )
+from .token_manager import (
+    TokenManager,
+    TokenInfo,
+    TokenRotationEvent,
+    get_edge_token_manager,
+    reset_edge_token_manager,
+)
 
 __version__ = "1.0.0"
 __all__ = [
@@ -85,4 +92,10 @@ __all__ = [
     "EventTopics",
     "RobotStatus",
     "QueueStatus",
+    # Token 管理
+    "TokenManager",
+    "TokenInfo",
+    "TokenRotationEvent",
+    "get_edge_token_manager",
+    "reset_edge_token_manager",
 ]

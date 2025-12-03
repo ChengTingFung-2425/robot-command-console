@@ -19,6 +19,7 @@
 | **規劃** | [plans/MASTER_PLAN.md](plans/MASTER_PLAN.md)、[plans/PHASE3_EDGE_ALL_IN_ONE.md](plans/PHASE3_EDGE_ALL_IN_ONE.md) |
 | **開發指南** | [development/](development/) |
 | **功能文件** | [features/](features/) |
+| **安全文件** | [security/TOKEN_SECURITY.md](security/TOKEN_SECURITY.md) |
 
 ---
 
@@ -142,14 +143,60 @@ if action_name not in VALID_ACTIONS:
 
 **原因**：防止無效動作導致執行錯誤。
 
+### Token 安全比較
+
+```python
+# ❌ 直接使用 hmac.compare_digest（可能拋出異常）
+if hmac.compare_digest(token, valid_token):
+    return True
+
+# ✅ 先檢查長度再進行比較
+if len(token) == len(valid_token) and \
+   hmac.compare_digest(token, valid_token):
+    return True
+```
+
+**原因**：`hmac.compare_digest` 在比較不同長度的字串時可能拋出 `TypeError`。同時先檢查長度可以避免不必要的時序洩漏。
+
+### 執行緒鎖與方法呼叫
+
+```python
+# ❌ 在持有鎖的情況下呼叫也需要獲取鎖的方法（會造成死鎖）
+def rotate_token(self):
+    with self._lock:
+        # generate_token 也會嘗試獲取 self._lock
+        new_token, new_info = self.generate_token()
+
+# ✅ 提取內部邏輯避免重複獲取鎖
+def rotate_token(self):
+    with self._lock:
+        self._archive_current_token()
+        # 直接執行 token 生成邏輯
+        token = secrets.token_hex(self._token_length)
+        ...
+```
+
+**原因**：Python 的 `threading.Lock` 是非重入鎖，同一執行緒重複獲取會造成死鎖。使用 `threading.RLock`（可重入鎖）或提取內部邏輯可解決此問題。
+
+### Token 輪替設計
+
+> 📖 **詳細指南**：[security/TOKEN_SECURITY.md](security/TOKEN_SECURITY.md)
+
+**經驗教訓**：
+1. Token 輪替時應保留舊 Token 的寬限期，避免服務中斷
+2. 使用雜湊存儲舊 Token 以避免明文儲存
+3. 定期清理過期的舊 Token 以防止記憶體洩漏
+4. 輪替事件應通知所有相關訂閱者
+
 ---
 
 ## 📝 開發流程提醒
 
 1. **新增共用工具**：放在 `src/common/`
 2. **環境區分**：使用 `ENV_TYPE=edge` 或 `ENV_TYPE=server`
-3. **文檔位置**：規劃放 `docs/plans/`，技術放 `docs/`，開發指南放 `docs/development/`
+3. **文檔位置**：規劃放 `docs/plans/`，技術放 `docs/`，開發指南放 `docs/development/`，安全相關放 `docs/security/`
 4. **測試與文檔同步**：文檔路徑變更時需同步更新測試
+5. **任務完成後**：更新 `PROJECT_MEMORY.md` 記錄經驗教訓
 
 ---
 

@@ -21,7 +21,7 @@ sys.modules['awsiot'] = MagicMock()
 sys.modules['awsiot.mqtt5_client_builder'] = MagicMock()
 
 # 添加 Robot-Console 目錄到路徑
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'Robot-Console'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'Robot-Console'))
 
 
 class TestPubSubActionsArray(unittest.TestCase):

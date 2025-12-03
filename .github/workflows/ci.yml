@@ -250,8 +250,12 @@ jobs:
 
       - name: 執行安全測試
         run: |
-          PYTHONPATH="${PYTHONPATH}:${PWD}/src" python3 -m pytest tests/test_security_features.py -v
+          PYTHONPATH="${PYTHONPATH}:${PWD}/src" python3 -m pytest tests/core/test_security_features.py -v
 
       - name: 執行認證測試
         run: |
-          PYTHONPATH="${PYTHONPATH}:${PWD}/src" python3 -m pytest tests/test_auth_compliance.py -v
+          PYTHONPATH="${PYTHONPATH}:${PWD}/src" python3 -m pytest tests/core/test_auth_compliance.py -v
+
+      - name: 執行 Phase 3.1 整合測試
+        run: |
+          PYTHONPATH="${PYTHONPATH}:${PWD}/src" python3 -m pytest tests/phase3/ -v

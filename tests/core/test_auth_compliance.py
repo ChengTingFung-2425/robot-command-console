@@ -10,7 +10,7 @@ import asyncio
 from uuid import uuid4
 
 # 添加 MCP 目錄到路徑
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from MCP.auth_manager import AuthManager  # noqa: E402
 from MCP.logging_monitor import LoggingMonitor  # noqa: E402

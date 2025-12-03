@@ -14,7 +14,7 @@ import sys
 from unittest.mock import MagicMock, patch
 
 # Path manipulation (before project imports)
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 # Third-party imports
 import pytest  # noqa: E402

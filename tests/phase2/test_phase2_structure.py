@@ -8,7 +8,7 @@ from pathlib import Path
 
 def test_project_root_structure():
     """驗證專案根目錄結構"""
-    project_root = Path(__file__).parent.parent
+    project_root = Path(__file__).parent.parent.parent
 
     # 必須存在的目錄
     required_dirs = [
@@ -34,7 +34,7 @@ def test_project_root_structure():
 
 def test_electron_app_structure():
     """驗證 Electron 應用目錄結構"""
-    project_root = Path(__file__).parent.parent
+    project_root = Path(__file__).parent.parent.parent
     electron_dir = project_root / "electron-app"
 
     # Electron 必須的文件
@@ -58,7 +58,7 @@ def test_electron_app_structure():
 
 def test_tests_directory():
     """驗證測試目錄結構"""
-    project_root = Path(__file__).parent.parent
+    project_root = Path(__file__).parent.parent.parent
     tests_dir = project_root / "tests"
 
     # 確認舊的 Test 目錄不存在
@@ -68,15 +68,16 @@ def test_tests_directory():
     # 確認新的 tests 目錄存在且包含測試文件
     assert tests_dir.exists(), "tests/ 目錄不存在"
 
-    test_files = list(tests_dir.glob("test_*.py"))
+    # 測試文件現在在子目錄中 (phase1/, phase2/, phase3/, core/)
+    test_files = list(tests_dir.glob("**/test_*.py"))
     assert len(test_files) > 0, "tests/ 目錄中沒有測試文件"
 
-    # 驗證關鍵測試文件存在
+    # 驗證關鍵測試文件存在（現在在子目錄中）
     key_tests = [
-        "test_auth_compliance.py",
-        "test_command_handler_compliance.py",
-        "test_contract_compliance.py",
-        "test_queue_system.py",
+        "core/test_auth_compliance.py",
+        "core/test_command_handler_compliance.py",
+        "core/test_contract_compliance.py",
+        "phase2/test_queue_system.py",
     ]
 
     for test_file in key_tests:
@@ -85,7 +86,7 @@ def test_tests_directory():
 
 def test_config_directory():
     """驗證配置目錄結構"""
-    project_root = Path(__file__).parent.parent
+    project_root = Path(__file__).parent.parent.parent
     config_dir = project_root / "config"
 
     assert config_dir.exists(), "config/ 目錄不存在"
@@ -94,7 +95,7 @@ def test_config_directory():
 
 def test_documentation_structure():
     """驗證文檔結構"""
-    project_root = Path(__file__).parent.parent
+    project_root = Path(__file__).parent.parent.parent
     docs_dir = project_root / "docs"
 
     # Phase 2 關鍵文檔（已更新路徑）
@@ -112,7 +113,7 @@ def test_documentation_structure():
 
 def test_root_level_files():
     """驗證根層級關鍵文件"""
-    project_root = Path(__file__).parent.parent
+    project_root = Path(__file__).parent.parent.parent
 
     root_files = [
         "README.md",
@@ -130,7 +131,7 @@ def test_root_level_files():
 
 def test_python_imports_work():
     """驗證 Python 導入路徑仍然有效"""
-    project_root = Path(__file__).parent.parent
+    project_root = Path(__file__).parent.parent.parent
 
     # 確保 src 在 Python 路徑中
     src_path = str(project_root / "src")
@@ -158,7 +159,7 @@ def test_python_imports_work():
 
 def test_common_module_imports():
     """驗證共用模組可以導入"""
-    project_root = Path(__file__).parent.parent
+    project_root = Path(__file__).parent.parent.parent
 
     # 確保 src 在 Python 路徑中
     src_path = str(project_root / "src")
@@ -186,7 +187,7 @@ def test_common_module_imports():
 
 def test_no_old_references_in_root():
     """確認根目錄沒有舊的 Electron 文件"""
-    project_root = Path(__file__).parent.parent
+    project_root = Path(__file__).parent.parent.parent
 
     # 這些文件應該已移到 electron-app/
     old_files = [

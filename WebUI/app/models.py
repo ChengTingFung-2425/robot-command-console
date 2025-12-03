@@ -199,7 +199,11 @@ class UserProfile(db.Model):
                 7000, 8000, 9000, 10000, 11000, 12000, 13000, 14000, 15000, 16000,  # L21-30
                 17000, 18000, 19000, 20000, 21000, 22000, 23000, 24000, 25000, 26000  # L31-40
             ]
-            prev_points = points_for_levels[self.level - 1] if self.level - 1 < len(points_for_levels) else 26000 + (self.level - 41) * 1000
+            prev_points = (
+                points_for_levels[self.level - 1]
+                if self.level - 1 < len(points_for_levels)
+                else 26000 + (self.level - 41) * 1000
+            )
         
         progress = current_points - prev_points
         needed = next_level_points - prev_points
@@ -306,7 +310,10 @@ class AdvancedCommand(db.Model):
     updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
 
     # relationship to versions (the canonical source for historical versions)
-    versions = db.relationship('AdvancedCommandVersion', backref='advanced_command', lazy='dynamic', cascade='all, delete-orphan')
+    versions = db.relationship(
+        'AdvancedCommandVersion', backref='advanced_command',
+        lazy='dynamic', cascade='all, delete-orphan'
+    )
 
     def add_version(self, content: str, status: str = 'pending', bump: bool = True) -> AdvancedCommandVersion:
         """Create a new AdvCommand + AdvancedCommandVersion and sync legacy fields.
@@ -378,7 +385,10 @@ class UserAchievement(db.Model):
     achievement_id = db.Column(db.Integer, db.ForeignKey('achievement.id'), nullable=False, index=True)
     earned_at = db.Column(db.DateTime, index=True, default=db.func.now())
     
-    user = db.relationship('User', backref=db.backref('earned_achievements', lazy='dynamic', cascade='all, delete-orphan'))
+    user = db.relationship(
+        'User',
+        backref=db.backref('earned_achievements', lazy='dynamic', cascade='all, delete-orphan')
+    )
     achievement = db.relationship('Achievement', backref=db.backref('earned_by_users', lazy='dynamic'))
     
     __table_args__ = (db.UniqueConstraint('user_id', 'achievement_id', name='uq_user_achievement'),)

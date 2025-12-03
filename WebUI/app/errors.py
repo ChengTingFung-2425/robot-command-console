@@ -24,5 +24,5 @@ try:
     from . import app as global_app
     if global_app is not None:
         register_error_handlers(global_app)
-except:
+except Exception:
     pass

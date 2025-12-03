@@ -14,14 +14,13 @@ from unittest.mock import AsyncMock, MagicMock
 # 添加 MCP 目錄到路徑
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from MCP.command_handler import CommandHandler
-from MCP.auth_manager import AuthManager
-from MCP.logging_monitor import LoggingMonitor
-from MCP.context_manager import ContextManager
-from MCP.robot_router import RobotRouter
-from MCP.models import (
+from MCP.command_handler import CommandHandler  # noqa: E402
+from MCP.auth_manager import AuthManager  # noqa: E402
+from MCP.logging_monitor import LoggingMonitor  # noqa: E402
+from MCP.context_manager import ContextManager  # noqa: E402
+from MCP.robot_router import RobotRouter  # noqa: E402
+from MCP.models import (  # noqa: E402
     CommandRequest,
-    CommandResponse,
     CommandStatus,
     ErrorCode,
     Actor,
@@ -31,7 +30,6 @@ from MCP.models import (
     CommandTarget,
     Priority,
     EventCategory,
-    EventSeverity,
 )
 
 

@@ -6,6 +6,7 @@ from wtforms import IntegerField
 from wtforms.validators import DataRequired, Email, EqualTo, ValidationError
 from WebUI.app.models import User
 
+
 # classes
 class LoginForm(FlaskForm):
     username = StringField('用戶名稱', validators=[DataRequired()])
@@ -31,19 +32,23 @@ class RegisterForm(FlaskForm):
         if user:
             raise ValidationError('電子郵件已被註冊。')
 
+
 class RegisterRobotForm(FlaskForm):
     name = StringField('機器人名稱', validators=[DataRequired()])
     type = StringField('機器人類型', validators=[DataRequired()])
     submit = SubmitField('註冊機器人')
 
+
 class ResetPasswordRequestForm(FlaskForm):
     email = StringField('電子郵件', validators=[DataRequired(), Email()])
     submit = SubmitField('發送重設密碼郵件')
+
 
 class ResetPasswordForm(FlaskForm):
     password = PasswordField('新密碼', validators=[DataRequired()])
     password2 = PasswordField('重複新密碼', validators=[DataRequired(), EqualTo('password')])
     submit = SubmitField('重設密碼')
+
 
 class AdvancedCommandForm(FlaskForm):
     name = StringField('指令名稱', validators=[DataRequired()])
@@ -51,7 +56,8 @@ class AdvancedCommandForm(FlaskForm):
     category = StringField('分類', validators=[DataRequired()])
     base_commands = TextAreaField('基礎指令序列（JSON）', validators=[DataRequired()])
     version = IntegerField('版本', default=1)
-    # when the base_commands reference other advanced commands, allow updating nested references to latest approved version
+    # when the base_commands reference other advanced commands, allow updating
+    # nested references to latest approved version
     nested_command = BooleanField('是否嵌套指令')
     submit = SubmitField('提交進階指令')
 

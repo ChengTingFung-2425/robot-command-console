@@ -12,13 +12,13 @@ from datetime import datetime, timezone
 # 添加 src 目錄到路徑
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from robot_service.queue import (
+from robot_service.queue import (  # noqa: E402
     Message,
     MessagePriority,
     MemoryQueue,
     QueueHandler,
 )
-from robot_service.service_manager import ServiceManager
+from robot_service.service_manager import ServiceManager  # noqa: E402
 
 
 class TestMessage(unittest.TestCase):

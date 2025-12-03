@@ -106,7 +106,7 @@ def create_app(config_name='default'):
 # Create default app instance for backward compatibility
 try:
     app = create_app()
-except:
-    # If we can't create the app in this context (e.g., during testing), 
+except Exception:
+    # If we can't create the app in this context (e.g., during testing),
     # we'll create it explicitly in tests
     pass

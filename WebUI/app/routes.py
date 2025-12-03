@@ -7,7 +7,10 @@ from flask import Blueprint, jsonify, request, render_template, redirect, url_fo
 from flask_login import current_user, login_user, logout_user, login_required
 from WebUI.app import db
 from WebUI.app.models import Robot, Command, User, AdvancedCommand, UserProfile
-from WebUI.app.forms import LoginForm, RegisterForm, RegisterRobotForm, ResetPasswordRequestForm, ResetPasswordForm, AdvancedCommandForm
+from WebUI.app.forms import (
+    LoginForm, RegisterForm, RegisterRobotForm,
+    ResetPasswordRequestForm, ResetPasswordForm, AdvancedCommandForm
+)
 from WebUI.app.email import send_email
 from WebUI.app.engagement import award_on_registration, get_or_create_user_profile
 import json
@@ -18,6 +21,8 @@ import logging
 bp = Blueprint('webui', __name__)
 
 # functions
+
+
 def send_password_reset_email(user, token):
     """發送密碼重設郵件"""
     send_email(
@@ -29,6 +34,8 @@ def send_password_reset_email(user, token):
     )
 
 # 首頁
+
+
 @bp.route('/', methods=['GET', 'POST'])
 def home():
     if request.method == 'POST':
@@ -37,6 +44,8 @@ def home():
     return render_template('home.html.j2')
 
 # 用戶註冊
+
+
 @bp.route('/register', methods=['GET', 'POST'])
 def register():
     if current_user.is_authenticated:
@@ -61,6 +70,8 @@ def register():
     return render_template('register.html.j2', form=form)
 
 # 用戶登入
+
+
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
@@ -76,12 +87,16 @@ def login():
     return render_template('login.html.j2', form=form)
 
 # 用戶登出
+
+
 @bp.route('/logout')
 def logout():
     logout_user()
     return redirect(url_for('webui.home'))
 
 # 用戶檔案頁面
+
+
 @bp.route('/user/<username>')
 def user_profile(username):
     """Display user profile with engagement metrics and achievements."""
@@ -104,6 +119,8 @@ def user_profile(username):
     )
 
 # 編輯用戶檔案
+
+
 @bp.route('/user/edit_profile', methods=['GET', 'POST'])
 @login_required
 def edit_profile():
@@ -118,6 +135,8 @@ def edit_profile():
     return render_template('edit_profile.html.j2')
 
 # 排行榜
+
+
 @bp.route('/leaderboard')
 def leaderboard():
     """Display leaderboard of top users."""
@@ -141,6 +160,8 @@ def leaderboard():
     )
 
 # 註冊機器人
+
+
 @bp.route('/register_robot', methods=['GET', 'POST'])
 @login_required
 def register_robot():
@@ -159,6 +180,8 @@ def register_robot():
     return render_template('register_robot.html.j2', form=form)
 
 # 儀表板頁面：顯示當前用戶的機器人
+
+
 @bp.route('/dashboard', methods=['GET'])
 @login_required
 def robot_dashboard():
@@ -169,6 +192,8 @@ def robot_dashboard():
     return render_template('robot_dashboard.html.j2', robots=robots)
 
 # API：查詢所有機器人（JSON）
+
+
 @bp.route('/robots', methods=['GET'])
 def list_robots():
     """列出所有機器人 (API)"""
@@ -331,7 +356,7 @@ def send_actions_to_robot(robot, actions):
                 }
             else:
                 # MQTT 發送失敗，記錄警告
-                logging.warning(f"MQTT 發送失敗，可能是 MQTT 未啟用或連接失敗")
+                logging.warning("MQTT 發送失敗，可能是 MQTT 未啟用或連接失敗")
                 
         except ImportError as e:
             logging.warning(f"無法導入 MQTT 客戶端模組: {str(e)}")
@@ -341,7 +366,7 @@ def send_actions_to_robot(robot, actions):
         # 備用方案：如果 MQTT 不可用或失敗，只記錄到日誌
         # 這允許在沒有 MQTT 配置的環境中仍然可以測試其他功能
         logging.info(
-            f"備用方案：動作列表已記錄（MQTT 不可用），等待其他傳輸機制"
+            "備用方案：動作列表已記錄（MQTT 不可用），等待其他傳輸機制"
         )
         
         return {
@@ -488,6 +513,8 @@ def reset_password_request():
     return render_template('reset_password_request.html.j2', form=form)
 
 # 密碼重設
+
+
 @bp.route('/reset_password/<token>', methods=['GET', 'POST'])
 def reset_password(token):
     if current_user.is_authenticated:
@@ -505,6 +532,8 @@ def reset_password(token):
     return render_template('reset_password.html.j2', form=form)
 
 # 進階指令分享區
+
+
 @bp.route('/advanced_commands', methods=['GET'])
 def advanced_commands():
     # 獲取篩選參數（從 URL 查詢字串或 session）
@@ -569,6 +598,8 @@ def advanced_commands():
     )
 
 # 建立進階指令
+
+
 @bp.route('/advanced_commands/create', methods=['GET', 'POST'])
 @login_required
 def create_advanced_command():
@@ -717,6 +748,8 @@ def edit_advanced_command(cmd_id):
     )
 
 # 審核進階指令（僅 admin/auditor）
+
+
 @bp.route('/advanced_commands/audit/<int:cmd_id>', methods=['POST'])
 @login_required
 def audit_advanced_command(cmd_id):

@@ -290,7 +290,7 @@ token = os.environ.get("APP_TOKEN") or secrets.token_hex(32)
 
 **原因**：硬編碼的預設 token 在生產環境中是安全風險。使用 `secrets.token_hex()` 生成加密安全的隨機 token。
 
-### 基本指令執行流程貫通（Phase 3.2）
+### 基本指令執行流程貫通（Phase 3.1.7）
 
 #### 指令處理器設計
 

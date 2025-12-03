@@ -187,9 +187,6 @@ class ServiceManager:
 
         Args:
             dispatcher: 分派函式，接受 (robot_id, actions) 並返回成功與否
-
-        Raises:
-            RuntimeError: 如果在服務運行中嘗試更改分派器
         """
         with self._processor_lock:
             if self._started:

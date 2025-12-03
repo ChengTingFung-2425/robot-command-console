@@ -174,6 +174,23 @@ class TestCommandProcessor(unittest.TestCase):
             ["go_forward", "stand"]
         )
 
+    def test_all_actions_invalid(self):
+        """測試所有動作都無效的情況"""
+        message = Message(
+            payload={
+                "robot_id": "robot_x",
+                "actions": ["invalid_action1", "invalid_action2"]
+            },
+            priority=MessagePriority.NORMAL,
+            trace_id="test-trace-x"
+        )
+
+        result = self.loop.run_until_complete(self.processor.process(message))
+
+        # 應該成功處理，但不分派任何動作
+        self.assertTrue(result)
+        self.assertEqual(len(self.dispatched_actions), 0)
+
     def test_skip_wait_commands(self):
         """測試跳過 wait 指令"""
         message = Message(

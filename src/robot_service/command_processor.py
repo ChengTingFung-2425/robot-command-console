@@ -98,6 +98,15 @@ class CommandProcessor:
                 # 過濾掉無效動作
                 actions = [a for a in actions if a in VALID_ACTIONS]
 
+                # 檢查是否還有有效動作
+                if not actions:
+                    logger.warning("All actions were invalid", extra={
+                        "message_id": message.id,
+                        "trace_id": message.trace_id,
+                        "service": "robot_service.command_processor"
+                    })
+                    return True  # 沒有有效動作時視為成功處理
+
             # 提取目標機器人 ID
             robot_id = self._extract_robot_id(payload)
 

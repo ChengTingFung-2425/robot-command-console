@@ -3,8 +3,8 @@
  * 提供 Edge App 的共用功能
  */
 
-// API 基礎 URL
-const API_BASE_URL = '';
+// API 基礎 URL（使用當前 origin，確保在不同部署環境中正常工作）
+const API_BASE_URL = window.location.origin;
 
 /**
  * 通用 API 請求函式

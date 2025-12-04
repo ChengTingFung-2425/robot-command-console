@@ -33,12 +33,31 @@ edge_ui = Blueprint(
     static_url_path='/edge/static'
 )
 
+# ============================================================
+# 配置常數（可透過環境變數覆蓋）
+# ============================================================
+
+# LLM 提供商端點配置
+OLLAMA_ENDPOINT = os.environ.get('OLLAMA_ENDPOINT', 'http://127.0.0.1:11434')
+LMSTUDIO_ENDPOINT = os.environ.get('LMSTUDIO_ENDPOINT', 'http://127.0.0.1:1234')
+MCP_API_URL = os.environ.get('MCP_API_URL', 'http://localhost:8000')
+
+# 預設設定值
+DEFAULT_SETTINGS: Dict[str, Any] = {
+    'duration_unit': 's',
+    'theme': 'light',
+    'llm_provider': None,
+    'llm_model': None,
+}
+
 
 # ============================================================
 # 本地機器人管理（Edge 功能）
+# TODO: 遷移到 SQLite 持久化存儲（Phase 3.3）
+# 目前使用記憶體存儲用於 POC 驗證
 # ============================================================
 
-# 本地機器人資料存儲（簡化版，實際應使用 SQLite）
+# 本地機器人資料存儲（簡化版）
 _local_robots: Dict[str, Dict[str, Any]] = {}
 
 
@@ -223,16 +242,19 @@ def api_llm_providers():
 
 
 def detect_local_llm_providers() -> List[Dict[str, Any]]:
-    """偵測本地 LLM 提供商"""
+    """偵測本地 LLM 提供商
+    
+    使用環境變數配置的端點進行檢測：
+    - OLLAMA_ENDPOINT: Ollama 服務端點
+    - LMSTUDIO_ENDPOINT: LM Studio 服務端點
+    """
     providers = []
 
-    # 檢測 Ollama (預設 port 11434)
+    # 檢測 Ollama
     try:
         import urllib.request
-        req = urllib.request.Request(
-            'http://127.0.0.1:11434/api/tags',
-            method='GET'
-        )
+        ollama_url = f'{OLLAMA_ENDPOINT}/api/tags'
+        req = urllib.request.Request(ollama_url, method='GET')
         req.add_header('Accept', 'application/json')
         with urllib.request.urlopen(req, timeout=2) as response:
             data = json.loads(response.read().decode())
@@ -241,19 +263,17 @@ def detect_local_llm_providers() -> List[Dict[str, Any]]:
                 'name': 'ollama',
                 'display_name': 'Ollama',
                 'status': 'available',
-                'endpoint': 'http://127.0.0.1:11434',
+                'endpoint': OLLAMA_ENDPOINT,
                 'models': [m.get('name') for m in models],
             })
     except Exception:
         pass
 
-    # 檢測 LM Studio (預設 port 1234)
+    # 檢測 LM Studio
     try:
         import urllib.request
-        req = urllib.request.Request(
-            'http://127.0.0.1:1234/v1/models',
-            method='GET'
-        )
+        lmstudio_url = f'{LMSTUDIO_ENDPOINT}/v1/models'
+        req = urllib.request.Request(lmstudio_url, method='GET')
         req.add_header('Accept', 'application/json')
         with urllib.request.urlopen(req, timeout=2) as response:
             data = json.loads(response.read().decode())
@@ -262,7 +282,7 @@ def detect_local_llm_providers() -> List[Dict[str, Any]]:
                 'name': 'lmstudio',
                 'display_name': 'LM Studio',
                 'status': 'available',
-                'endpoint': 'http://127.0.0.1:1234',
+                'endpoint': LMSTUDIO_ENDPOINT,
                 'models': [m.get('id') for m in models],
             })
     except Exception:
@@ -283,10 +303,9 @@ def check_internet_connection() -> bool:
 
 def check_mcp_connection() -> bool:
     """檢查 MCP 服務連線"""
-    mcp_url = os.environ.get('MCP_API_URL', 'http://localhost:8000')
     try:
         import urllib.request
-        urllib.request.urlopen(f'{mcp_url}/health', timeout=2)
+        urllib.request.urlopen(f'{MCP_API_URL}/health', timeout=2)
         return True
     except Exception:
         return False
@@ -294,14 +313,11 @@ def check_mcp_connection() -> bool:
 
 # ============================================================
 # 用戶設定 API（本地存儲）
+# TODO: 遷移到持久化存儲（Phase 3.3）
 # ============================================================
 
-_user_settings: Dict[str, Any] = {
-    'duration_unit': 's',
-    'theme': 'light',
-    'llm_provider': None,
-    'llm_model': None,
-}
+# 用戶設定（記憶體存儲，重啟後會重設）
+_user_settings: Dict[str, Any] = DEFAULT_SETTINGS.copy()
 
 
 @edge_ui.route('/api/edge/settings', methods=['GET'])

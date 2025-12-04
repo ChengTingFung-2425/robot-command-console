@@ -229,12 +229,13 @@ async function submitRegister() {
         if (data.success) {
             hideRegisterModal();
             refreshRobots();
+            showToast('機器人註冊成功');
         } else {
-            alert('註冊失敗: ' + (data.error || '未知錯誤'));
+            showToast('註冊失敗: ' + (data.error || '未知錯誤'), 'error');
         }
     } catch (error) {
         console.error('Failed to register robot:', error);
-        alert('註冊失敗');
+        showToast('註冊失敗', 'error');
     }
 }
 
@@ -245,7 +246,19 @@ function selectRobot(robotId) {
 
 // 查看詳情
 function viewDetails(robotId) {
-    alert('機器人詳情功能開發中...\nRobot ID: ' + robotId);
+    showToast('機器人詳情功能開發中...', 'info');
+}
+
+// 顯示提示訊息
+function showToast(message, type = 'success', duration = 3000) {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.remove();
+    }, duration);
 }
 
 // 頁面載入時刷新

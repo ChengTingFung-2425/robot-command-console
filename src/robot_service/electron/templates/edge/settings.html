@@ -141,6 +141,7 @@ async function resetSettings() {
     }
     
     try {
+        // 從後端取得預設值並重設
         const res = await fetch('/api/edge/settings', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -156,6 +157,8 @@ async function resetSettings() {
         if (data.success) {
             loadSettings();
             showToast('設定已重設');
+        } else {
+            showToast('重設失敗', 'error');
         }
     } catch (error) {
         console.error('Failed to reset settings:', error);

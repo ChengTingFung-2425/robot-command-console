@@ -49,8 +49,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from common.network_monitor import NetworkMonitor, NetworkStatus  # noqa: E402
 from common.shared_state import SharedStateManager  # noqa: E402
 from common.datetime_utils import utc_now  # noqa: E402
-from src.robot_service.queue.interface import Message, MessagePriority  # noqa: E402
-from src.robot_service.queue.offline_buffer import OfflineBuffer  # noqa: E402
+from .interface import Message, MessagePriority  # noqa: E402
+from .offline_buffer import OfflineBuffer  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

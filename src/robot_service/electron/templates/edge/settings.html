@@ -126,11 +126,11 @@ async function saveSetting(key, value) {
         
         const data = await res.json();
         if (data.success) {
-            showToast('設定已儲存');
+            window.EdgeUI.showToast('設定已儲存');
         }
     } catch (error) {
         console.error('Failed to save setting:', error);
-        showToast('儲存失敗', 'error');
+        window.EdgeUI.showToast('儲存失敗', 'error');
     }
 }
 
@@ -145,7 +145,7 @@ async function resetSettings() {
         const defaultsRes = await fetch('/api/edge/settings/defaults');
         const defaultsData = await defaultsRes.json();
         if (!defaultsData || !defaultsData.settings) {
-            showToast('取得預設值失敗', 'error');
+            window.EdgeUI.showToast('取得預設值失敗', 'error');
             return;
         }
         
@@ -159,31 +159,13 @@ async function resetSettings() {
         const data = await res.json();
         if (data.success) {
             loadSettings();
-            showToast('設定已重設');
+            window.EdgeUI.showToast('設定已重設');
         } else {
-            showToast('重設失敗', 'error');
+            window.EdgeUI.showToast('重設失敗', 'error');
         }
     } catch (error) {
         console.error('Failed to reset settings:', error);
-        showToast('重設失敗', 'error');
-    }
-}
-
-// 顯示提示訊息（使用共用的 EdgeUI.showToast 或本地實作）
-function showToast(message, type = 'success') {
-    if (window.EdgeUI && window.EdgeUI.showToast) {
-        window.EdgeUI.showToast(message, type);
-    } else {
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        toast.textContent = message;
-        toast.setAttribute('role', 'alert');
-        toast.setAttribute('aria-live', 'polite');
-        document.body.appendChild(toast);
-        
-        setTimeout(() => {
-            toast.remove();
-        }, 3000);
+        window.EdgeUI.showToast('重設失敗', 'error');
     }
 }
 </script>

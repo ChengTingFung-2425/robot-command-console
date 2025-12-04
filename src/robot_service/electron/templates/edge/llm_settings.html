@@ -199,26 +199,14 @@ async function selectProvider(providerName) {
         
         const data = await res.json();
         if (data.success) {
-            showToast(`已選擇 ${providerName} 作為 LLM 提供商`, 'success');
+            window.EdgeUI.showToast(`已選擇 ${providerName} 作為 LLM 提供商`, 'success');
         } else {
-            showToast('選擇失敗', 'error');
+            window.EdgeUI.showToast('選擇失敗', 'error');
         }
     } catch (error) {
         console.error('Failed to select provider:', error);
-        showToast('選擇失敗', 'error');
+        window.EdgeUI.showToast('選擇失敗', 'error');
     }
-}
-
-// 顯示提示訊息
-function showToast(message, type = 'success', duration = 3000) {
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.remove();
-    }, duration);
 }
 </script>
 {% endblock %}

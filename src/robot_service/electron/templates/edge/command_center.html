@@ -151,7 +151,7 @@ async function selectRobot(robotId) {
 // 發送動作指令
 async function sendAction(action) {
     if (!selectedRobotId) {
-        showToast('請先選擇機器人', 'warning');
+        window.EdgeUI.showToast('請先選擇機器人', 'warning');
         return;
     }
     
@@ -244,18 +244,6 @@ function getStatusIcon(status) {
         case 'error': return '❌';
         default: return '❓';
     }
-}
-
-// 顯示提示訊息
-function showToast(message, type = 'success', duration = 3000) {
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.remove();
-    }, duration);
 }
 </script>
 {% endblock %}

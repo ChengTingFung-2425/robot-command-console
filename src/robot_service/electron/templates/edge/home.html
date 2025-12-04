@@ -142,12 +142,12 @@ async function registerDemoRobot() {
         
         const data = await res.json();
         if (data.success) {
-            showToast('機器人註冊成功: ' + data.robot.name);
+            window.EdgeUI.showToast('機器人註冊成功: ' + data.robot.name);
             refreshStatus();
         }
     } catch (error) {
         console.error('Failed to register robot:', error);
-        showToast('註冊失敗', 'error');
+        window.EdgeUI.showToast('註冊失敗', 'error');
     }
 }
 

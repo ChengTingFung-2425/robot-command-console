@@ -507,6 +507,148 @@ showToast('操作成功');
 2. Edge API 使用 `/api/edge/` 前綴，與現有 API 區分
 3. 保持路由命名一致性（kebab-case）
 
+### 7.7 異常處理與日誌記錄
+
+```python
+# ❌ 靜默捕獲異常（難以除錯）
+try:
+    detect_service()
+except Exception:
+    pass
+
+# ✅ 記錄 debug 日誌以便除錯
+try:
+    detect_service()
+except Exception as e:
+    logger.debug(f'Failed to detect service at {endpoint}: {e}')
+```
+
+**經驗教訓**：
+1. 即使是預期的失敗（如服務未啟動），也應記錄 debug 日誌
+2. 避免使用空的 `except: pass`，至少記錄錯誤信息
+3. 使用 `logger.debug()` 而非 `logger.error()` 以避免正常情況下的日誌噪音
+
+### 7.8 網路連線檢查彈性設計
+
+```python
+# ❌ 硬編碼單一端點（某些網路環境可能失敗）
+def check_internet():
+    urllib.request.urlopen('https://www.google.com', timeout=3)
+
+# ✅ 使用多個備用端點
+def check_internet_connection() -> bool:
+    check_urls = [
+        'https://www.google.com',
+        'https://www.cloudflare.com',
+        'https://1.1.1.1'
+    ]
+    for url in check_urls:
+        try:
+            urllib.request.urlopen(url, timeout=3)
+            return True
+        except Exception:
+            continue
+    return False
+```
+
+**經驗教訓**：
+1. 考慮不同網路環境（中國大陸、企業內網等）
+2. 提供多個備用端點以提高可靠性
+3. 使用快速失敗策略（短超時）避免阻塞
+
+### 7.9 前端可訪問性（Accessibility）
+
+```javascript
+// ❌ 缺少 ARIA 屬性
+const toast = document.createElement('div');
+toast.textContent = message;
+
+// ✅ 添加 ARIA 屬性提升螢幕閱讀器支援
+const toast = document.createElement('div');
+toast.textContent = message;
+toast.setAttribute('role', 'alert');
+toast.setAttribute('aria-live', 'polite');
+```
+
+```html
+<!-- ❌ 缺少語意化標籤 -->
+<nav class="navbar">
+
+<!-- ✅ 添加 aria-label -->
+<nav class="navbar" aria-label="主要導航">
+```
+
+**經驗教訓**：
+1. Toast 通知需添加 `role="alert"` 和 `aria-live="polite"`
+2. 導航元素需添加 `aria-label` 描述
+3. 遵循 WCAG 可訪問性指南
+
+### 7.10 前端預設值與後端同步
+
+```javascript
+// ❌ 前端硬編碼預設值（可能與後端不同步）
+body: JSON.stringify({
+    duration_unit: 's',
+    theme: 'light'
+})
+
+// ✅ 從後端 API 取得預設值
+const defaultsRes = await fetch('/api/edge/settings/defaults');
+const defaultsData = await defaultsRes.json();
+body: JSON.stringify(defaultsData.settings)
+```
+
+**經驗教訓**：
+1. 預設值應由後端統一定義（單一真相來源）
+2. 提供 `/api/.../defaults` 端點供前端取得預設值
+3. 避免前後端預設值不同步的問題
+
+### 7.11 Electron Token 注入機制
+
+```javascript
+// ❌ 假設 Token 存在但未實作
+headers: { 
+    'Authorization': 'Bearer ???',
+    // Token 會由 Electron 注入
+}
+
+// ✅ 安全地嘗試取得 Token
+const token = (window.electronAPI && typeof window.electronAPI.getToken === 'function') 
+    ? await window.electronAPI.getToken() 
+    : '';
+headers: { 
+    'Authorization': token ? `Bearer ${token}` : '',
+}
+```
+
+**經驗教訓**：
+1. 檢查 `electronAPI` 是否存在再使用
+2. 提供空字串作為後備值
+3. 在文檔中明確說明 Token 注入機制
+
+### 7.12 JSDoc 註解規範
+
+```javascript
+// ❌ 簡單註解
+/**
+ * 通用 API 請求函式
+ */
+
+// ✅ 完整 JSDoc 註解
+/**
+ * 通用 API 請求函式
+ * @param {string} endpoint - API 端點路徑
+ * @param {Object} options - fetch 選項
+ * @returns {Promise<Object>} API 回應資料
+ * @throws {Error} 當請求失敗或回應不正常時拋出錯誤
+ */
+```
+
+**經驗教訓**：
+1. 公開 API 函式應有完整的 JSDoc 註解
+2. 包含 `@param`、`@returns`、`@throws` 說明
+3. 提高代碼可維護性和 IDE 自動完成支援
+
 ---
 
 **最後更新**：2025-12-04

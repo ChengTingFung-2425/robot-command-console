@@ -4,8 +4,40 @@
 
 {% block content %}
 <div class="page-header">
-    <h1>📊 機器人儀表板</h1>
+    <h1>📊 機器人監控儀表板</h1>
     <p class="subtitle">監控所有本地機器人狀態</p>
+</div>
+
+<!-- 摘要統計卡片 -->
+<div id="summary-cards" class="summary-grid">
+    <div class="summary-card summary-total">
+        <div class="summary-icon">🤖</div>
+        <div class="summary-content">
+            <span class="summary-value" id="total-robots">0</span>
+            <span class="summary-label">機器人總數</span>
+        </div>
+    </div>
+    <div class="summary-card summary-connected">
+        <div class="summary-icon">🟢</div>
+        <div class="summary-content">
+            <span class="summary-value" id="connected-robots">0</span>
+            <span class="summary-label">已連線</span>
+        </div>
+    </div>
+    <div class="summary-card summary-healthy">
+        <div class="summary-icon">✅</div>
+        <div class="summary-content">
+            <span class="summary-value" id="healthy-robots">0</span>
+            <span class="summary-label">健康狀態</span>
+        </div>
+    </div>
+    <div class="summary-card summary-warning">
+        <div class="summary-icon">⚠️</div>
+        <div class="summary-content">
+            <span class="summary-value" id="warning-robots">0</span>
+            <span class="summary-label">需要關注</span>
+        </div>
+    </div>
 </div>
 
 <div class="toolbar">
@@ -15,6 +47,9 @@
     <button class="btn btn-secondary" onclick="refreshRobots()">
         🔄 重新整理
     </button>
+    <button class="btn btn-info" onclick="checkAllHealth()">
+        🩺 健康檢查
+    </button>
 </div>
 
 <div class="robots-grid" id="robots-container">
@@ -22,7 +57,7 @@
         {% for robot in robots %}
         <div class="robot-card" data-robot-id="{{ robot.id }}">
             <div class="robot-header">
-                <span class="robot-icon">🤖</span>
+                <span class="robot-icon">{{ robot.icon or '🤖' }}</span>
                 <h3 class="robot-name">{{ robot.name }}</h3>
                 <span class="robot-status status-{{ robot.status }}">
                     {{ robot.status }}
@@ -32,12 +67,13 @@
                 <div class="robot-info">
                     <div class="info-row">
                         <span class="info-label">類型</span>
-                        <span class="info-value">{{ robot.type }}</span>
+                        <span class="info-value">{{ robot.type_display or robot.type }}</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">電量</span>
                         <div class="battery-bar">
-                            <div class="battery-level" style="width: {{ robot.battery }}%"></div>
+                            <div class="battery-level battery-{{ 'high' if robot.battery > 50 else 'medium' if robot.battery > 20 else 'low' }}" 
+                                 style="width: {{ robot.battery }}%"></div>
                         </div>
                         <span class="info-value">{{ robot.battery }}%</span>
                     </div>
@@ -57,14 +93,29 @@
                             {% endif %}
                         </span>
                     </div>
+                    <div class="info-row">
+                        <span class="info-label">健康</span>
+                        <span class="info-value">
+                            {% if robot.health_status == 'healthy' %}
+                            <span class="health-badge health-healthy">✅ 健康</span>
+                            {% elif robot.health_status == 'warning' %}
+                            <span class="health-badge health-warning">⚠️ 警告</span>
+                            {% else %}
+                            <span class="health-badge health-unknown">❓ 未知</span>
+                            {% endif %}
+                        </span>
+                    </div>
                 </div>
             </div>
             <div class="robot-actions">
                 <button class="btn btn-sm btn-primary" onclick="selectRobot('{{ robot.id }}')">
                     🎮 控制
                 </button>
-                <button class="btn btn-sm btn-info" onclick="viewDetails('{{ robot.id }}')">
+                <button class="btn btn-sm btn-info" onclick="showDetailsModal('{{ robot.id }}')">
                     📋 詳情
+                </button>
+                <button class="btn btn-sm btn-success" onclick="checkRobotHealth('{{ robot.id }}')">
+                    🩺 檢查
                 </button>
             </div>
         </div>
@@ -97,11 +148,11 @@
                 <div class="form-group">
                     <label for="robot-type">類型</label>
                     <select id="robot-type" name="type">
-                        <option value="humanoid">人形機器人</option>
-                        <option value="agv">AGV 搬運車</option>
-                        <option value="arm">機械手臂</option>
-                        <option value="drone">無人機</option>
-                        <option value="other">其他</option>
+                        <option value="humanoid">🤖 人形機器人</option>
+                        <option value="agv">🚗 AGV 搬運車</option>
+                        <option value="arm">🦾 機械手臂</option>
+                        <option value="drone">🚁 無人機</option>
+                        <option value="other">⚙️ 其他</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -116,18 +167,204 @@
         </div>
     </div>
 </div>
+
+<!-- 機器人詳情對話框 -->
+<div id="details-modal" class="modal" style="display: none;">
+    <div class="modal-content modal-lg">
+        <div class="modal-header">
+            <h2>📋 機器人詳情</h2>
+            <button class="modal-close" onclick="hideDetailsModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="details-content">
+            <div class="loading">載入中...</div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-danger" onclick="confirmDeleteRobot()">🗑️ 刪除</button>
+            <button class="btn btn-secondary" onclick="hideDetailsModal()">關閉</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+/* 摘要統計卡片 */
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.summary-card {
+    background: white;
+    padding: 20px;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.summary-icon {
+    font-size: 2em;
+}
+
+.summary-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.summary-value {
+    font-size: 1.8em;
+    font-weight: 700;
+    color: var(--dark);
+}
+
+.summary-label {
+    font-size: 0.9em;
+    color: var(--gray);
+}
+
+.summary-total { border-left: 4px solid var(--primary); }
+.summary-connected { border-left: 4px solid var(--success); }
+.summary-healthy { border-left: 4px solid var(--info); }
+.summary-warning { border-left: 4px solid var(--warning); }
+
+/* 電量條顏色 */
+.battery-level.battery-high { background: var(--success); }
+.battery-level.battery-medium { background: var(--warning); }
+.battery-level.battery-low { background: var(--danger); }
+
+/* 健康徽章 */
+.health-badge {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+}
+
+.health-healthy { background: #d4edda; color: #155724; }
+.health-warning { background: #fff3cd; color: #856404; }
+.health-unknown { background: #e9ecef; color: #6c757d; }
+
+/* 大型對話框 */
+.modal-lg {
+    max-width: 700px;
+}
+
+/* 詳情內容 */
+.details-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.details-section {
+    background: var(--light);
+    padding: 15px;
+    border-radius: var(--radius);
+}
+
+.details-section h4 {
+    margin-bottom: 12px;
+    color: var(--primary);
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--gray-light);
+}
+
+.details-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+}
+
+.details-label {
+    color: var(--gray);
+}
+
+.details-value {
+    font-weight: 500;
+}
+
+.capabilities-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.capability-tag {
+    background: white;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    border: 1px solid var(--gray-light);
+}
+
+.health-history {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.health-history-item {
+    padding: 8px;
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+    font-size: 0.9em;
+}
+
+.health-history-item.status-healthy { background: #d4edda; }
+.health-history-item.status-warning { background: #fff3cd; }
+.health-history-item.status-disconnected { background: #f8d7da; }
+</style>
 {% endblock %}
 
 {% block scripts %}
 <script>
+let currentRobotId = null;
+
+// HTML 跳脫函式（防止 XSS）
+function escapeHtml(text) {
+    if (text === null || text === undefined) return '';
+    const div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
+}
+
+// 頁面載入時刷新資料
+document.addEventListener('DOMContentLoaded', function() {
+    refreshRobots();
+    loadSummary();
+    // 每 30 秒自動刷新
+    setInterval(refreshRobots, 30000);
+    setInterval(loadSummary, 30000);
+});
+
+// 載入儀表板摘要
+async function loadSummary() {
+    try {
+        const res = await fetch('/api/edge/dashboard/summary');
+        const data = await res.json();
+        const summary = data.summary;
+        
+        document.getElementById('total-robots').textContent = summary.total_robots;
+        document.getElementById('connected-robots').textContent = summary.connected;
+        document.getElementById('healthy-robots').textContent = summary.healthy;
+        // 使用後端計算的 needs_attention 避免重複計數
+        document.getElementById('warning-robots').textContent = summary.needs_attention;
+    } catch (error) {
+        console.error('Failed to load summary:', error);
+    }
+}
+
 // 重新整理機器人列表
 async function refreshRobots() {
     try {
         const res = await fetch('/api/edge/robots');
         const data = await res.json();
         
-        // 無論列表是否為空都要渲染，以正確顯示空白狀態
         renderRobots(data.robots || []);
+        loadSummary();
     } catch (error) {
         console.error('Failed to refresh robots:', error);
     }
@@ -152,27 +389,34 @@ function renderRobots(robots) {
     }
     
     container.innerHTML = robots.map(robot => `
-        <div class="robot-card" data-robot-id="${robot.id}">
+        <div class="robot-card" data-robot-id="${escapeHtml(robot.id)}">
             <div class="robot-header">
-                <span class="robot-icon">🤖</span>
-                <h3 class="robot-name">${robot.name}</h3>
-                <span class="robot-status status-${robot.status}">
-                    ${robot.status}
+                <span class="robot-icon">${escapeHtml(robot.icon) || '🤖'}</span>
+                <h3 class="robot-name">${escapeHtml(robot.name)}</h3>
+                <span class="robot-status status-${escapeHtml(robot.status)}">
+                    ${escapeHtml(robot.status)}
                 </span>
             </div>
             <div class="robot-body">
                 <div class="robot-info">
                     <div class="info-row">
                         <span class="info-label">類型</span>
-                        <span class="info-value">${robot.type}</span>
+                        <span class="info-value">${escapeHtml(robot.type_display || robot.type)}</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">電量</span>
                         <div class="battery-bar">
-                            <div class="battery-level" style="width: ${robot.battery}%"></div>
+                            <div class="battery-level battery-${robot.battery > 50 ? 'high' : robot.battery > 20 ? 'medium' : 'low'}" 
+                                 style="width: ${Number(robot.battery) || 0}%"></div>
                         </div>
-                        <span class="info-value">${robot.battery}%</span>
+                        <span class="info-value">${escapeHtml(robot.battery)}%</span>
                     </div>
+                    ${robot.location ? `
+                    <div class="info-row">
+                        <span class="info-label">位置</span>
+                        <span class="info-value">${escapeHtml(robot.location)}</span>
+                    </div>
+                    ` : ''}
                     <div class="info-row">
                         <span class="info-label">連線</span>
                         <span class="info-value">
@@ -181,18 +425,39 @@ function renderRobots(robots) {
                                 : '<span class="status-indicator status-error">🔴 未連線</span>'}
                         </span>
                     </div>
+                    <div class="info-row">
+                        <span class="info-label">健康</span>
+                        <span class="info-value">
+                            ${getHealthBadge(robot.health_status)}
+                        </span>
+                    </div>
                 </div>
             </div>
             <div class="robot-actions">
-                <button class="btn btn-sm btn-primary" onclick="selectRobot('${robot.id}')">
+                <button class="btn btn-sm btn-primary" onclick="selectRobot('${escapeHtml(robot.id)}')">
                     🎮 控制
                 </button>
-                <button class="btn btn-sm btn-info" onclick="viewDetails('${robot.id}')">
+                <button class="btn btn-sm btn-info" onclick="showDetailsModal('${escapeHtml(robot.id)}')">
                     📋 詳情
+                </button>
+                <button class="btn btn-sm btn-success" onclick="checkRobotHealth('${escapeHtml(robot.id)}')">
+                    🩺 檢查
                 </button>
             </div>
         </div>
     `).join('');
+}
+
+// 取得健康徽章 HTML
+function getHealthBadge(status) {
+    switch (status) {
+        case 'healthy':
+            return '<span class="health-badge health-healthy">✅ 健康</span>';
+        case 'warning':
+            return '<span class="health-badge health-warning">⚠️ 警告</span>';
+        default:
+            return '<span class="health-badge health-unknown">❓ 未知</span>';
+    }
 }
 
 // 顯示註冊對話框
@@ -243,12 +508,183 @@ function selectRobot(robotId) {
     window.location.href = `/ui/command-center?robot=${robotId}`;
 }
 
-// 查看詳情
-function viewDetails(robotId) {
-    window.EdgeUI.showToast('機器人詳情功能開發中...', 'info');
+// 執行單一機器人健康檢查
+async function checkRobotHealth(robotId) {
+    try {
+        window.EdgeUI.showToast('正在執行健康檢查...', 'info');
+        const res = await fetch(`/api/edge/robots/${robotId}/health`);
+        const data = await res.json();
+        
+        if (data.health.status === 'healthy') {
+            window.EdgeUI.showToast('✅ 機器人健康狀態良好', 'success');
+        } else if (data.health.status === 'warning') {
+            window.EdgeUI.showToast('⚠️ 機器人需要關注', 'warning');
+        } else {
+            window.EdgeUI.showToast('❓ 機器人狀態未知', 'info');
+        }
+        
+        refreshRobots();
+    } catch (error) {
+        console.error('Failed to check health:', error);
+        window.EdgeUI.showToast('健康檢查失敗', 'error');
+    }
 }
 
-// 頁面載入時刷新
-document.addEventListener('DOMContentLoaded', refreshRobots);
+// 執行所有機器人健康檢查
+async function checkAllHealth() {
+    try {
+        const res = await fetch('/api/edge/robots');
+        const data = await res.json();
+        
+        if (!data.robots || data.robots.length === 0) {
+            window.EdgeUI.showToast('沒有機器人需要檢查', 'info');
+            return;
+        }
+        
+        window.EdgeUI.showToast(`正在檢查 ${data.robots.length} 個機器人...`, 'info');
+        
+        for (const robot of data.robots) {
+            await fetch(`/api/edge/robots/${robot.id}/health`);
+        }
+        
+        refreshRobots();
+        window.EdgeUI.showToast('健康檢查完成', 'success');
+    } catch (error) {
+        console.error('Failed to check all health:', error);
+        window.EdgeUI.showToast('健康檢查失敗', 'error');
+    }
+}
+
+// 顯示詳情對話框
+async function showDetailsModal(robotId) {
+    currentRobotId = robotId;
+    document.getElementById('details-modal').style.display = 'flex';
+    document.getElementById('details-content').innerHTML = '<div class="loading">載入中...</div>';
+    
+    try {
+        // 載入機器人資料
+        const robotRes = await fetch(`/api/edge/robots/${robotId}`);
+        const robotData = await robotRes.json();
+        
+        // 載入健康歷史
+        const historyRes = await fetch(`/api/edge/robots/${robotId}/health/history?limit=5`);
+        const historyData = await historyRes.json();
+        
+        renderDetails(robotData.robot, historyData.history);
+    } catch (error) {
+        console.error('Failed to load robot details:', error);
+        document.getElementById('details-content').innerHTML = '<div class="error">載入失敗</div>';
+    }
+}
+
+// 渲染詳情內容
+function renderDetails(robot, healthHistory) {
+    const content = document.getElementById('details-content');
+    
+    content.innerHTML = `
+        <div class="details-grid">
+            <div class="details-section">
+                <h4>${escapeHtml(robot.icon) || '🤖'} 基本資訊</h4>
+                <div class="details-row">
+                    <span class="details-label">名稱</span>
+                    <span class="details-value">${escapeHtml(robot.name)}</span>
+                </div>
+                <div class="details-row">
+                    <span class="details-label">ID</span>
+                    <span class="details-value">${escapeHtml(robot.id)}</span>
+                </div>
+                <div class="details-row">
+                    <span class="details-label">類型</span>
+                    <span class="details-value">${escapeHtml(robot.type_display || robot.type)}</span>
+                </div>
+                <div class="details-row">
+                    <span class="details-label">位置</span>
+                    <span class="details-value">${escapeHtml(robot.location) || '-'}</span>
+                </div>
+                <div class="details-row">
+                    <span class="details-label">建立時間</span>
+                    <span class="details-value">${robot.created_at ? escapeHtml(window.EdgeUI.formatDateTime(robot.created_at)) : '-'}</span>
+                </div>
+            </div>
+            
+            <div class="details-section">
+                <h4>📊 狀態資訊</h4>
+                <div class="details-row">
+                    <span class="details-label">狀態</span>
+                    <span class="details-value">${escapeHtml(robot.status)}</span>
+                </div>
+                <div class="details-row">
+                    <span class="details-label">連線</span>
+                    <span class="details-value">${robot.connected ? '🟢 已連線' : '🔴 未連線'}</span>
+                </div>
+                <div class="details-row">
+                    <span class="details-label">電量</span>
+                    <span class="details-value">${escapeHtml(robot.battery)}%</span>
+                </div>
+                <div class="details-row">
+                    <span class="details-label">健康狀態</span>
+                    <span class="details-value">${getHealthBadge(robot.health_status)}</span>
+                </div>
+                <div class="details-row">
+                    <span class="details-label">最後連線</span>
+                    <span class="details-value">${robot.last_seen ? escapeHtml(window.EdgeUI.formatDateTime(robot.last_seen)) : '-'}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="details-section" style="margin-top: 15px;">
+            <h4>🛠️ 能力清單</h4>
+            <div class="capabilities-list">
+                ${(robot.capabilities || []).map(cap => `
+                    <span class="capability-tag">${escapeHtml(cap)}</span>
+                `).join('')}
+            </div>
+        </div>
+        
+        <div class="details-section" style="margin-top: 15px;">
+            <h4>🩺 健康檢查歷史</h4>
+            <div class="health-history">
+                ${healthHistory.length > 0 ? healthHistory.map(h => `
+                    <div class="health-history-item status-${escapeHtml(h.status)}">
+                        <strong>${escapeHtml(h.status)}</strong> - ${escapeHtml(window.EdgeUI.formatDateTime(h.timestamp))}
+                        ${h.response_time_ms ? `(${escapeHtml(h.response_time_ms)}ms)` : ''}
+                    </div>
+                `).join('') : '<p>尚無健康檢查記錄</p>'}
+            </div>
+        </div>
+    `;
+}
+
+// 隱藏詳情對話框
+function hideDetailsModal() {
+    document.getElementById('details-modal').style.display = 'none';
+    currentRobotId = null;
+}
+
+// 確認刪除機器人
+async function confirmDeleteRobot() {
+    if (!currentRobotId) return;
+    
+    const confirmed = await window.EdgeUI.confirmAction('確定要刪除這個機器人嗎？此操作無法復原。');
+    if (!confirmed) return;
+    
+    try {
+        const res = await fetch(`/api/edge/robots/${currentRobotId}`, {
+            method: 'DELETE'
+        });
+        
+        const data = await res.json();
+        if (data.success) {
+            hideDetailsModal();
+            refreshRobots();
+            window.EdgeUI.showToast('機器人已刪除', 'success');
+        } else {
+            window.EdgeUI.showToast('刪除失敗: ' + (data.error || '未知錯誤'), 'error');
+        }
+    } catch (error) {
+        console.error('Failed to delete robot:', error);
+        window.EdgeUI.showToast('刪除失敗', 'error');
+    }
+}
 </script>
 {% endblock %}

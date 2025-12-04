@@ -162,6 +162,19 @@ electron-app/
 - [x] 建立 Edge UI CSS 樣式 (`edge.css`)
 - [x] 建立通用 JavaScript (`edge-common.js`)
 
+#### 階段 1.5：機器人監控儀表板增強（✅ 已完成）
+- [x] 機器人類型系統（humanoid, agv, arm, drone, other）
+- [x] 機器人健康檢查 API (`/api/edge/robots/<id>/health`)
+- [x] 機器人健康歷史 API (`/api/edge/robots/<id>/health/history`)
+- [x] 儀表板摘要 API (`/api/edge/dashboard/summary`)
+- [x] 機器人類型 API (`/api/edge/robot-types`)
+- [x] 機器人刪除 API (`DELETE /api/edge/robots/<id>`)
+- [x] 儀表板摘要統計卡片
+- [x] 機器人詳情對話框
+- [x] 健康檢查按鈕與歷史顯示
+- [x] 電量視覺化（高/中/低）
+- [x] 測試覆蓋（23 個新測試）
+
 #### 階段 2：指令控制
 - [ ] 實作指令執行 API
 - [ ] 實作指令控制中心頁面

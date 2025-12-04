@@ -228,6 +228,158 @@ timestamp = utc_now_iso()
 
 ---
 
+## 🚀 Phase 3.1 經驗教訓
+
+> 📖 **詳細報告**：[phase3/PHASE3_1_STATUS_REPORT.md](phase3/PHASE3_1_STATUS_REPORT.md)
+
+### 6.1 服務協調器設計模式
+
+```python
+# ✅ 使用抽象基礎類別定義服務介面
+class ServiceBase(ABC):
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        pass
+    
+    @abstractmethod
+    async def start(self) -> bool:
+        pass
+    
+    @abstractmethod
+    async def stop(self, timeout: Optional[float] = None) -> bool:
+        pass
+    
+    @abstractmethod
+    async def health_check(self) -> Dict[str, Any]:
+        pass
+```
+
+**經驗教訓**：
+1. 使用抽象基礎類別確保所有服務實作統一的介面
+2. 服務協調器負責生命週期管理，服務本身只負責自身邏輯
+3. 服務狀態應由外部協調器追蹤，避免服務自己管理狀態導致不一致
+
+### 6.2 共享狀態管理器設計
+
+```python
+# ✅ 整合狀態存儲和事件匯流排
+class SharedStateManager:
+    def __init__(self, db_path=None):
+        self._state_store = LocalStateStore(db_path=db_path)
+        self._event_bus = LocalEventBus()
+    
+    async def update_robot_status(self, robot_id: str, status: Dict):
+        # 更新狀態
+        await self._state_store.set(key, status)
+        # 發布事件通知訂閱者
+        await self._event_bus.publish(EventTopics.ROBOT_STATUS_UPDATED, {...})
+```
+
+**經驗教訓**：
+1. 狀態更新和事件通知應在同一處理中完成，確保一致性
+2. 使用預定義的狀態鍵（`StateKeys`）和事件主題（`EventTopics`）避免拼寫錯誤
+3. SQLite 作為本地狀態存儲可滿足 Edge 環境需求，支援 TTL 過期
+4. 事件匯流排應支援通配符訂閱以便監控所有相關事件
+
+### 6.3 服務註冊安全檢查
+
+```python
+# ❌ 直接覆蓋已註冊的服務
+def register_service(self, service: ServiceBase):
+    self._services[service.name] = service  # 可能覆蓋運行中的服務
+
+# ✅ 檢查服務狀態後再註冊
+def register_service(self, service: ServiceBase):
+    if service.name in self._services:
+        old_service = self._services[service.name]
+        if old_service.is_running:
+            raise ValueError(f"Cannot replace running service: {service.name}")
+```
+
+**原因**：替換正在運行的服務可能導致資源洩漏和狀態不一致。
+
+### 6.4 非同步狀態變更通知
+
+```python
+# ✅ 使用回呼機制通知狀態變更
+def set_state_change_callback(
+    self,
+    callback: Callable[[str, ServiceStatus, ServiceStatus, ServiceState], Coroutine],
+) -> None:
+    self._state_change_callback = callback
+
+async def _notify_state_change(
+    self,
+    service_name: str,
+    old_status: ServiceStatus,
+    new_status: ServiceStatus,
+) -> None:
+    if old_status == new_status:
+        return  # 避免重複通知
+    if self._state_change_callback:
+        await self._state_change_callback(service_name, old_status, new_status, state)
+```
+
+**經驗教訓**：
+1. 狀態變更通知應是非同步的，避免阻塞主流程
+2. 只在狀態實際變更時通知，避免冗餘通知
+3. 回呼失敗不應影響主流程，需要錯誤處理
+
+### 6.5 健康檢查任務可取消設計
+
+```python
+# ✅ 使用 shutdown event 實現可取消的定期任務
+async def _periodic_health_check(self) -> None:
+    while self._running:
+        try:
+            await asyncio.wait_for(
+                self._shutdown_event.wait(),
+                timeout=self._health_check_interval,
+            )
+            break  # 收到關閉信號
+        except asyncio.TimeoutError:
+            # 正常超時，執行健康檢查
+            if not self._running or self._shutdown_event.is_set():
+                break
+            await self.check_all_services_health()
+```
+
+**經驗教訓**：
+1. 使用 `asyncio.Event` 而非簡單的 `sleep` 以支援快速關閉
+2. 在執行耗時操作前檢查運行狀態
+3. 正確處理 `CancelledError` 以確保優雅關閉
+
+### 6.6 dataclass 與 datetime 結合使用
+
+```python
+# ✅ 使用 field(default_factory=...) 設定動態預設值
+from dataclasses import dataclass, field
+from src.common.datetime_utils import utc_now
+
+@dataclass
+class RobotStatus:
+    robot_id: str
+    connected: bool = False
+    updated_at: datetime = field(default_factory=utc_now)  # 動態預設值
+```
+
+**原因**：直接使用 `datetime.now()` 作為預設值會導致所有實例共享同一個時間戳。
+
+### 6.7 測試覆蓋增長策略
+
+| 階段 | 測試數 | 增加數 | 說明 |
+|------|--------|--------|------|
+| Phase 3.1 初期 | 243 | - | 基礎測試 |
+| Phase 3.1 完成 | 365 | +122 | 服務協調器、共享狀態等 |
+
+**經驗教訓**：
+1. 每個新模組都應有對應的測試套件
+2. 測試文件命名應清晰反映測試對象（如 `test_service_coordinator.py`）
+3. 使用 mock 隔離外部依賴，提高測試速度和可靠性
+
+---
+
 ## 📝 開發流程提醒
 
 1. **新增共用工具**：放在 `src/common/`
@@ -238,4 +390,4 @@ timestamp = utc_now_iso()
 
 ---
 
-**最後更新**：2025-12-03
+**最後更新**：2025-12-04

@@ -710,30 +710,63 @@ class ServiceCoordinator:
 
             return False
 
-    async def start_all_services(self) -> Dict[str, bool]:
+    async def start_all_services(self, concurrent: bool = False) -> Dict[str, bool]:
         """
         啟動所有已註冊的服務
+
+        Args:
+            concurrent: 是否並發啟動服務。預設為 False（循序啟動）。
+                        若服務之間有依賴關係，建議使用循序啟動。
 
         Returns:
             服務名稱 -> 是否成功的字典
         """
         logger.info("Starting all services", extra={
             "service_count": len(self._services),
+            "concurrent": concurrent,
             "service": "service_coordinator"
         })
 
         results = {}
 
-        for service_name in self._services:
-            state = self._states[service_name]
-            if state.config.enabled:
+        # 取得需要啟動的服務
+        services_to_start = [
+            (name, state) for name, state in self._states.items()
+            if state.config.enabled
+        ]
+        disabled_services = [
+            name for name, state in self._states.items()
+            if not state.config.enabled
+        ]
+
+        # 記錄被停用的服務
+        for service_name in disabled_services:
+            logger.info("Service disabled, skipping", extra={
+                "service_name": service_name,
+                "service": "service_coordinator"
+            })
+            results[service_name] = True
+
+        if concurrent and services_to_start:
+            # 並發啟動所有服務
+            service_names = [name for name, _ in services_to_start]
+            tasks = [self.start_service(name) for name in service_names]
+            results_list = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for name, result in zip(service_names, results_list):
+                if isinstance(result, Exception):
+                    logger.error("Service start raised exception", extra={
+                        "service_name": name,
+                        "error": str(result),
+                        "service": "service_coordinator"
+                    })
+                    results[name] = False
+                else:
+                    results[name] = result
+        else:
+            # 循序啟動（預設，適用於有依賴關係的服務）
+            for service_name, _ in services_to_start:
                 results[service_name] = await self.start_service(service_name)
-            else:
-                logger.info("Service disabled, skipping", extra={
-                    "service_name": service_name,
-                    "service": "service_coordinator"
-                })
-                results[service_name] = True
 
         all_success = all(results.values())
 
@@ -748,28 +781,50 @@ class ServiceCoordinator:
     async def stop_all_services(
         self,
         timeout: Optional[float] = None,
+        concurrent: bool = False,
     ) -> Dict[str, bool]:
         """
         停止所有已註冊的服務
 
         Args:
             timeout: 每個服務的停止逾時（秒）
+            concurrent: 是否並發停止服務。預設為 False（循序停止）。
+                        若服務之間有依賴關係，建議使用循序停止。
 
         Returns:
             服務名稱 -> 是否成功的字典
         """
         logger.info("Stopping all services", extra={
             "service_count": len(self._services),
+            "concurrent": concurrent,
             "service": "service_coordinator"
         })
 
         results = {}
+        service_names = list(self._services.keys())
 
-        for service_name in self._services:
-            results[service_name] = await self.stop_service(
-                service_name,
-                timeout=timeout,
-            )
+        if concurrent and service_names:
+            # 並發停止所有服務
+            tasks = [self.stop_service(name, timeout=timeout) for name in service_names]
+            results_list = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for name, result in zip(service_names, results_list):
+                if isinstance(result, Exception):
+                    logger.error("Service stop raised exception", extra={
+                        "service_name": name,
+                        "error": str(result),
+                        "service": "service_coordinator"
+                    })
+                    results[name] = False
+                else:
+                    results[name] = result
+        else:
+            # 循序停止（預設，適用於有依賴關係的服務）
+            for service_name in service_names:
+                results[service_name] = await self.stop_service(
+                    service_name,
+                    timeout=timeout,
+                )
 
         all_success = all(results.values())
 
@@ -874,13 +929,32 @@ class ServiceCoordinator:
         """
         檢查所有服務的健康狀態
 
+        使用並發執行以提高效能，減少總健康檢查時間。
+
         Returns:
             服務名稱 -> 是否健康的字典
         """
-        results = {}
+        if not self._services:
+            return {}
 
-        for service_name in self._services:
-            results[service_name] = await self.check_service_health(service_name)
+        # 並發執行所有健康檢查以提高效能
+        service_names = list(self._services.keys())
+        tasks = [self.check_service_health(name) for name in service_names]
+
+        # 使用 gather 並發執行，return_exceptions=True 確保單個失敗不會影響其他
+        results_list = await asyncio.gather(*tasks, return_exceptions=True)
+
+        results = {}
+        for name, result in zip(service_names, results_list):
+            if isinstance(result, Exception):
+                logger.error("Health check raised exception", extra={
+                    "service_name": name,
+                    "error": str(result),
+                    "service": "service_coordinator"
+                })
+                results[name] = False
+            else:
+                results[name] = result
 
         return results
 

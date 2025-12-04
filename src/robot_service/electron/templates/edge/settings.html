@@ -141,16 +141,19 @@ async function resetSettings() {
     }
     
     try {
-        // 從後端取得預設值並重設
+        // 先從後端取得預設值
+        const defaultsRes = await fetch('/api/edge/settings/defaults');
+        const defaultsData = await defaultsRes.json();
+        if (!defaultsData || !defaultsData.settings) {
+            showToast('取得預設值失敗', 'error');
+            return;
+        }
+        
+        // 用預設值重設設定
         const res = await fetch('/api/edge/settings', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                duration_unit: 's',
-                theme: 'light',
-                llm_provider: null,
-                llm_model: null
-            })
+            body: JSON.stringify(defaultsData.settings)
         });
         
         const data = await res.json();
@@ -166,16 +169,22 @@ async function resetSettings() {
     }
 }
 
-// 顯示提示訊息
+// 顯示提示訊息（使用共用的 EdgeUI.showToast 或本地實作）
 function showToast(message, type = 'success') {
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.remove();
-    }, 3000);
+    if (window.EdgeUI && window.EdgeUI.showToast) {
+        window.EdgeUI.showToast(message, type);
+    } else {
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.textContent = message;
+        toast.setAttribute('role', 'alert');
+        toast.setAttribute('aria-live', 'polite');
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.remove();
+        }, 3000);
+    }
 }
 </script>
 {% endblock %}

@@ -159,12 +159,16 @@ async function sendAction(action) {
     addToHistory(action, 'pending');
     
     try {
-        // 這裡會調用實際的指令 API
+        // 嘗試從 Electron API 取得 Token，若無則使用空字串
+        const token = (window.electronAPI && typeof window.electronAPI.getToken === 'function') 
+            ? await window.electronAPI.getToken() 
+            : '';
+        
         const res = await fetch('/api/command', {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
-                // Token 會由 Electron 注入
+                'Authorization': token ? `Bearer ${token}` : '',
             },
             body: JSON.stringify({
                 robot_id: selectedRobotId,

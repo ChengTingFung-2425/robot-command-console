@@ -142,12 +142,12 @@ async function registerDemoRobot() {
         
         const data = await res.json();
         if (data.success) {
-            alert('機器人註冊成功: ' + data.robot.name);
+            showToast('機器人註冊成功: ' + data.robot.name);
             refreshStatus();
         }
     } catch (error) {
         console.error('Failed to register robot:', error);
-        alert('註冊失敗');
+        showToast('註冊失敗', 'error');
     }
 }
 

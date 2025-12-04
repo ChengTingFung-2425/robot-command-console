@@ -248,11 +248,11 @@ def detect_local_llm_providers() -> List[Dict[str, Any]]:
     - OLLAMA_ENDPOINT: Ollama 服務端點
     - LMSTUDIO_ENDPOINT: LM Studio 服務端點
     """
+    import urllib.request
     providers = []
 
     # 檢測 Ollama
     try:
-        import urllib.request
         ollama_url = f'{OLLAMA_ENDPOINT}/api/tags'
         req = urllib.request.Request(ollama_url, method='GET')
         req.add_header('Accept', 'application/json')
@@ -266,12 +266,11 @@ def detect_local_llm_providers() -> List[Dict[str, Any]]:
                 'endpoint': OLLAMA_ENDPOINT,
                 'models': [m.get('name') for m in models],
             })
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f'Failed to detect Ollama at {OLLAMA_ENDPOINT}: {e}')
 
     # 檢測 LM Studio
     try:
-        import urllib.request
         lmstudio_url = f'{LMSTUDIO_ENDPOINT}/v1/models'
         req = urllib.request.Request(lmstudio_url, method='GET')
         req.add_header('Accept', 'application/json')
@@ -285,20 +284,27 @@ def detect_local_llm_providers() -> List[Dict[str, Any]]:
                 'endpoint': LMSTUDIO_ENDPOINT,
                 'models': [m.get('id') for m in models],
             })
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f'Failed to detect LM Studio at {LMSTUDIO_ENDPOINT}: {e}')
 
     return providers
 
 
 def check_internet_connection() -> bool:
-    """檢查網路連線"""
-    try:
-        import urllib.request
-        urllib.request.urlopen('https://www.google.com', timeout=3)
-        return True
-    except Exception:
-        return False
+    """檢查網路連線（嘗試多個端點）"""
+    check_urls = [
+        'https://www.google.com',
+        'https://www.cloudflare.com',
+        'https://1.1.1.1'
+    ]
+    import urllib.request
+    for url in check_urls:
+        try:
+            urllib.request.urlopen(url, timeout=3)
+            return True
+        except Exception:
+            continue
+    return False
 
 
 def check_mcp_connection() -> bool:
@@ -325,6 +331,15 @@ def api_get_settings():
     """取得用戶設定"""
     return jsonify({
         'settings': _user_settings,
+        'request_id': getattr(g, 'request_id', None),
+    })
+
+
+@edge_ui.route('/api/edge/settings/defaults', methods=['GET'])
+def api_get_settings_defaults():
+    """取得預設設定值"""
+    return jsonify({
+        'settings': DEFAULT_SETTINGS,
         'request_id': getattr(g, 'request_id', None),
     })
 

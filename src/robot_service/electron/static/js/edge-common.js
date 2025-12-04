@@ -8,6 +8,10 @@ const API_BASE_URL = window.location.origin;
 
 /**
  * 通用 API 請求函式
+ * @param {string} endpoint - API 端點路徑
+ * @param {Object} options - fetch 選項
+ * @returns {Promise<Object>} API 回應資料
+ * @throws {Error} 當請求失敗或回應不正常時拋出錯誤
  */
 async function apiRequest(endpoint, options = {}) {
     const url = API_BASE_URL + endpoint;
@@ -44,6 +48,7 @@ async function apiRequest(endpoint, options = {}) {
 
 /**
  * 更新連線狀態指示器
+ * @returns {Promise<void>}
  */
 async function updateConnectionStatus() {
     try {
@@ -73,6 +78,8 @@ async function updateConnectionStatus() {
 
 /**
  * 格式化時間
+ * @param {Date|string} date - 日期物件或 ISO 字串
+ * @returns {string} 格式化的時間字串
  */
 function formatTime(date) {
     if (typeof date === 'string') {
@@ -87,6 +94,8 @@ function formatTime(date) {
 
 /**
  * 格式化日期時間
+ * @param {Date|string} date - 日期物件或 ISO 字串
+ * @returns {string} 格式化的日期時間字串
  */
 function formatDateTime(date) {
     if (typeof date === 'string') {
@@ -102,12 +111,18 @@ function formatDateTime(date) {
 }
 
 /**
- * 顯示提示訊息
+ * 顯示提示訊息（Toast 通知）
+ * @param {string} message - 訊息內容
+ * @param {string} type - 訊息類型 ('success' | 'error' | 'warning' | 'info')
+ * @param {number} duration - 顯示時間（毫秒）
  */
 function showToast(message, type = 'success', duration = 3000) {
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
     toast.textContent = message;
+    // 添加 ARIA 屬性以提升可訪問性
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'polite');
     document.body.appendChild(toast);
     
     setTimeout(() => {
@@ -117,6 +132,8 @@ function showToast(message, type = 'success', duration = 3000) {
 
 /**
  * 確認對話框
+ * @param {string} message - 確認訊息
+ * @returns {Promise<boolean>} 用戶選擇結果
  */
 function confirmAction(message) {
     return new Promise((resolve) => {

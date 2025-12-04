@@ -126,9 +126,8 @@ async function refreshRobots() {
         const res = await fetch('/api/edge/robots');
         const data = await res.json();
         
-        if (data.robots && data.robots.length > 0) {
-            renderRobots(data.robots);
-        }
+        // 無論列表是否為空都要渲染，以正確顯示空白狀態
+        renderRobots(data.robots || []);
     } catch (error) {
         console.error('Failed to refresh robots:', error);
     }

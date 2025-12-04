@@ -1,0 +1,245 @@
+{% extends "edge/base.html" %}
+
+{% block title %}指令控制中心{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🎮 指令控制中心</h1>
+    <p class="subtitle">選擇機器人並發送動作指令</p>
+</div>
+
+<div class="control-layout">
+    <!-- 左側：機器人選擇 -->
+    <div class="control-sidebar">
+        <h3>選擇機器人</h3>
+        <div id="robot-selector" class="robot-selector">
+            {% if robots %}
+                {% for robot in robots %}
+                <div class="robot-option" data-robot-id="{{ robot.id }}" onclick="selectRobot('{{ robot.id }}')">
+                    <span class="robot-icon">🤖</span>
+                    <span class="robot-name">{{ robot.name }}</span>
+                    <span class="robot-status status-{{ robot.status }}">{{ robot.status }}</span>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <p>尚無機器人</p>
+                    <a href="{{ url_for('edge_ui.ui_dashboard') }}" class="btn btn-sm btn-primary">
+                        ➕ 註冊機器人
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 右側：指令區域 -->
+    <div class="control-main">
+        <div id="no-robot-selected" class="placeholder">
+            <div class="placeholder-icon">👈</div>
+            <h3>請先選擇機器人</h3>
+            <p>從左側列表選擇要控制的機器人</p>
+        </div>
+
+        <div id="command-panel" class="command-panel" style="display: none;">
+            <div class="selected-robot-info">
+                <h3>
+                    <span class="robot-icon">🤖</span>
+                    <span id="selected-robot-name">-</span>
+                </h3>
+                <span id="selected-robot-status" class="robot-status">-</span>
+            </div>
+
+            <!-- 快捷動作按鈕 -->
+            <div class="action-section">
+                <h4>🏃 移動控制</h4>
+                <div class="action-grid">
+                    <button class="action-btn" onclick="sendAction('go_forward')">⬆️ 前進</button>
+                    <button class="action-btn" onclick="sendAction('back_fast')">⬇️ 後退</button>
+                    <button class="action-btn" onclick="sendAction('turn_left')">⬅️ 左轉</button>
+                    <button class="action-btn" onclick="sendAction('turn_right')">➡️ 右轉</button>
+                    <button class="action-btn" onclick="sendAction('left_move_fast')">↙️ 左移</button>
+                    <button class="action-btn" onclick="sendAction('right_move_fast')">↘️ 右移</button>
+                </div>
+            </div>
+
+            <div class="action-section">
+                <h4>🧍 姿態控制</h4>
+                <div class="action-grid">
+                    <button class="action-btn" onclick="sendAction('stand')">🧍 站立</button>
+                    <button class="action-btn" onclick="sendAction('bow')">🙇 鞠躬</button>
+                    <button class="action-btn" onclick="sendAction('squat')">🏋️ 蹲下</button>
+                    <button class="action-btn" onclick="sendAction('wave')">👋 揮手</button>
+                    <button class="action-btn" onclick="sendAction('stand_up_front')">↗️ 前起身</button>
+                    <button class="action-btn" onclick="sendAction('stand_up_back')">↘️ 後起身</button>
+                </div>
+            </div>
+
+            <div class="action-section">
+                <h4>💃 舞蹈動作</h4>
+                <div class="action-grid">
+                    <button class="action-btn" onclick="sendAction('dance_two')">💃 舞蹈 2</button>
+                    <button class="action-btn" onclick="sendAction('dance_three')">💃 舞蹈 3</button>
+                    <button class="action-btn" onclick="sendAction('dance_four')">💃 舞蹈 4</button>
+                    <button class="action-btn" onclick="sendAction('dance_five')">💃 舞蹈 5</button>
+                </div>
+            </div>
+
+            <div class="action-section">
+                <h4>⚠️ 緊急控制</h4>
+                <div class="action-grid">
+                    <button class="action-btn action-danger" onclick="sendAction('stop')">🛑 停止</button>
+                </div>
+            </div>
+
+            <!-- 執行歷史 -->
+            <div class="history-section">
+                <h4>📋 執行歷史</h4>
+                <div id="command-history" class="command-history">
+                    <p class="placeholder-text">尚無執行記錄</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let selectedRobotId = null;
+let commandHistory = [];
+
+// 從 URL 參數選擇機器人
+document.addEventListener('DOMContentLoaded', function() {
+    const params = new URLSearchParams(window.location.search);
+    const robotId = params.get('robot');
+    if (robotId) {
+        selectRobot(robotId);
+    }
+});
+
+// 選擇機器人
+async function selectRobot(robotId) {
+    selectedRobotId = robotId;
+    
+    // 更新選中狀態
+    document.querySelectorAll('.robot-option').forEach(el => {
+        el.classList.remove('selected');
+    });
+    const selectedOption = document.querySelector(`[data-robot-id="${robotId}"]`);
+    if (selectedOption) {
+        selectedOption.classList.add('selected');
+    }
+    
+    // 獲取機器人資料
+    try {
+        const res = await fetch(`/api/edge/robots/${robotId}`);
+        const data = await res.json();
+        
+        if (data.robot) {
+            document.getElementById('selected-robot-name').textContent = data.robot.name;
+            document.getElementById('selected-robot-status').textContent = data.robot.status;
+            document.getElementById('selected-robot-status').className = `robot-status status-${data.robot.status}`;
+            
+            document.getElementById('no-robot-selected').style.display = 'none';
+            document.getElementById('command-panel').style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Failed to load robot:', error);
+    }
+}
+
+// 發送動作指令
+async function sendAction(action) {
+    if (!selectedRobotId) {
+        alert('請先選擇機器人');
+        return;
+    }
+    
+    // 添加到歷史
+    addToHistory(action, 'pending');
+    
+    try {
+        // 這裡會調用實際的指令 API
+        const res = await fetch('/api/command', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                // Token 會由 Electron 注入
+            },
+            body: JSON.stringify({
+                robot_id: selectedRobotId,
+                command: action,
+                priority: 'NORMAL'
+            })
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok) {
+            updateHistoryStatus(action, 'success', data.message_id);
+        } else {
+            updateHistoryStatus(action, 'error', data.error);
+        }
+    } catch (error) {
+        console.error('Failed to send action:', error);
+        updateHistoryStatus(action, 'error', error.message);
+    }
+}
+
+// 添加到歷史記錄
+function addToHistory(action, status) {
+    const timestamp = new Date().toLocaleTimeString();
+    commandHistory.unshift({
+        action,
+        status,
+        timestamp,
+        id: Date.now()
+    });
+    
+    // 保持最多 20 條記錄
+    if (commandHistory.length > 20) {
+        commandHistory.pop();
+    }
+    
+    renderHistory();
+}
+
+// 更新歷史記錄狀態
+function updateHistoryStatus(action, status, message) {
+    const item = commandHistory.find(h => h.action === action && h.status === 'pending');
+    if (item) {
+        item.status = status;
+        item.message = message;
+        renderHistory();
+    }
+}
+
+// 渲染歷史記錄
+function renderHistory() {
+    const container = document.getElementById('command-history');
+    
+    if (commandHistory.length === 0) {
+        container.innerHTML = '<p class="placeholder-text">尚無執行記錄</p>';
+        return;
+    }
+    
+    container.innerHTML = commandHistory.map(item => `
+        <div class="history-item status-${item.status}">
+            <span class="history-time">${item.timestamp}</span>
+            <span class="history-action">${item.action}</span>
+            <span class="history-status">${getStatusIcon(item.status)}</span>
+        </div>
+    `).join('');
+}
+
+// 狀態圖示
+function getStatusIcon(status) {
+    switch (status) {
+        case 'pending': return '⏳';
+        case 'success': return '✅';
+        case 'error': return '❌';
+        default: return '❓';
+    }
+}
+</script>
+{% endblock %}

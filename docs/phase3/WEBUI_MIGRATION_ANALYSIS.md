@@ -149,12 +149,18 @@ electron-app/
 
 ### 實作計畫
 
-#### 階段 1：基礎擴展（本次實作）
+#### 階段 1：基礎擴展（✅ 已完成）
 - [x] 分析 Edge/Cloud 功能隔離
-- [ ] 擴展 Flask Service 結構
-- [ ] 新增 Edge UI 模板目錄
-- [ ] 實作機器人儀表板 API
-- [ ] 實作機器人儀表板頁面
+- [x] 擴展 Flask Service 結構
+- [x] 新增 Edge UI 模板目錄
+- [x] 實作 Edge UI 藍圖 (`edge_ui.py`)
+- [x] 實作機器人儀表板 API (`/api/edge/robots`)
+- [x] 實作機器人儀表板頁面 (`/ui/dashboard`)
+- [x] 實作指令控制中心頁面 (`/ui/command-center`)
+- [x] 實作 LLM 設定頁面 (`/ui/llm-settings`)
+- [x] 實作用戶設定頁面 (`/ui/settings`)
+- [x] 建立 Edge UI CSS 樣式 (`edge.css`)
+- [x] 建立通用 JavaScript (`edge-common.js`)
 
 #### 階段 2：指令控制
 - [ ] 實作指令執行 API

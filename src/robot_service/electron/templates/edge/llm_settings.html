@@ -1,0 +1,210 @@
+{% extends "edge/base.html" %}
+
+{% block title %}LLM 設定{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🧠 LLM 設定</h1>
+    <p class="subtitle">管理本地 LLM 提供商</p>
+</div>
+
+<!-- 連線狀態 -->
+<div class="section">
+    <h2>📡 連線狀態</h2>
+    <div class="status-grid">
+        <div class="status-card" id="internet-status-card">
+            <span class="status-icon">🌐</span>
+            <span class="status-label">網路連線</span>
+            <span id="internet-status" class="status-value status-checking">檢查中...</span>
+        </div>
+        <div class="status-card" id="mcp-status-card">
+            <span class="status-icon">☁️</span>
+            <span class="status-label">MCP 伺服器</span>
+            <span id="mcp-status" class="status-value status-checking">檢查中...</span>
+        </div>
+        <div class="status-card" id="llm-status-card">
+            <span class="status-icon">🧠</span>
+            <span class="status-label">本地 LLM</span>
+            <span id="llm-status" class="status-value status-checking">檢查中...</span>
+        </div>
+    </div>
+</div>
+
+<!-- LLM 提供商列表 -->
+<div class="section">
+    <h2>🔌 LLM 提供商</h2>
+    <div class="toolbar">
+        <button class="btn btn-primary" onclick="discoverProviders()">
+            🔍 掃描提供商
+        </button>
+        <button class="btn btn-secondary" onclick="refreshStatus()">
+            🔄 重新整理
+        </button>
+    </div>
+    
+    <div id="providers-container" class="providers-list">
+        <div class="loading">正在載入...</div>
+    </div>
+</div>
+
+<!-- 使用說明 -->
+<div class="section">
+    <h2>📖 使用說明</h2>
+    <div class="info-grid">
+        <div class="info-card">
+            <h4>🦙 Ollama</h4>
+            <p>預設端口：11434</p>
+            <p>安裝：<code>curl -fsSL https://ollama.ai/install.sh | sh</code></p>
+            <a href="https://ollama.ai" target="_blank" class="btn btn-sm btn-info">
+                官方網站 ↗
+            </a>
+        </div>
+        <div class="info-card">
+            <h4>🎨 LM Studio</h4>
+            <p>預設端口：1234</p>
+            <p>下載後啟動本地伺服器功能</p>
+            <a href="https://lmstudio.ai" target="_blank" class="btn btn-sm btn-info">
+                官方網站 ↗
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 頁面載入時檢查狀態
+document.addEventListener('DOMContentLoaded', function() {
+    refreshStatus();
+});
+
+// 重新整理狀態
+async function refreshStatus() {
+    try {
+        const res = await fetch('/api/edge/llm/status');
+        const data = await res.json();
+        
+        // 更新網路狀態
+        const internetStatus = document.getElementById('internet-status');
+        if (data.internet_available) {
+            internetStatus.textContent = '已連線';
+            internetStatus.className = 'status-value status-success';
+        } else {
+            internetStatus.textContent = '離線';
+            internetStatus.className = 'status-value status-warning';
+        }
+        
+        // 更新 MCP 狀態
+        const mcpStatus = document.getElementById('mcp-status');
+        if (data.mcp_available) {
+            mcpStatus.textContent = '運行中';
+            mcpStatus.className = 'status-value status-success';
+        } else {
+            mcpStatus.textContent = '未連線';
+            mcpStatus.className = 'status-value status-error';
+        }
+        
+        // 更新 LLM 狀態
+        const llmStatus = document.getElementById('llm-status');
+        if (data.local_llm_available) {
+            llmStatus.textContent = '可用';
+            llmStatus.className = 'status-value status-success';
+        } else {
+            llmStatus.textContent = '不可用';
+            llmStatus.className = 'status-value status-error';
+        }
+        
+        // 渲染提供商列表
+        renderProviders(data.local_llm_providers || []);
+        
+    } catch (error) {
+        console.error('Failed to refresh status:', error);
+    }
+}
+
+// 掃描提供商
+async function discoverProviders() {
+    const container = document.getElementById('providers-container');
+    container.innerHTML = '<div class="loading">正在掃描...</div>';
+    
+    try {
+        const res = await fetch('/api/edge/llm/providers');
+        const data = await res.json();
+        renderProviders(data.providers || []);
+    } catch (error) {
+        console.error('Failed to discover providers:', error);
+        container.innerHTML = '<div class="error">掃描失敗</div>';
+    }
+}
+
+// 渲染提供商列表
+function renderProviders(providers) {
+    const container = document.getElementById('providers-container');
+    
+    if (providers.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">🔍</div>
+                <h3>未找到 LLM 提供商</h3>
+                <p>請確保 Ollama 或 LM Studio 正在運行，然後點擊「掃描提供商」</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = providers.map(provider => `
+        <div class="provider-card status-${provider.status}">
+            <div class="provider-header">
+                <span class="provider-icon">${provider.name === 'ollama' ? '🦙' : '🎨'}</span>
+                <h3 class="provider-name">${provider.display_name}</h3>
+                <span class="provider-status status-${provider.status}">
+                    ${provider.status === 'available' ? '✅ 可用' : '❌ 不可用'}
+                </span>
+            </div>
+            <div class="provider-body">
+                <div class="info-row">
+                    <span class="info-label">端點</span>
+                    <span class="info-value">${provider.endpoint}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">可用模型</span>
+                    <span class="info-value">${provider.models ? provider.models.length : 0} 個</span>
+                </div>
+                ${provider.models && provider.models.length > 0 ? `
+                <div class="models-list">
+                    ${provider.models.slice(0, 5).map(m => `
+                        <span class="model-tag">${m}</span>
+                    `).join('')}
+                    ${provider.models.length > 5 ? `<span class="model-tag">+${provider.models.length - 5} 更多</span>` : ''}
+                </div>
+                ` : ''}
+            </div>
+            <div class="provider-actions">
+                <button class="btn btn-sm btn-primary" onclick="selectProvider('${provider.name}')">
+                    選擇此提供商
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// 選擇提供商
+async function selectProvider(providerName) {
+    try {
+        const res = await fetch('/api/edge/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ llm_provider: providerName })
+        });
+        
+        const data = await res.json();
+        if (data.success) {
+            alert(`已選擇 ${providerName} 作為 LLM 提供商`);
+        }
+    } catch (error) {
+        console.error('Failed to select provider:', error);
+        alert('選擇失敗');
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,178 @@
+{% extends "edge/base.html" %}
+
+{% block title %}用戶設定{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>⚙️ 用戶設定</h1>
+    <p class="subtitle">調整本地偏好設定</p>
+</div>
+
+<div class="settings-container">
+    <!-- UI 設定 -->
+    <div class="settings-section">
+        <h2>🎨 介面設定</h2>
+        
+        <div class="setting-item">
+            <div class="setting-info">
+                <label>時間單位</label>
+                <p class="setting-desc">選擇進階指令編輯器中的時間顯示單位</p>
+            </div>
+            <div class="setting-control">
+                <select id="duration-unit" onchange="saveSetting('duration_unit', this.value)">
+                    <option value="s">秒 (s)</option>
+                    <option value="ms">毫秒 (ms)</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="setting-item">
+            <div class="setting-info">
+                <label>主題</label>
+                <p class="setting-desc">選擇介面主題</p>
+            </div>
+            <div class="setting-control">
+                <select id="theme" onchange="saveSetting('theme', this.value)">
+                    <option value="light">淺色</option>
+                    <option value="dark">深色</option>
+                    <option value="auto">自動</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    
+    <!-- LLM 偏好 -->
+    <div class="settings-section">
+        <h2>🧠 LLM 偏好</h2>
+        
+        <div class="setting-item">
+            <div class="setting-info">
+                <label>預設提供商</label>
+                <p class="setting-desc">選擇預設的 LLM 提供商</p>
+            </div>
+            <div class="setting-control">
+                <select id="llm-provider" onchange="saveSetting('llm_provider', this.value)">
+                    <option value="">未設定</option>
+                    <option value="ollama">Ollama</option>
+                    <option value="lmstudio">LM Studio</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="setting-item">
+            <div class="setting-info">
+                <label>預設模型</label>
+                <p class="setting-desc">輸入預設使用的模型名稱</p>
+            </div>
+            <div class="setting-control">
+                <input type="text" id="llm-model" placeholder="例：llama2:latest" 
+                       onchange="saveSetting('llm_model', this.value)">
+            </div>
+        </div>
+    </div>
+    
+    <!-- 關於 -->
+    <div class="settings-section">
+        <h2>ℹ️ 關於</h2>
+        
+        <div class="about-info">
+            <p><strong>Robot Command Console - Edge App</strong></p>
+            <p>版本：Phase 3.2</p>
+            <p>本地 WebUI 移植版本</p>
+        </div>
+        
+        <div class="action-buttons">
+            <button class="btn btn-secondary" onclick="resetSettings()">
+                🔄 重設所有設定
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 頁面載入時載入設定
+document.addEventListener('DOMContentLoaded', loadSettings);
+
+// 載入設定
+async function loadSettings() {
+    try {
+        const res = await fetch('/api/edge/settings');
+        const data = await res.json();
+        
+        if (data.settings) {
+            document.getElementById('duration-unit').value = data.settings.duration_unit || 's';
+            document.getElementById('theme').value = data.settings.theme || 'light';
+            document.getElementById('llm-provider').value = data.settings.llm_provider || '';
+            document.getElementById('llm-model').value = data.settings.llm_model || '';
+        }
+    } catch (error) {
+        console.error('Failed to load settings:', error);
+    }
+}
+
+// 儲存設定
+async function saveSetting(key, value) {
+    try {
+        const settings = {};
+        settings[key] = value;
+        
+        const res = await fetch('/api/edge/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+        });
+        
+        const data = await res.json();
+        if (data.success) {
+            showToast('設定已儲存');
+        }
+    } catch (error) {
+        console.error('Failed to save setting:', error);
+        showToast('儲存失敗', 'error');
+    }
+}
+
+// 重設設定
+async function resetSettings() {
+    if (!confirm('確定要重設所有設定嗎？')) {
+        return;
+    }
+    
+    try {
+        const res = await fetch('/api/edge/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                duration_unit: 's',
+                theme: 'light',
+                llm_provider: null,
+                llm_model: null
+            })
+        });
+        
+        const data = await res.json();
+        if (data.success) {
+            loadSettings();
+            showToast('設定已重設');
+        }
+    } catch (error) {
+        console.error('Failed to reset settings:', error);
+        showToast('重設失敗', 'error');
+    }
+}
+
+// 顯示提示訊息
+function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.remove();
+    }, 3000);
+}
+</script>
+{% endblock %}

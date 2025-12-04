@@ -6,6 +6,12 @@ Flask Adapter
 - Bearer Token 認證
 - Token 輪替支援（寬限期）
 - 時間安全的 Token 比較
+
+Edge UI 功能：
+- 機器人儀表板
+- 指令控制中心
+- LLM 設定管理
+- 用戶設定
 """
 
 import asyncio
@@ -117,6 +123,7 @@ def create_flask_app(
     service_manager: Optional[ServiceManager] = None,
     app_token: Optional[str] = None,
     token_validator: Optional[TokenValidator] = None,
+    enable_edge_ui: bool = True,
 ) -> Flask:
     """
     建立 Flask 應用
@@ -125,6 +132,7 @@ def create_flask_app(
         service_manager: 服務管理器實例，若無則建立新的
         app_token: 認證 token，若無則從環境變數讀取
         token_validator: Token 驗證器實例，若無則建立預設的
+        enable_edge_ui: 是否啟用 Edge UI（預設啟用）
 
     Returns:
         Flask 應用實例
@@ -162,6 +170,15 @@ def create_flask_app(
     if token_validator is None:
         token_validator = TokenValidator(APP_TOKEN)
     app.config['TOKEN_VALIDATOR'] = token_validator
+
+    # 註冊 Edge UI 藍圖
+    if enable_edge_ui:
+        try:
+            from .edge_ui import edge_ui
+            app.register_blueprint(edge_ui)
+            logger.info('Edge UI blueprint registered')
+        except ImportError as e:
+            logger.warning(f'Failed to register Edge UI blueprint: {e}')
 
     # Prometheus Metrics
     REQUEST_COUNT = Counter(

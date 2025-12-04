@@ -1,0 +1,169 @@
+{% extends "edge/base.html" %}
+
+{% block title %}首頁{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🤖 Robot Command Console</h1>
+    <p class="subtitle">Edge 本地控制中心</p>
+</div>
+
+<div class="card-grid">
+    <div class="card card-primary">
+        <div class="card-icon">📊</div>
+        <h3>機器人儀表板</h3>
+        <p>監控所有本地機器人的即時狀態、電量和位置。</p>
+        <a href="{{ url_for('edge_ui.ui_dashboard') }}" class="btn btn-primary">開啟儀表板</a>
+    </div>
+
+    <div class="card card-success">
+        <div class="card-icon">🎮</div>
+        <h3>指令控制中心</h3>
+        <p>選擇機器人並發送動作指令，即時監控執行狀態。</p>
+        <a href="{{ url_for('edge_ui.ui_command_center') }}" class="btn btn-success">開啟控制中心</a>
+    </div>
+
+    <div class="card card-info">
+        <div class="card-icon">🧠</div>
+        <h3>LLM 設定</h3>
+        <p>管理本地 LLM 提供商（Ollama / LM Studio）。</p>
+        <a href="{{ url_for('edge_ui.ui_llm_settings') }}" class="btn btn-info">LLM 設定</a>
+    </div>
+
+    <div class="card card-warning">
+        <div class="card-icon">⚙️</div>
+        <h3>用戶設定</h3>
+        <p>調整 UI 偏好、時間單位等本地設定。</p>
+        <a href="{{ url_for('edge_ui.ui_settings') }}" class="btn btn-warning">開啟設定</a>
+    </div>
+</div>
+
+<div class="section">
+    <h2>📡 系統狀態</h2>
+    <div class="status-grid" id="system-status">
+        <div class="status-card" id="flask-status">
+            <span class="status-icon">🔌</span>
+            <span class="status-label">Flask Service</span>
+            <span class="status-value status-success">運行中</span>
+        </div>
+        <div class="status-card" id="llm-status">
+            <span class="status-icon">🧠</span>
+            <span class="status-label">本地 LLM</span>
+            <span class="status-value status-checking">檢查中...</span>
+        </div>
+        <div class="status-card" id="internet-status">
+            <span class="status-icon">🌐</span>
+            <span class="status-label">網路連線</span>
+            <span class="status-value status-checking">檢查中...</span>
+        </div>
+        <div class="status-card" id="robots-status">
+            <span class="status-icon">🤖</span>
+            <span class="status-label">機器人數量</span>
+            <span class="status-value">0</span>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <h2>🚀 快速操作</h2>
+    <div class="action-buttons">
+        <button class="btn btn-lg btn-primary" onclick="registerDemoRobot()">
+            ➕ 註冊示範機器人
+        </button>
+        <button class="btn btn-lg btn-secondary" onclick="refreshStatus()">
+            🔄 重新整理狀態
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 頁面載入時檢查狀態
+document.addEventListener('DOMContentLoaded', function() {
+    refreshStatus();
+});
+
+// 重新整理狀態
+async function refreshStatus() {
+    try {
+        // 檢查 LLM 狀態
+        const llmRes = await fetch('/api/edge/llm/status');
+        const llmData = await llmRes.json();
+        
+        const llmStatus = document.querySelector('#llm-status .status-value');
+        if (llmData.local_llm_available) {
+            llmStatus.textContent = '可用';
+            llmStatus.className = 'status-value status-success';
+        } else {
+            llmStatus.textContent = '不可用';
+            llmStatus.className = 'status-value status-error';
+        }
+        
+        const internetStatus = document.querySelector('#internet-status .status-value');
+        if (llmData.internet_available) {
+            internetStatus.textContent = '已連線';
+            internetStatus.className = 'status-value status-success';
+        } else {
+            internetStatus.textContent = '離線';
+            internetStatus.className = 'status-value status-warning';
+        }
+        
+        // 檢查機器人數量
+        const robotsRes = await fetch('/api/edge/robots');
+        const robotsData = await robotsRes.json();
+        
+        const robotsStatus = document.querySelector('#robots-status .status-value');
+        robotsStatus.textContent = robotsData.count;
+        
+        // 更新導航列狀態
+        updateConnectionStatus(llmData);
+        
+    } catch (error) {
+        console.error('Failed to refresh status:', error);
+    }
+}
+
+// 註冊示範機器人
+async function registerDemoRobot() {
+    try {
+        const res = await fetch('/api/edge/robots', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: 'Demo Robot ' + Date.now(),
+                type: 'humanoid',
+                capabilities: [
+                    'go_forward', 'back_fast', 'turn_left', 'turn_right',
+                    'stand', 'bow', 'wave', 'dance_two'
+                ]
+            })
+        });
+        
+        const data = await res.json();
+        if (data.success) {
+            alert('機器人註冊成功: ' + data.robot.name);
+            refreshStatus();
+        }
+    } catch (error) {
+        console.error('Failed to register robot:', error);
+        alert('註冊失敗');
+    }
+}
+
+// 更新連線狀態指示器
+function updateConnectionStatus(data) {
+    const indicator = document.getElementById('connection-status');
+    if (data.local_llm_available && data.internet_available) {
+        indicator.textContent = '✅ 完全連線';
+        indicator.className = 'status-indicator status-success';
+    } else if (data.local_llm_available || data.internet_available) {
+        indicator.textContent = '⚠️ 部分連線';
+        indicator.className = 'status-indicator status-warning';
+    } else {
+        indicator.textContent = '❌ 離線模式';
+        indicator.className = 'status-indicator status-error';
+    }
+}
+</script>
+{% endblock %}

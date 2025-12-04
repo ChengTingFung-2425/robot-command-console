@@ -74,7 +74,6 @@ class LocalEventBus:
         self._pattern_subscriptions: Dict[str, Set[str]] = defaultdict(set)  # pattern -> set of subscription_ids
         # 使用 deque 作為歷史記錄容器，O(1) 複雜度的自動丟棄舊項目
         self._history: Deque[Event] = deque(maxlen=history_size)
-        self._history_size = history_size
         self._enable_history = enable_history
         self._subscription_counter = 0
         self._lock = asyncio.Lock()

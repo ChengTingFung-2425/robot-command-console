@@ -90,9 +90,31 @@ class ProcessService(ServiceBase):
         return process is not None and process.poll() is None
 
     async def _get_http_session(self) -> aiohttp.ClientSession:
-        """取得或建立 HTTP 客戶端會話（重複使用以提高效能）"""
+        """取得或建立 HTTP 客戶端會話（重複使用以提高效能）
+
+        使用連線池和合理的超時設定以優化效能：
+        - TCP 連線池限制避免資源耗盡
+        - DNS 快取減少重複解析
+        - 合理的超時設定避免長時間阻塞
+        """
         if self._http_session is None or self._http_session.closed:
-            self._http_session = aiohttp.ClientSession()
+            # 配置連線池以優化效能
+            connector = aiohttp.TCPConnector(
+                limit=10,           # 最大同時連線數
+                limit_per_host=5,   # 每個主機的最大連線數
+                ttl_dns_cache=300,  # DNS 快取 5 分鐘
+                enable_cleanup_closed=True,  # 自動清理已關閉的連線
+            )
+            # 設定預設超時避免長時間阻塞
+            timeout = aiohttp.ClientTimeout(
+                total=30,      # 總超時 30 秒
+                connect=10,    # 連線超時 10 秒
+                sock_read=10,  # 讀取超時 10 秒
+            )
+            self._http_session = aiohttp.ClientSession(
+                connector=connector,
+                timeout=timeout,
+            )
         return self._http_session
 
     async def _close_http_session(self) -> None:

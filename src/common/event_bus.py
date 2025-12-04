@@ -12,10 +12,10 @@ Local Event Bus
 import asyncio
 import fnmatch
 import logging
-from collections import defaultdict
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Coroutine, Dict, List, Optional, Set
+from typing import Any, Callable, Coroutine, Dict, Deque, List, Optional, Set
 
 from .datetime_utils import utc_now
 
@@ -72,8 +72,8 @@ class LocalEventBus:
         self._subscriptions: Dict[str, Subscription] = {}
         self._topic_handlers: Dict[str, Set[str]] = defaultdict(set)
         self._pattern_subscriptions: Dict[str, Set[str]] = defaultdict(set)  # pattern -> set of subscription_ids
-        self._history: List[Event] = []
-        self._history_size = history_size
+        # 使用 deque 作為歷史記錄容器，O(1) 複雜度的自動丟棄舊項目
+        self._history: Deque[Event] = deque(maxlen=history_size)
         self._enable_history = enable_history
         self._subscription_counter = 0
         self._lock = asyncio.Lock()
@@ -206,12 +206,10 @@ class LocalEventBus:
             correlation_id=correlation_id,
         )
 
-        # 記錄歷史
+        # 記錄歷史（使用 deque 自動管理大小，O(1) 複雜度）
         if self._enable_history:
             async with self._lock:
                 self._history.append(event)
-                if len(self._history) > self._history_size:
-                    self._history = self._history[-self._history_size:]
 
         # 取得匹配的訂閱
         matching_subscriptions = await self._get_matching_subscriptions(topic)

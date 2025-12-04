@@ -625,5 +625,139 @@ class TestServiceCoordinatorIntegration(unittest.TestCase):
         self.loop.run_until_complete(test())
 
 
+class TestServiceCoordinatorConcurrency(unittest.TestCase):
+    """測試 ServiceCoordinator 並發功能"""
+
+    def setUp(self):
+        """設定測試環境"""
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+
+    def tearDown(self):
+        """清理測試環境"""
+        self.loop.close()
+
+    def test_concurrent_start_all_services(self):
+        """測試並發啟動所有服務"""
+        async def test():
+            coordinator = ServiceCoordinator()
+            service1 = MockService("service1")
+            service2 = MockService("service2")
+            service3 = MockService("service3")
+
+            coordinator.register_service(service1)
+            coordinator.register_service(service2)
+            coordinator.register_service(service3)
+
+            # 使用並發模式啟動
+            results = await coordinator.start_all_services(concurrent=True)
+
+            self.assertTrue(results["service1"])
+            self.assertTrue(results["service2"])
+            self.assertTrue(results["service3"])
+            self.assertTrue(service1.is_running)
+            self.assertTrue(service2.is_running)
+            self.assertTrue(service3.is_running)
+
+        self.loop.run_until_complete(test())
+
+    def test_concurrent_stop_all_services(self):
+        """測試並發停止所有服務"""
+        async def test():
+            coordinator = ServiceCoordinator()
+            service1 = MockService("service1")
+            service2 = MockService("service2")
+            service3 = MockService("service3")
+
+            coordinator.register_service(service1)
+            coordinator.register_service(service2)
+            coordinator.register_service(service3)
+
+            # 先啟動
+            await coordinator.start_all_services()
+
+            # 使用並發模式停止
+            results = await coordinator.stop_all_services(concurrent=True)
+
+            self.assertTrue(results["service1"])
+            self.assertTrue(results["service2"])
+            self.assertTrue(results["service3"])
+            self.assertFalse(service1.is_running)
+            self.assertFalse(service2.is_running)
+            self.assertFalse(service3.is_running)
+
+        self.loop.run_until_complete(test())
+
+    def test_concurrent_health_check_all(self):
+        """測試並發健康檢查"""
+        async def test():
+            coordinator = ServiceCoordinator()
+            service1 = MockService("service1")
+            service2 = MockService("service2")
+            service3 = MockService("service3")
+
+            coordinator.register_service(service1)
+            coordinator.register_service(service2)
+            coordinator.register_service(service3)
+
+            await coordinator.start_all_services()
+
+            # check_all_services_health 現在使用並發
+            results = await coordinator.check_all_services_health()
+
+            self.assertTrue(results["service1"])
+            self.assertTrue(results["service2"])
+            self.assertTrue(results["service3"])
+
+        self.loop.run_until_complete(test())
+
+    def test_concurrent_start_with_one_failure(self):
+        """測試並發啟動時一個服務失敗"""
+        async def test():
+            coordinator = ServiceCoordinator()
+            service1 = MockService("service1")
+            service2 = MockService("service2")
+            service3 = MockService("service3")
+
+            # 設定 service2 啟動失敗
+            service2.set_start_success(False)
+
+            coordinator.register_service(service1)
+            coordinator.register_service(service2)
+            coordinator.register_service(service3)
+
+            results = await coordinator.start_all_services(concurrent=True)
+
+            # service1 和 service3 應該成功
+            self.assertTrue(results["service1"])
+            self.assertFalse(results["service2"])
+            self.assertTrue(results["service3"])
+
+            # 確認狀態
+            self.assertTrue(service1.is_running)
+            self.assertFalse(service2.is_running)
+            self.assertTrue(service3.is_running)
+
+        self.loop.run_until_complete(test())
+
+    def test_sequential_start_default(self):
+        """測試預設循序啟動行為"""
+        async def test():
+            coordinator = ServiceCoordinator()
+            service1 = MockService("service1")
+            service2 = MockService("service2")
+
+            coordinator.register_service(service1)
+            coordinator.register_service(service2)
+
+            # 預設是循序啟動
+            results = await coordinator.start_all_services()  # concurrent=False
+
+            self.assertTrue(results["service1"])
+            self.assertTrue(results["service2"])
+
+        self.loop.run_until_complete(test())
+
+
 if __name__ == '__main__':
     unittest.main()

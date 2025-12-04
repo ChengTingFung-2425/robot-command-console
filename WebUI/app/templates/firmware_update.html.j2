@@ -1,0 +1,691 @@
+{% extends "base.html.j2" %}
+{% block app_content %}
+<div class="page-header">
+    <h1>固件更新 <small>管理機器人固件版本</small></h1>
+</div>
+
+<!-- CSRF Token for API requests -->
+<meta name="csrf-token" content="{{ csrf_token() if csrf_token is defined else '' }}">
+
+<!-- 機器人選擇 -->
+<div class="panel panel-default">
+    <div class="panel-heading">
+        <h3 class="panel-title">
+            <i class="glyphicon glyphicon-hdd" aria-hidden="true"></i> 選擇機器人
+        </h3>
+    </div>
+    <div class="panel-body">
+        {% if robots %}
+        <div class="row">
+            {% for robot in robots %}
+            <div class="col-md-4 col-sm-6">
+                <div class="well robot-card" id="robot-card-{{ robot.id }}" 
+                     onclick="selectRobot({{ robot.id }}, {{ robot.name | tojson }}, {{ robot.type | tojson }}, {{ (robot.firmware_version or default_firmware_version) | tojson }})"
+                     style="cursor: pointer;">
+                    <div class="media">
+                        <div class="media-left">
+                            <span class="glyphicon glyphicon-cog" style="font-size: 32px; color: #337ab7;"></span>
+                        </div>
+                        <div class="media-body">
+                            <h4 class="media-heading">{{ robot.name }}</h4>
+                            <p class="text-muted">類型：{{ robot.type }}</p>
+                            <p>
+                                <strong>固件版本：</strong>
+                                <span id="robot-version-{{ robot.id }}">{{ robot.firmware_version or default_firmware_version }}</span>
+                            </p>
+                            <p>
+                                <span class="label label-{{ 'success' if robot.status == 'online' else 'warning' if robot.status == 'idle' else 'danger' }}">
+                                    {{ robot.status }}
+                                </span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            <span class="glyphicon glyphicon-info-sign"></span>
+            您還沒有註冊任何機器人。請先
+            <a href="{{ url_for('webui.register_robot') }}">註冊機器人</a>。
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 固件狀態面板（選擇機器人後顯示） -->
+<div class="panel panel-info" id="firmware-status-panel" style="display: none;">
+    <div class="panel-heading">
+        <h3 class="panel-title">
+            <i class="glyphicon glyphicon-info-sign"></i> 
+            固件狀態 - <span id="selected-robot-name"></span>
+        </h3>
+    </div>
+    <div class="panel-body">
+        <div class="row">
+            <div class="col-md-6">
+                <dl class="dl-horizontal">
+                    <dt>當前版本</dt>
+                    <dd id="current-version">-</dd>
+                    <dt>最新版本</dt>
+                    <dd id="latest-version">-</dd>
+                    <dt>狀態</dt>
+                    <dd id="update-status-text">-</dd>
+                </dl>
+            </div>
+            <div class="col-md-6">
+                <div id="update-available-alert" class="alert alert-success" style="display: none;">
+                    <span class="glyphicon glyphicon-ok-circle"></span>
+                    <strong>有可用更新！</strong>
+                    <p id="update-release-notes" class="small" style="margin-top: 8px;"></p>
+                </div>
+                <div id="no-update-alert" class="alert alert-info" style="display: none;">
+                    <span class="glyphicon glyphicon-ok"></span>
+                    已是最新版本
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 可用固件版本列表 -->
+<div class="panel panel-default" id="firmware-versions-panel" style="display: none;">
+    <div class="panel-heading">
+        <h3 class="panel-title">
+            <i class="glyphicon glyphicon-list"></i> 可用固件版本
+            <button type="button" class="btn btn-sm btn-default pull-right" onclick="refreshVersions()">
+                <span class="glyphicon glyphicon-refresh"></span> 重新整理
+            </button>
+        </h3>
+    </div>
+    <div class="panel-body">
+        <div id="versions-loading" class="text-center" style="padding: 20px;">
+            <span class="glyphicon glyphicon-refresh glyphicon-spin" style="font-size: 24px;"></span>
+            <p>載入中...</p>
+        </div>
+        <div id="versions-container" style="display: none;">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>版本</th>
+                        <th>發布日期</th>
+                        <th>類型</th>
+                        <th>大小</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="versions-tbody">
+                    <!-- 動態填充 -->
+                </tbody>
+            </table>
+            <div id="no-versions-message" class="alert alert-warning" style="display: none;">
+                <span class="glyphicon glyphicon-warning-sign"></span>
+                沒有找到適用於此機器人類型的固件版本。
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 更新進度面板 -->
+<div class="panel panel-primary" id="update-progress-panel" style="display: none;">
+    <div class="panel-heading">
+        <h3 class="panel-title">
+            <i class="glyphicon glyphicon-download"></i> 固件更新進度
+        </h3>
+    </div>
+    <div class="panel-body">
+        <div class="row">
+            <div class="col-md-8">
+                <h4 id="update-target-version">更新至版本：-</h4>
+                <div class="progress" style="height: 25px;">
+                    <div class="progress-bar progress-bar-striped active" id="update-progress-bar"
+                         role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"
+                         style="width: 0%; min-width: 3em;">
+                        0%
+                    </div>
+                </div>
+                <p id="update-status-detail" class="text-muted">準備中...</p>
+            </div>
+            <div class="col-md-4 text-right">
+                <button type="button" class="btn btn-danger" id="cancel-update-btn" onclick="cancelUpdate()">
+                    <span class="glyphicon glyphicon-remove"></span> 取消更新
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 更新歷史 -->
+<div class="panel panel-default" id="update-history-panel" style="display: none;">
+    <div class="panel-heading">
+        <h3 class="panel-title">
+            <i class="glyphicon glyphicon-time"></i> 更新歷史
+        </h3>
+    </div>
+    <div class="panel-body">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>時間</th>
+                    <th>目標版本</th>
+                    <th>狀態</th>
+                    <th>操作者</th>
+                </tr>
+            </thead>
+            <tbody id="history-tbody">
+                <!-- 動態填充 -->
+            </tbody>
+        </table>
+        <div id="no-history-message" class="text-muted text-center" style="display: none;">
+            尚無更新歷史
+        </div>
+    </div>
+</div>
+
+<style>
+    .robot-card {
+        transition: all 0.2s;
+    }
+    .robot-card:hover {
+        background-color: #f5f5f5;
+        border-color: #337ab7;
+    }
+    .robot-card.selected {
+        background-color: #d9edf7;
+        border-color: #337ab7;
+    }
+    .glyphicon-spin {
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+    .version-row.current {
+        background-color: #dff0d8;
+    }
+</style>
+
+<script>
+/**
+ * 固件更新頁面 JavaScript
+ */
+(function() {
+    'use strict';
+    
+    var selectedRobotId = null;
+    var selectedRobotType = null;
+    var currentUpdateId = null;
+    var pollInterval = null;
+    
+    /**
+     * 取得 CSRF Token 用於 API 請求
+     * @returns {string} CSRF token 或空字串
+     */
+    function getCsrfToken() {
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        return meta ? meta.getAttribute('content') : '';
+    }
+    
+    /**
+     * 取得包含 CSRF Token 的請求標頭
+     * @returns {Object} 包含 Content-Type 和 X-CSRFToken 的標頭物件
+     */
+    function getRequestHeaders() {
+        var headers = { 'Content-Type': 'application/json' };
+        var csrfToken = getCsrfToken();
+        if (csrfToken) {
+            headers['X-CSRFToken'] = csrfToken;
+        }
+        return headers;
+    }
+    
+    // 狀態對應樣式
+    var STATUS_CONFIG = {
+        'pending': { cssClass: 'label label-default', text: '等待中' },
+        'downloading': { cssClass: 'label label-info', text: '下載中' },
+        'installing': { cssClass: 'label label-primary', text: '安裝中' },
+        'completed': { cssClass: 'label label-success', text: '完成' },
+        'failed': { cssClass: 'label label-danger', text: '失敗' },
+        'cancelled': { cssClass: 'label label-warning', text: '已取消' }
+    };
+    
+    // 選擇機器人
+    window.selectRobot = function(robotId, robotName, robotType, currentVersion) {
+        selectedRobotId = robotId;
+        selectedRobotType = robotType;
+        
+        // 更新選中狀態
+        document.querySelectorAll('.robot-card').forEach(function(card) {
+            card.classList.remove('selected');
+        });
+        document.getElementById('robot-card-' + robotId).classList.add('selected');
+        
+        // 顯示固件狀態面板
+        document.getElementById('firmware-status-panel').style.display = 'block';
+        document.getElementById('selected-robot-name').textContent = robotName;
+        document.getElementById('current-version').textContent = currentVersion;
+        
+        // 顯示版本列表面板
+        document.getElementById('firmware-versions-panel').style.display = 'block';
+        
+        // 顯示歷史面板
+        document.getElementById('update-history-panel').style.display = 'block';
+        
+        // 檢查固件狀態
+        checkFirmwareStatus(robotId);
+        
+        // 載入可用版本
+        loadFirmwareVersions(robotType);
+        
+        // 載入更新歷史
+        loadUpdateHistory(robotId);
+    };
+    
+    // 檢查固件狀態
+    function checkFirmwareStatus(robotId) {
+        fetch('/api/firmware/check/' + robotId)
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    document.getElementById('current-version').textContent = data.current_version;
+                    document.getElementById('latest-version').textContent = data.latest_version || '無';
+                    
+                    if (data.update_available) {
+                        document.getElementById('update-available-alert').style.display = 'block';
+                        document.getElementById('no-update-alert').style.display = 'none';
+                        document.getElementById('update-status-text').innerHTML = 
+                            '<span class="text-warning">有可用更新</span>';
+                        
+                        if (data.latest_firmware && data.latest_firmware.release_notes) {
+                            document.getElementById('update-release-notes').textContent = 
+                                data.latest_firmware.release_notes;
+                        }
+                    } else {
+                        document.getElementById('update-available-alert').style.display = 'none';
+                        document.getElementById('no-update-alert').style.display = 'block';
+                        document.getElementById('update-status-text').innerHTML = 
+                            '<span class="text-success">已是最新</span>';
+                    }
+                } else {
+                    showAlert('danger', data.error || '檢查固件狀態失敗');
+                }
+            })
+            .catch(function(err) {
+                console.error('檢查固件狀態失敗:', err);
+                showAlert('danger', '無法連線到伺服器');
+            });
+    }
+    
+    // 載入可用固件版本
+    function loadFirmwareVersions(robotType) {
+        document.getElementById('versions-loading').style.display = 'block';
+        document.getElementById('versions-container').style.display = 'none';
+        
+        fetch('/api/firmware/versions?robot_type=' + encodeURIComponent(robotType))
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                document.getElementById('versions-loading').style.display = 'none';
+                document.getElementById('versions-container').style.display = 'block';
+                
+                if (data.success && data.versions && data.versions.length > 0) {
+                    renderVersions(data.versions);
+                } else {
+                    document.getElementById('no-versions-message').style.display = 'block';
+                    document.getElementById('versions-tbody').innerHTML = '';
+                }
+            })
+            .catch(function(err) {
+                document.getElementById('versions-loading').style.display = 'none';
+                document.getElementById('versions-container').style.display = 'block';
+                document.getElementById('no-versions-message').style.display = 'block';
+                console.error('載入固件版本失敗:', err);
+            });
+    }
+    
+    // 渲染版本列表
+    function renderVersions(versions) {
+        var tbody = document.getElementById('versions-tbody');
+        var currentVersion = document.getElementById('current-version').textContent;
+        
+        tbody.innerHTML = '';
+        document.getElementById('no-versions-message').style.display = 'none';
+        
+        versions.forEach(function(version) {
+            var row = document.createElement('tr');
+            var isCurrent = version.version === currentVersion;
+            
+            if (isCurrent) {
+                row.className = 'version-row current';
+            }
+            
+            // 版本號
+            var versionTd = document.createElement('td');
+            var strong = document.createElement('strong');
+            strong.textContent = version.version;
+            versionTd.appendChild(strong);
+            if (version.is_stable) {
+                var stableLabel = document.createElement('span');
+                stableLabel.className = 'label label-success';
+                stableLabel.textContent = '穩定版';
+                stableLabel.style.marginLeft = '8px';
+                versionTd.appendChild(stableLabel);
+            }
+            if (isCurrent) {
+                var currentLabel = document.createElement('span');
+                currentLabel.className = 'label label-info';
+                currentLabel.textContent = '當前版本';
+                currentLabel.style.marginLeft = '8px';
+                versionTd.appendChild(currentLabel);
+            }
+            row.appendChild(versionTd);
+            
+            // 發布日期
+            var dateTd = document.createElement('td');
+            dateTd.textContent = version.created_at ? 
+                new Date(version.created_at).toLocaleDateString('zh-TW') : '-';
+            row.appendChild(dateTd);
+            
+            // 類型
+            var typeTd = document.createElement('td');
+            typeTd.textContent = version.robot_type;
+            row.appendChild(typeTd);
+            
+            // 大小
+            var sizeTd = document.createElement('td');
+            sizeTd.textContent = version.file_size ? 
+                formatFileSize(version.file_size) : '-';
+            row.appendChild(sizeTd);
+            
+            // 操作
+            var actionTd = document.createElement('td');
+            if (!isCurrent) {
+                var updateBtn = document.createElement('button');
+                updateBtn.className = 'btn btn-sm btn-primary';
+                updateBtn.type = 'button';
+                updateBtn.innerHTML = '<span class="glyphicon glyphicon-download"></span> 安裝';
+                (function(versionId, versionStr) {
+                    updateBtn.addEventListener('click', function() {
+                        startUpdate(versionId, versionStr);
+                    });
+                })(version.id, version.version);
+                actionTd.appendChild(updateBtn);
+            } else {
+                var currentText = document.createElement('span');
+                currentText.className = 'text-muted';
+                currentText.textContent = '已安裝';
+                actionTd.appendChild(currentText);
+            }
+            row.appendChild(actionTd);
+            
+            tbody.appendChild(row);
+        });
+    }
+    
+    // 格式化檔案大小
+    function formatFileSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+    
+    // 開始更新
+    function startUpdate(versionId, versionStr) {
+        if (!selectedRobotId) {
+            showAlert('warning', '請先選擇機器人');
+            return;
+        }
+        
+        if (!confirm('確定要將固件更新至版本 ' + versionStr + ' 嗎？\n\n更新過程中請勿關閉機器人電源。')) {
+            return;
+        }
+        
+        fetch('/api/firmware/update', {
+            method: 'POST',
+            headers: getRequestHeaders(),
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                robot_id: selectedRobotId,
+                firmware_version_id: versionId
+            })
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.success) {
+                currentUpdateId = data.update_id;
+                showUpdateProgress(versionStr);
+                startProgressPolling();
+                showAlert('success', '固件更新已啟動');
+            } else {
+                showAlert('danger', data.error || '啟動更新失敗');
+            }
+        })
+        .catch(function(err) {
+            console.error('啟動更新失敗:', err);
+            showAlert('danger', '無法連線到伺服器');
+        });
+    }
+    
+    // 顯示更新進度
+    function showUpdateProgress(versionStr) {
+        document.getElementById('update-progress-panel').style.display = 'block';
+        document.getElementById('update-target-version').textContent = '更新至版本：' + versionStr;
+        updateProgressBar(0, 'pending');
+    }
+    
+    // 更新進度條
+    function updateProgressBar(progress, status) {
+        var bar = document.getElementById('update-progress-bar');
+        bar.style.width = progress + '%';
+        bar.textContent = progress + '%';
+        bar.setAttribute('aria-valuenow', progress);
+        
+        var statusDetail = document.getElementById('update-status-detail');
+        var statusConfig = STATUS_CONFIG[status] || STATUS_CONFIG['pending'];
+        statusDetail.textContent = statusConfig.text;
+        
+        // 更新進度條樣式
+        bar.className = 'progress-bar progress-bar-striped';
+        if (status === 'completed') {
+            bar.classList.add('progress-bar-success');
+            bar.classList.remove('active');
+        } else if (status === 'failed') {
+            bar.classList.add('progress-bar-danger');
+            bar.classList.remove('active');
+        } else if (status === 'cancelled') {
+            bar.classList.add('progress-bar-warning');
+            bar.classList.remove('active');
+        } else {
+            bar.classList.add('active');
+        }
+    }
+    
+    // 開始輪詢更新狀態
+    function startProgressPolling() {
+        if (pollInterval) {
+            clearInterval(pollInterval);
+        }
+        
+        pollInterval = setInterval(function() {
+            if (!currentUpdateId) {
+                clearInterval(pollInterval);
+                return;
+            }
+            
+            fetch('/api/firmware/status/' + currentUpdateId)
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    if (data.success && data.update) {
+                        var update = data.update;
+                        updateProgressBar(update.progress, update.status);
+                        
+                        // 如果更新完成或失敗，停止輪詢
+                        if (['completed', 'failed', 'cancelled'].indexOf(update.status) !== -1) {
+                            clearInterval(pollInterval);
+                            currentUpdateId = null;
+                            
+                            // 更新顯示
+                            if (update.status === 'completed') {
+                                showAlert('success', '固件更新完成！');
+                                // 重新載入狀態
+                                if (selectedRobotId) {
+                                    checkFirmwareStatus(selectedRobotId);
+                                    loadFirmwareVersions(selectedRobotType);
+                                    loadUpdateHistory(selectedRobotId);
+                                    // 更新卡片上的版本顯示
+                                    var versionSpan = document.getElementById('robot-version-' + selectedRobotId);
+                                    if (versionSpan && update.target_version) {
+                                        versionSpan.textContent = update.target_version;
+                                    }
+                                }
+                            } else if (update.status === 'failed') {
+                                showAlert('danger', '固件更新失敗：' + (update.error_message || '未知錯誤'));
+                            }
+                            
+                            document.getElementById('cancel-update-btn').disabled = true;
+                        }
+                    }
+                })
+                .catch(function(err) {
+                    console.error('輪詢更新狀態失敗:', err);
+                });
+        }, 2000); // 每 2 秒輪詢一次
+    }
+    
+    // 取消更新
+    window.cancelUpdate = function() {
+        if (!currentUpdateId) {
+            return;
+        }
+        
+        if (!confirm('確定要取消固件更新嗎？')) {
+            return;
+        }
+        
+        fetch('/api/firmware/cancel/' + currentUpdateId, {
+            method: 'POST',
+            headers: getRequestHeaders(),
+            credentials: 'same-origin'
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.success) {
+                showAlert('warning', '固件更新已取消');
+                clearInterval(pollInterval);
+                currentUpdateId = null;
+                updateProgressBar(0, 'cancelled');
+                document.getElementById('cancel-update-btn').disabled = true;
+            } else {
+                showAlert('danger', data.error || '取消更新失敗');
+            }
+        })
+        .catch(function(err) {
+            console.error('取消更新失敗:', err);
+            showAlert('danger', '無法連線到伺服器');
+        });
+    };
+    
+    // 重新整理版本列表
+    window.refreshVersions = function() {
+        if (selectedRobotType) {
+            loadFirmwareVersions(selectedRobotType);
+        }
+    };
+    
+    // 載入更新歷史
+    function loadUpdateHistory(robotId) {
+        fetch('/api/firmware/history/' + robotId)
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                if (data.success && data.updates && data.updates.length > 0) {
+                    renderHistory(data.updates);
+                } else {
+                    document.getElementById('no-history-message').style.display = 'block';
+                    document.getElementById('history-tbody').innerHTML = '';
+                }
+            })
+            .catch(function(err) {
+                console.error('載入更新歷史失敗:', err);
+                document.getElementById('no-history-message').style.display = 'block';
+            });
+    }
+    
+    // 渲染更新歷史
+    function renderHistory(updates) {
+        var tbody = document.getElementById('history-tbody');
+        tbody.innerHTML = '';
+        document.getElementById('no-history-message').style.display = 'none';
+        
+        updates.forEach(function(update) {
+            var row = document.createElement('tr');
+            
+            // 時間
+            var timeTd = document.createElement('td');
+            timeTd.textContent = update.started_at ? 
+                new Date(update.started_at).toLocaleString('zh-TW') : '-';
+            row.appendChild(timeTd);
+            
+            // 目標版本
+            var versionTd = document.createElement('td');
+            versionTd.textContent = update.target_version || '-';
+            row.appendChild(versionTd);
+            
+            // 狀態
+            var statusTd = document.createElement('td');
+            var statusConfig = STATUS_CONFIG[update.status] || STATUS_CONFIG['pending'];
+            var statusSpan = document.createElement('span');
+            statusSpan.className = statusConfig.cssClass;
+            statusSpan.textContent = statusConfig.text;
+            statusTd.appendChild(statusSpan);
+            row.appendChild(statusTd);
+            
+            // 操作者
+            var userTd = document.createElement('td');
+            userTd.textContent = update.initiated_by || '-';
+            row.appendChild(userTd);
+            
+            tbody.appendChild(row);
+        });
+    }
+    
+    // 顯示提示訊息
+    function showAlert(type, message) {
+        var allowedTypes = ['success', 'info', 'warning', 'danger'];
+        if (allowedTypes.indexOf(type) === -1) {
+            type = 'info';
+        }
+
+        var alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-' + type + ' alert-dismissible';
+        alertDiv.setAttribute('role', 'alert');
+
+        var closeButton = document.createElement('button');
+        closeButton.type = 'button';
+        closeButton.className = 'close';
+        closeButton.setAttribute('data-dismiss', 'alert');
+        closeButton.setAttribute('aria-label', 'Close');
+
+        var closeSpan = document.createElement('span');
+        closeSpan.setAttribute('aria-hidden', 'true');
+        closeSpan.innerHTML = '&times;';
+        closeButton.appendChild(closeSpan);
+
+        alertDiv.appendChild(closeButton);
+        alertDiv.appendChild(document.createTextNode(message));
+
+        var container = document.querySelector('.container');
+        if (!container) {
+            container = document.body;
+        }
+        container.insertBefore(alertDiv, container.firstChild);
+
+        setTimeout(function() {
+            if (alertDiv.parentNode) {
+                alertDiv.parentNode.removeChild(alertDiv);
+            }
+        }, 5000);
+    }
+})();
+</script>
+{% endblock %}

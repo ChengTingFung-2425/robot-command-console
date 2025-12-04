@@ -1260,6 +1260,7 @@ def firmware_update_page():
 
 
 @bp.route('/api/firmware/versions', methods=['GET'])
+@login_required
 def get_firmware_versions():
     """取得可用的固件版本列表
     
@@ -1486,11 +1487,19 @@ def initiate_firmware_update():
 
 
 def _start_firmware_update_task(update_id: int):
-    """模擬固件更新任務（在實際應用中應為非同步任務）
+    """初始化固件更新任務（模擬實作）
     
-    注意：這是一個簡化的模擬實作。在生產環境中，
-    這應該是一個背景任務（如 Celery 任務）來處理實際的
-    固件下載、驗證和安裝過程。
+    注意：這是一個簡化的模擬實作，僅將狀態更新為 'downloading' 並設置進度為 10%。
+    完整的更新流程需要透過 `/api/firmware/simulate-progress` API 手動推進。
+    
+    在生產環境中，這應該是一個背景任務（如 Celery 任務）來處理：
+    1. 下載固件檔案
+    2. 驗證校驗碼
+    3. 傳送到機器人
+    4. 執行安裝
+    5. 驗證安裝結果
+    
+    TODO: 實作完整的非同步更新流程，包括進度追蹤和錯誤處理。
     """
     from WebUI.app.models import FirmwareUpdate
     
@@ -1609,7 +1618,8 @@ def cancel_firmware_update(update_id):
             }), 400
         
         update.status = 'cancelled'
-        update.completed_at = db.func.now()
+        from datetime import datetime
+        update.completed_at = datetime.utcnow()
         db.session.commit()
         
         logging.info(
@@ -1655,7 +1665,8 @@ def simulate_firmware_progress(update_id):
         if new_status:
             update.status = new_status
             if new_status in ['completed', 'failed', 'cancelled']:
-                update.completed_at = db.func.now()
+                from datetime import datetime
+                update.completed_at = datetime.utcnow()
                 # 如果完成，更新機器人的固件版本
                 if new_status == 'completed' and update.robot:
                     update.robot.firmware_version = update.firmware_version.version

@@ -23,6 +23,9 @@ def upgrade():
             sa.Column('firmware_version', sa.String(length=32), nullable=True)
         )
 
+    # Set default firmware_version for existing robots
+    op.execute("UPDATE robot SET firmware_version = '1.0.0' WHERE firmware_version IS NULL")
+
     # Create firmware_version table
     op.create_table(
         'firmware_version',

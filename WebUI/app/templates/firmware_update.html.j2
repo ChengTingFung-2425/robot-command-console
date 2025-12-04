@@ -17,7 +17,7 @@
             {% for robot in robots %}
             <div class="col-md-4 col-sm-6">
                 <div class="well robot-card" id="robot-card-{{ robot.id }}" 
-                     onclick="selectRobot({{ robot.id }}, '{{ robot.name }}', '{{ robot.type }}', '{{ robot.firmware_version or default_firmware_version }}')"
+                     onclick="selectRobot({{ robot.id }}, {{ robot.name | tojson }}, {{ robot.type | tojson }}, {{ (robot.firmware_version or default_firmware_version) | tojson }})"
                      style="cursor: pointer;">
                     <div class="media">
                         <div class="media-left">
@@ -647,6 +647,9 @@
         alertDiv.appendChild(document.createTextNode(message));
 
         var container = document.querySelector('.container');
+        if (!container) {
+            container = document.body;
+        }
         container.insertBefore(alertDiv, container.firstChild);
 
         setTimeout(function() {

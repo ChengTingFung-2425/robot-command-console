@@ -269,7 +269,7 @@ class TestFirmwareUITemplate(unittest.TestCase):
         
         # 檢查必要的 JavaScript 函式
         assert 'selectRobot' in content
-        assert 'startUpdate' in content or 'startupdate' in content.lower()
+        assert 'startUpdate' in content
         assert 'cancelUpdate' in content
 
 

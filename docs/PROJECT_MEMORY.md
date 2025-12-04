@@ -387,6 +387,7 @@ class RobotStatus:
 3. **文檔位置**：規劃放 `docs/plans/`，技術放 `docs/`，開發指南放 `docs/development/`，安全相關放 `docs/security/`
 4. **測試與文檔同步**：文檔路徑變更時需同步更新測試
 5. **任務完成後**：更新 `PROJECT_MEMORY.md` 記錄經驗教訓
+6. **AI 記憶存儲**：`store_memory` 工具只能在 review 模式下使用，一般開發任務請直接更新此文件記錄經驗教訓
 
 ---
 

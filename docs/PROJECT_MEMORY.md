@@ -305,7 +305,7 @@ def register_service(self, service: ServiceBase):
 # ✅ 使用回呼機制通知狀態變更
 def set_state_change_callback(
     self,
-    callback: Callable[[str, ServiceStatus, ServiceStatus, ServiceState], Coroutine],
+    callback: Callable[[str, ServiceStatus, ServiceStatus], Coroutine],
 ) -> None:
     self._state_change_callback = callback
 
@@ -318,7 +318,7 @@ async def _notify_state_change(
     if old_status == new_status:
         return  # 避免重複通知
     if self._state_change_callback:
-        await self._state_change_callback(service_name, old_status, new_status, state)
+        await self._state_change_callback(service_name, old_status, new_status)
 ```
 
 **經驗教訓**：

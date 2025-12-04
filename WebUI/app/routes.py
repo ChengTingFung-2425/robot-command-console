@@ -1242,3 +1242,426 @@ def toggle_cors():
             'success': False,
             'error': '切換 CORS 設定失敗'
         }), 500
+
+
+# ===== 固件更新 API =====
+
+@bp.route('/firmware', methods=['GET'])
+@login_required
+def firmware_update_page():
+    """固件更新管理頁面"""
+    robots = Robot.query.filter_by(owner=current_user).all()
+    return render_template('firmware_update.html.j2', robots=robots)
+
+
+@bp.route('/api/firmware/versions', methods=['GET'])
+def get_firmware_versions():
+    """取得可用的固件版本列表
+    
+    Query Parameters:
+        robot_type: 篩選特定機器人類型的固件
+        stable_only: 是否只顯示穩定版本（預設 true）
+    """
+    from WebUI.app.models import FirmwareVersion
+    
+    try:
+        robot_type = request.args.get('robot_type')
+        stable_only = request.args.get('stable_only', 'true').lower() == 'true'
+        
+        query = FirmwareVersion.query
+        
+        if robot_type:
+            query = query.filter_by(robot_type=robot_type)
+        
+        if stable_only:
+            query = query.filter_by(is_stable=True)
+        
+        # Order by version descending (newest first)
+        versions = query.order_by(FirmwareVersion.created_at.desc()).all()
+        
+        return jsonify({
+            'success': True,
+            'versions': [v.to_dict() for v in versions],
+            'count': len(versions)
+        })
+    except Exception as e:
+        logging.error(f'取得固件版本列表失敗: {str(e)}', exc_info=True)
+        return jsonify({
+            'success': False,
+            'versions': [],
+            'error': '取得固件版本列表失敗'
+        }), 500
+
+
+@bp.route('/api/firmware/check/<int:robot_id>', methods=['GET'])
+@login_required
+def check_firmware_status(robot_id):
+    """檢查機器人的固件狀態
+    
+    回傳機器人當前固件版本以及是否有可用的更新
+    """
+    from WebUI.app.models import FirmwareVersion
+    
+    try:
+        robot = Robot.query.get_or_404(robot_id)
+        
+        # 權限檢查：確認用戶擁有該機器人
+        if robot.owner != current_user and not current_user.is_admin():
+            return jsonify({
+                'success': False,
+                'error': '您沒有權限查看此機器人'
+            }), 403
+        
+        current_version = robot.firmware_version or '1.0.0'
+        
+        # 查找該機器人類型的最新穩定版本
+        latest_version = FirmwareVersion.query.filter_by(
+            robot_type=robot.type,
+            is_stable=True
+        ).order_by(FirmwareVersion.created_at.desc()).first()
+        
+        # 判斷是否有更新可用
+        update_available = False
+        latest_version_str = None
+        if latest_version:
+            latest_version_str = latest_version.version
+            # 簡單版本比較（假設版本格式為 x.y.z）
+            update_available = _compare_versions(
+                current_version,
+                latest_version.version
+            ) < 0
+        
+        return jsonify({
+            'success': True,
+            'robot_id': robot.id,
+            'robot_name': robot.name,
+            'robot_type': robot.type,
+            'current_version': current_version,
+            'latest_version': latest_version_str,
+            'update_available': update_available,
+            'latest_firmware': latest_version.to_dict() if latest_version else None
+        })
+    except Exception as e:
+        logging.error(f'檢查固件狀態失敗: {str(e)}', exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': '檢查固件狀態時發生錯誤'
+        }), 500
+
+
+def _compare_versions(v1: str, v2: str) -> int:
+    """比較兩個版本號
+    
+    Returns:
+        -1 if v1 < v2
+        0 if v1 == v2
+        1 if v1 > v2
+    """
+    try:
+        parts1 = [int(x) for x in v1.split('.')]
+        parts2 = [int(x) for x in v2.split('.')]
+        
+        # Pad shorter version with zeros
+        while len(parts1) < len(parts2):
+            parts1.append(0)
+        while len(parts2) < len(parts1):
+            parts2.append(0)
+        
+        for p1, p2 in zip(parts1, parts2):
+            if p1 < p2:
+                return -1
+            elif p1 > p2:
+                return 1
+        return 0
+    except (ValueError, AttributeError):
+        # If parsing fails, return 0 (equal)
+        return 0
+
+
+@bp.route('/api/firmware/update', methods=['POST'])
+@login_required
+def initiate_firmware_update():
+    """啟動固件更新
+    
+    Request Body (JSON):
+        {
+            "robot_id": 1,
+            "firmware_version_id": 2
+        }
+    """
+    from WebUI.app.models import FirmwareVersion, FirmwareUpdate
+    
+    try:
+        data = request.get_json(silent=True) or {}
+        
+        robot_id = data.get('robot_id')
+        firmware_version_id = data.get('firmware_version_id')
+        
+        if not robot_id or not firmware_version_id:
+            return jsonify({
+                'success': False,
+                'error': '缺少必要參數：robot_id 和 firmware_version_id'
+            }), 400
+        
+        # 取得機器人
+        robot = Robot.query.get_or_404(robot_id)
+        
+        # 權限檢查
+        if robot.owner != current_user and not current_user.is_admin():
+            return jsonify({
+                'success': False,
+                'error': '您沒有權限更新此機器人'
+            }), 403
+        
+        # 取得目標固件版本
+        firmware = FirmwareVersion.query.get_or_404(firmware_version_id)
+        
+        # 驗證固件類型與機器人類型匹配
+        if firmware.robot_type != robot.type:
+            return jsonify({
+                'success': False,
+                'error': f'固件類型不匹配：固件適用於 {firmware.robot_type}，但機器人類型為 {robot.type}'
+            }), 400
+        
+        # 檢查是否已有進行中的更新
+        existing_update = FirmwareUpdate.query.filter(
+            FirmwareUpdate.robot_id == robot_id,
+            FirmwareUpdate.status.in_(['pending', 'downloading', 'installing'])
+        ).first()
+        
+        if existing_update:
+            return jsonify({
+                'success': False,
+                'error': '該機器人已有進行中的固件更新',
+                'existing_update_id': existing_update.id
+            }), 409
+        
+        # 建立固件更新記錄
+        update = FirmwareUpdate(
+            robot_id=robot.id,
+            firmware_version_id=firmware.id,
+            initiated_by=current_user.id,
+            status='pending',
+            progress=0,
+            previous_version=robot.firmware_version
+        )
+        db.session.add(update)
+        db.session.commit()
+        
+        logging.info(
+            f'固件更新已啟動: robot={robot.name}, '
+            f'version={firmware.version}, initiated_by={current_user.username}'
+        )
+        
+        # 觸發固件更新過程（在實際應用中這會是非同步任務）
+        # 這裡模擬啟動更新
+        _start_firmware_update_task(update.id)
+        
+        return jsonify({
+            'success': True,
+            'message': f'已啟動固件更新至版本 {firmware.version}',
+            'update_id': update.id,
+            'update': update.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f'啟動固件更新失敗: {str(e)}', exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': '啟動固件更新時發生錯誤'
+        }), 500
+
+
+def _start_firmware_update_task(update_id: int):
+    """模擬固件更新任務（在實際應用中應為非同步任務）
+    
+    注意：這是一個簡化的模擬實作。在生產環境中，
+    這應該是一個背景任務（如 Celery 任務）來處理實際的
+    固件下載、驗證和安裝過程。
+    """
+    from WebUI.app.models import FirmwareUpdate
+    
+    try:
+        update = FirmwareUpdate.query.get(update_id)
+        if not update:
+            return
+        
+        # 更新狀態為下載中
+        update.status = 'downloading'
+        update.progress = 10
+        db.session.commit()
+        
+        # 在實際應用中，這裡會執行：
+        # 1. 下載固件檔案
+        # 2. 驗證校驗碼
+        # 3. 傳送到機器人
+        # 4. 執行安裝
+        # 5. 驗證安裝結果
+        
+        logging.info(f'固件更新任務已啟動: update_id={update_id}')
+        
+    except Exception as e:
+        logging.error(f'固件更新任務啟動失敗: {str(e)}', exc_info=True)
+
+
+@bp.route('/api/firmware/status/<int:update_id>', methods=['GET'])
+@login_required
+def get_firmware_update_status(update_id):
+    """查詢固件更新狀態"""
+    from WebUI.app.models import FirmwareUpdate
+    
+    try:
+        update = FirmwareUpdate.query.get_or_404(update_id)
+        
+        # 權限檢查
+        if update.user != current_user and not current_user.is_admin():
+            # 也允許機器人擁有者查看
+            if update.robot.owner != current_user:
+                return jsonify({
+                    'success': False,
+                    'error': '您沒有權限查看此更新狀態'
+                }), 403
+        
+        return jsonify({
+            'success': True,
+            'update': update.to_dict()
+        })
+        
+    except Exception as e:
+        logging.error(f'查詢固件更新狀態失敗: {str(e)}', exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': '查詢更新狀態時發生錯誤'
+        }), 500
+
+
+@bp.route('/api/firmware/history/<int:robot_id>', methods=['GET'])
+@login_required
+def get_firmware_update_history(robot_id):
+    """取得機器人的固件更新歷史"""
+    from WebUI.app.models import FirmwareUpdate
+    
+    try:
+        robot = Robot.query.get_or_404(robot_id)
+        
+        # 權限檢查
+        if robot.owner != current_user and not current_user.is_admin():
+            return jsonify({
+                'success': False,
+                'error': '您沒有權限查看此機器人'
+            }), 403
+        
+        updates = FirmwareUpdate.query.filter_by(
+            robot_id=robot_id
+        ).order_by(FirmwareUpdate.started_at.desc()).limit(20).all()
+        
+        return jsonify({
+            'success': True,
+            'robot_id': robot_id,
+            'robot_name': robot.name,
+            'updates': [u.to_dict() for u in updates],
+            'count': len(updates)
+        })
+        
+    except Exception as e:
+        logging.error(f'取得固件更新歷史失敗: {str(e)}', exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': '取得更新歷史時發生錯誤'
+        }), 500
+
+
+@bp.route('/api/firmware/cancel/<int:update_id>', methods=['POST'])
+@login_required
+def cancel_firmware_update(update_id):
+    """取消進行中的固件更新"""
+    from WebUI.app.models import FirmwareUpdate
+    
+    try:
+        update = FirmwareUpdate.query.get_or_404(update_id)
+        
+        # 權限檢查
+        if update.user != current_user and not current_user.is_admin():
+            if update.robot.owner != current_user:
+                return jsonify({
+                    'success': False,
+                    'error': '您沒有權限取消此更新'
+                }), 403
+        
+        # 只能取消尚未完成的更新
+        if update.status in ['completed', 'failed', 'cancelled']:
+            return jsonify({
+                'success': False,
+                'error': f'無法取消已{update.status}的更新'
+            }), 400
+        
+        update.status = 'cancelled'
+        update.completed_at = db.func.now()
+        db.session.commit()
+        
+        logging.info(
+            f'固件更新已取消: update_id={update_id}, '
+            f'cancelled_by={current_user.username}'
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': '固件更新已取消',
+            'update': update.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f'取消固件更新失敗: {str(e)}', exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': '取消更新時發生錯誤'
+        }), 500
+
+
+# 模擬固件更新進度 API（用於開發和演示）
+@bp.route('/api/firmware/simulate-progress/<int:update_id>', methods=['POST'])
+@login_required
+def simulate_firmware_progress(update_id):
+    """模擬固件更新進度（僅用於開發測試）"""
+    from WebUI.app.models import FirmwareUpdate
+    
+    try:
+        if not current_user.is_admin():
+            return jsonify({
+                'success': False,
+                'error': '只有管理員可以使用此功能'
+            }), 403
+        
+        update = FirmwareUpdate.query.get_or_404(update_id)
+        
+        data = request.get_json(silent=True) or {}
+        new_status = data.get('status')
+        new_progress = data.get('progress')
+        
+        if new_status:
+            update.status = new_status
+            if new_status in ['completed', 'failed', 'cancelled']:
+                update.completed_at = db.func.now()
+                # 如果完成，更新機器人的固件版本
+                if new_status == 'completed' and update.robot:
+                    update.robot.firmware_version = update.firmware_version.version
+        
+        if new_progress is not None:
+            update.progress = min(max(0, int(new_progress)), 100)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'update': update.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f'模擬固件更新進度失敗: {str(e)}', exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': '模擬進度時發生錯誤'
+        }), 500

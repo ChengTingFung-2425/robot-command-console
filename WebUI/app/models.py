@@ -228,6 +228,7 @@ class Robot(db.Model):
     status = db.Column(db.String(64), default='idle')
     battery = db.Column(db.Integer, default=100)  # 電池電量百分比 (0-100)
     location = db.Column(db.String(128))  # 機器人位置
+    firmware_version = db.Column(db.String(32), default='1.0.0')  # 目前固件版本
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
 
     def __repr__(self) -> str:
@@ -395,4 +396,98 @@ class UserAchievement(db.Model):
     
     def __repr__(self) -> str:
         return f'<UserAchievement user_id={self.user_id} achievement_id={self.achievement_id}>'
+
+
+class FirmwareVersion(db.Model):
+    """Available firmware versions for robots.
+    
+    Stores information about available firmware versions that can be installed
+    on different robot types.
+    """
+    __tablename__ = 'firmware_version'
+    id = db.Column(db.Integer, primary_key=True)
+    version = db.Column(db.String(32), nullable=False, index=True)  # e.g., '1.2.3'
+    robot_type = db.Column(db.String(64), nullable=False, index=True)  # e.g., 'humanoid', 'agv'
+    release_notes = db.Column(db.Text)  # Changelog/release notes
+    download_url = db.Column(db.String(512))  # URL to download firmware file
+    checksum = db.Column(db.String(128))  # SHA256 checksum for integrity verification
+    file_size = db.Column(db.Integer)  # File size in bytes
+    is_stable = db.Column(db.Boolean, default=True)  # True for stable releases
+    min_required_version = db.Column(db.String(32))  # Minimum version required to upgrade
+    
+    created_at = db.Column(db.DateTime, index=True, default=db.func.now())
+    updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
+    
+    # Unique constraint: only one version per robot type
+    __table_args__ = (
+        db.UniqueConstraint('version', 'robot_type', name='uq_firmware_version_type'),
+    )
+    
+    def to_dict(self) -> dict:
+        """Convert to dictionary for API responses."""
+        return {
+            'id': self.id,
+            'version': self.version,
+            'robot_type': self.robot_type,
+            'release_notes': self.release_notes,
+            'download_url': self.download_url,
+            'file_size': self.file_size,
+            'is_stable': self.is_stable,
+            'min_required_version': self.min_required_version,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+    
+    def __repr__(self) -> str:
+        return f'<FirmwareVersion {self.version} for {self.robot_type}>'
+
+
+class FirmwareUpdate(db.Model):
+    """Tracks firmware update operations for robots.
+    
+    Records the history of firmware updates including status, progress,
+    and any errors that occurred during the update process.
+    """
+    __tablename__ = 'firmware_update'
+    id = db.Column(db.Integer, primary_key=True)
+    robot_id = db.Column(db.Integer, db.ForeignKey('robot.id'), nullable=False, index=True)
+    firmware_version_id = db.Column(
+        db.Integer,
+        db.ForeignKey('firmware_version.id'),
+        nullable=False
+    )
+    initiated_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    # Update status: pending, downloading, installing, completed, failed, cancelled
+    status = db.Column(db.String(32), default='pending', index=True)
+    progress = db.Column(db.Integer, default=0)  # Progress percentage (0-100)
+    error_message = db.Column(db.Text)  # Error details if failed
+    previous_version = db.Column(db.String(32))  # Version before update
+    
+    started_at = db.Column(db.DateTime, default=db.func.now())
+    completed_at = db.Column(db.DateTime)
+    
+    # Relationships
+    robot = db.relationship('Robot', backref=db.backref('firmware_updates', lazy='dynamic'))
+    firmware_version = db.relationship('FirmwareVersion', backref='updates')
+    user = db.relationship('User', backref=db.backref('initiated_updates', lazy='dynamic'))
+    
+    def to_dict(self) -> dict:
+        """Convert to dictionary for API responses."""
+        return {
+            'id': self.id,
+            'robot_id': self.robot_id,
+            'robot_name': self.robot.name if self.robot else None,
+            'firmware_version': self.firmware_version.version if self.firmware_version else None,
+            'target_version': self.firmware_version.version if self.firmware_version else None,
+            'status': self.status,
+            'progress': self.progress,
+            'error_message': self.error_message,
+            'previous_version': self.previous_version,
+            'started_at': self.started_at.isoformat() if self.started_at else None,
+            'completed_at': self.completed_at.isoformat() if self.completed_at else None,
+            'initiated_by': self.user.username if self.user else None
+        }
+    
+    def __repr__(self) -> str:
+        return f'<FirmwareUpdate robot={self.robot_id} version={self.firmware_version_id} status={self.status}>'
 

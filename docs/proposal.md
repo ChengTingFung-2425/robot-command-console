@@ -295,7 +295,7 @@ Phase 2 開始演進為 Server-Edge-Runner 三層架構，Phase 3 將完整實�
 | Phase 0 | 探勘與需求收斂 | ✅ 完成 | 需求清單、目標平台矩陣 |
 | Phase 1 | 技術選型與 Electron POC | ✅ 完成 | Electron 整合、Flask 背景服務 |
 | Phase 2 | 模組化與後端服務層調整 | ✅ 完成 | 目錄重構、共用模組、LLM 整合、插件系統 |
-| Phase 3 | ALL-in-One Edge App | 📋 規劃中 | Edge 部署、統一啟動器、Cloud 整合 |
+| Phase 3 | ALL-in-One Edge App | 🔄 進行中 | Edge 部署、統一啟動器、Cloud 整合 |
 | Phase 4 | 封裝、簽署與發佈管線 | ⏳ 待開始 | CI/CD、安裝程式 |
 | Phase 5 | 測試、品質保證與監控 | ⏳ 待開始 | E2E 測試、錯誤追蹤 |
 | Phase 6 | 釋出、支持與持續優化 | ⏳ 待開始 | 正式發佈、版本管理 |
@@ -343,17 +343,18 @@ Phase 2 開始演進為 Server-Edge-Runner 三層架構，Phase 3 將完整實�
 - [x] 向後相容舊格式
 - [x] 參見 [phase2/ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md](phase2/ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md)
 
-### Phase 3：ALL-in-One Edge App（📋 規劃中）
+### Phase 3：ALL-in-One Edge App（🔄 進行中）
 
 > 詳細規劃請參見 [PHASE3_EDGE_ALL_IN_ONE.md](plans/PHASE3_EDGE_ALL_IN_ONE.md)
+> Phase 3.1 狀態報告請參見 [phase3/PHASE3_1_STATUS_REPORT.md](phase3/PHASE3_1_STATUS_REPORT.md)
 
 **核心目標**：將 MCP、WebUI、Robot-Console 整合為統一的 ALL-in-One Edge App，部署於消費級邊緣運算設備。
 
 **Edge（本地）職責**：
-- [ ] 用戶設定存儲
-- [ ] 機器人監控與健康檢查
+- [x] 用戶設定存儲（SharedStateManager 已實作）
+- [x] 機器人監控與健康檢查（ServiceCoordinator 已實作）
 - [ ] 固件更新管理
-- [ ] LLM 指令介面
+- [x] LLM 指令介面（LLMProviderManager 已實作）
 - [ ] 離線模式支援
 
 **Cloud（雲端）職責**：
@@ -363,7 +364,7 @@ Phase 2 開始演進為 Server-Edge-Runner 三層架構，Phase 3 將完整實�
 - [ ] 共享 LLM 分析服務（大數據優化）
 
 **子階段**：
-- [ ] Phase 3.1：基礎整合（統一啟動器、服務協調、LLM 選擇 UI）
+- [x] Phase 3.1：基礎整合（統一啟動器、服務協調、LLM 選擇 UI）
 - [ ] Phase 3.2：功能完善（WebUI 本地版、監控、CLI/TUI）
 - [ ] Phase 3.3：雲端整合（同步、共享指令、授權）
 - [ ] Phase 3.4：打包與發佈（AppImage、DMG、NSIS、Docker）
@@ -493,6 +494,6 @@ Phase 2 開始演進為 Server-Edge-Runner 三層架構，Phase 3 將完整實�
 
 ---
 
-**最後更新**：2025-11-26  
-**版本**：v3.0  
-**狀態**：Phase 2 完成，Phase 3 規劃中
+**最後更新**：2025-12-03  
+**版本**：v3.1  
+**狀態**：Phase 3.1 已完成，Phase 3.2 準備中

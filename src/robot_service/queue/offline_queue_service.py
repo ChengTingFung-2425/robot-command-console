@@ -51,6 +51,7 @@ from common.shared_state import SharedStateManager  # noqa: E402
 from common.datetime_utils import utc_now  # noqa: E402
 from .interface import Message, MessagePriority  # noqa: E402
 from .offline_buffer import OfflineBuffer  # noqa: E402
+from uuid import uuid4  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -278,6 +279,7 @@ class OfflineQueueService:
                 try:
                     await task
                 except asyncio.CancelledError:
+                    # 任務取消是預期行為，安全忽略
                     pass
 
         self._flush_task = None
@@ -423,7 +425,6 @@ class OfflineQueueService:
         Returns:
             資料 ID，失敗則返回 None
         """
-        from uuid import uuid4
         data_id = str(uuid4())
 
         message = Message(
@@ -683,9 +684,9 @@ class OfflineQueueService:
         network_health = await self._network_monitor.health_check()
 
         is_healthy = (
-            self._running and
-            command_buffer_health.get("status") == "healthy" and
-            sync_buffer_health.get("status") == "healthy"
+            self._running
+            and command_buffer_health.get("status") == "healthy"
+            and sync_buffer_health.get("status") == "healthy"
         )
 
         return {

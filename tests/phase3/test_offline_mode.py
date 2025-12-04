@@ -11,14 +11,13 @@ Phase 3.2 - 離線模式完善與斷線處理測試
 """
 
 import asyncio
-import os
 import sys
+from pathlib import Path
 import unittest
-from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
-# 添加 src 目錄到路徑
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
+# 使用 pathlib 添加 src 目錄到路徑
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 # 導入測試目標
 from common.network_monitor import (  # noqa: E402
@@ -36,13 +35,10 @@ from common.connection_manager import (  # noqa: E402
 )
 from robot_service.queue.offline_buffer import (  # noqa: E402
     OfflineBuffer,
-    BufferEntry,
-    BufferEntryStatus,
 )
 from robot_service.queue.interface import Message, MessagePriority  # noqa: E402
 from common.shared_state import (  # noqa: E402
     SharedStateManager,
-    StateKeys,
     EventTopics,
 )
 
@@ -82,7 +78,7 @@ class TestNetworkMonitor(unittest.TestCase):
             latency_ms=50.0,
         )
         data = state.to_dict()
-        
+
         self.assertEqual(data["status"], "online")
         self.assertEqual(data["consecutive_successes"], 3)
         self.assertEqual(data["latency_ms"], 50.0)
@@ -92,9 +88,9 @@ class TestNetworkMonitor(unittest.TestCase):
         async def test():
             with patch.object(self.monitor, '_check_endpoint', new_callable=AsyncMock) as mock_check:
                 mock_check.return_value = True
-                
+
                 result = await self.monitor.check_connection()
-                
+
                 self.assertTrue(result)
                 self.assertEqual(self.monitor.status, NetworkStatus.ONLINE)
                 self.assertEqual(self.monitor.state.consecutive_successes, 1)
@@ -106,11 +102,11 @@ class TestNetworkMonitor(unittest.TestCase):
         async def test():
             with patch.object(self.monitor, '_check_endpoint', new_callable=AsyncMock) as mock_check:
                 mock_check.return_value = False
-                
+
                 # 第一次失敗，還未達到閾值
                 await self.monitor.check_connection()
                 self.assertNotEqual(self.monitor.status, NetworkStatus.OFFLINE)
-                
+
                 # 第二次失敗，達到閾值
                 await self.monitor.check_connection()
                 self.assertEqual(self.monitor.status, NetworkStatus.OFFLINE)
@@ -123,13 +119,13 @@ class TestNetworkMonitor(unittest.TestCase):
         async def test():
             callback = AsyncMock()
             self.monitor.add_callback(callback)
-            
+
             with patch.object(self.monitor, '_check_endpoint', new_callable=AsyncMock) as mock_check:
                 # 先離線
                 mock_check.return_value = False
                 await self.monitor.check_connection()
                 await self.monitor.check_connection()  # 達到閾值
-                
+
                 # 回呼應該被呼叫
                 callback.assert_called()
                 call_args = callback.call_args
@@ -142,10 +138,10 @@ class TestNetworkMonitor(unittest.TestCase):
         async def test():
             with patch.object(self.monitor, '_check_endpoint', new_callable=AsyncMock) as mock_check:
                 mock_check.return_value = True
-                
+
                 await self.monitor.start()
                 self.assertTrue(self.monitor._running)
-                
+
                 await self.monitor.stop()
                 self.assertFalse(self.monitor._running)
 
@@ -158,11 +154,11 @@ class TestNetworkMonitor(unittest.TestCase):
                 mock_check.return_value = True
                 await self.monitor.start()
                 health = await self.monitor.health_check()
-                
+
                 self.assertEqual(health["status"], "healthy")
                 self.assertTrue(health["running"])
                 self.assertIn("network_state", health)
-                
+
                 await self.monitor.stop()
 
         self.loop.run_until_complete(test())
@@ -171,7 +167,7 @@ class TestNetworkMonitor(unittest.TestCase):
         """測試全域監控器"""
         monitor1 = get_network_monitor()
         monitor2 = get_network_monitor()
-        
+
         self.assertIs(monitor1, monitor2)
 
 
@@ -200,19 +196,19 @@ class TestOfflineBuffer(unittest.TestCase):
         """測試緩衝訊息"""
         async def test():
             await self.buffer.start()
-            
+
             message = Message(
                 id="msg-001",
                 payload={"action": "go_forward"},
                 priority=MessagePriority.NORMAL,
             )
-            
+
             result = await self.buffer.buffer(message)
-            
+
             self.assertTrue(result)
             size = await self.buffer.size()
             self.assertEqual(size, 1)
-            
+
             await self.buffer.stop()
 
         self.loop.run_until_complete(test())
@@ -222,18 +218,18 @@ class TestOfflineBuffer(unittest.TestCase):
         async def test():
             buffer = OfflineBuffer(db_path=":memory:", max_size=5)
             await buffer.start()
-            
+
             # 填滿緩衝區
             for i in range(5):
                 message = Message(id=f"msg-{i}", payload={"i": i})
                 await buffer.buffer(message)
-            
+
             # 超出限制應該失敗
             message = Message(id="msg-overflow", payload={})
             result = await buffer.buffer(message)
-            
+
             self.assertFalse(result)
-            
+
             await buffer.stop()
 
         self.loop.run_until_complete(test())
@@ -242,27 +238,28 @@ class TestOfflineBuffer(unittest.TestCase):
         """測試在線時清空緩衝"""
         async def test():
             await self.buffer.start()
-            
+
             # 設定發送處理器
             sent_messages = []
+
             async def send_handler(msg):
                 sent_messages.append(msg)
                 return True
-            
+
             self.buffer.set_send_handler(send_handler)
             self.buffer.set_online(True)
-            
+
             # 緩衝訊息
             message = Message(id="msg-001", payload={"action": "test"})
             await self.buffer.buffer(message)
-            
+
             # 清空緩衝
             result = await self.buffer.flush()
-            
+
             self.assertEqual(result["sent"], 1)
             self.assertEqual(len(sent_messages), 1)
             self.assertEqual(sent_messages[0].id, "msg-001")
-            
+
             await self.buffer.stop()
 
         self.loop.run_until_complete(test())
@@ -271,16 +268,16 @@ class TestOfflineBuffer(unittest.TestCase):
         """測試離線時不清空緩衝"""
         async def test():
             await self.buffer.start()
-            
+
             self.buffer.set_online(False)
-            
+
             message = Message(id="msg-001", payload={"action": "test"})
             await self.buffer.buffer(message)
-            
+
             result = await self.buffer.flush()
-            
+
             self.assertTrue(result.get("skipped", False))
-            
+
             await self.buffer.stop()
 
         self.loop.run_until_complete(test())
@@ -289,24 +286,24 @@ class TestOfflineBuffer(unittest.TestCase):
         """測試優先權排序"""
         async def test():
             await self.buffer.start()
-            
+
             # 緩衝不同優先權的訊息
             low = Message(id="low", payload={}, priority=MessagePriority.LOW)
             high = Message(id="high", payload={}, priority=MessagePriority.HIGH)
             normal = Message(id="normal", payload={}, priority=MessagePriority.NORMAL)
-            
+
             await self.buffer.buffer(low)
             await self.buffer.buffer(normal)
             await self.buffer.buffer(high)
-            
+
             # 取得待發送的條目
             entries = await self.buffer._get_pending_entries(10)
-            
+
             # 應該按優先權排序：high, normal, low
             self.assertEqual(entries[0].message.id, "high")
             self.assertEqual(entries[1].message.id, "normal")
             self.assertEqual(entries[2].message.id, "low")
-            
+
             await self.buffer.stop()
 
         self.loop.run_until_complete(test())
@@ -315,28 +312,29 @@ class TestOfflineBuffer(unittest.TestCase):
         """測試發送失敗重試"""
         async def test():
             await self.buffer.start()
-            
+
             call_count = 0
+
             async def failing_handler(msg):
                 nonlocal call_count
                 call_count += 1
                 return False
-            
+
             self.buffer.set_send_handler(failing_handler)
             self.buffer.set_online(True)
-            
+
             message = Message(id="msg-001", payload={})
             await self.buffer.buffer(message)
-            
+
             # 多次嘗試發送
             await self.buffer.flush()
             await self.buffer.flush()
             await self.buffer.flush()
-            
+
             # 發送失敗後應該仍在緩衝區（直到達到最大重試次數）
-            stats = await self.buffer.get_statistics()
+            # 只需驗證重試次數足夠
             self.assertGreaterEqual(call_count, 1)
-            
+
             await self.buffer.stop()
 
         self.loop.run_until_complete(test())
@@ -349,20 +347,20 @@ class TestOfflineBuffer(unittest.TestCase):
                 default_ttl_seconds=0.1,  # 0.1 秒過期
             )
             await buffer.start()
-            
+
             message = Message(id="msg-001", payload={})
             await buffer.buffer(message)
-            
+
             # 等待過期
             await asyncio.sleep(0.2)
-            
+
             # 清理過期條目
             count = await buffer.cleanup_expired()
-            
+
             self.assertEqual(count, 1)
             size = await buffer.size()
             self.assertEqual(size, 0)
-            
+
             await buffer.stop()
 
         self.loop.run_until_complete(test())
@@ -371,16 +369,16 @@ class TestOfflineBuffer(unittest.TestCase):
         """測試統計資訊"""
         async def test():
             await self.buffer.start()
-            
+
             message = Message(id="msg-001", payload={})
             await self.buffer.buffer(message)
-            
+
             stats = await self.buffer.get_statistics()
-            
+
             self.assertEqual(stats["pending"], 1)
             self.assertEqual(stats["total_buffered"], 1)
             self.assertIn("is_online", stats)
-            
+
             await self.buffer.stop()
 
         self.loop.run_until_complete(test())
@@ -389,13 +387,13 @@ class TestOfflineBuffer(unittest.TestCase):
         """測試健康檢查"""
         async def test():
             await self.buffer.start()
-            
+
             health = await self.buffer.health_check()
-            
+
             self.assertEqual(health["status"], "healthy")
             self.assertTrue(health["running"])
             self.assertIn("statistics", health)
-            
+
             await self.buffer.stop()
 
         self.loop.run_until_complete(test())
@@ -437,7 +435,7 @@ class TestConnectionManager(unittest.TestCase):
             reconnect_attempts=2,
         )
         data = state.to_dict()
-        
+
         self.assertEqual(data["status"], "connected")
         self.assertEqual(data["endpoint"], "http://localhost:8000")
         self.assertEqual(data["reconnect_attempts"], 2)
@@ -447,14 +445,14 @@ class TestConnectionManager(unittest.TestCase):
         async def test():
             connect_handler = AsyncMock(return_value=True)
             self.manager.set_connect_handler(connect_handler)
-            
+
             await self.manager.start()
             result = await self.manager.connect()
-            
+
             self.assertTrue(result)
             self.assertEqual(self.manager.status, ConnectionStatus.CONNECTED)
             connect_handler.assert_called_once()
-            
+
             await self.manager.stop()
 
         self.loop.run_until_complete(test())
@@ -464,13 +462,13 @@ class TestConnectionManager(unittest.TestCase):
         async def test():
             connect_handler = AsyncMock(return_value=False)
             self.manager.set_connect_handler(connect_handler)
-            
+
             await self.manager.start()
             result = await self.manager.connect()
-            
+
             self.assertFalse(result)
             self.assertEqual(self.manager.status, ConnectionStatus.DISCONNECTED)
-            
+
             await self.manager.stop()
 
         self.loop.run_until_complete(test())
@@ -480,17 +478,17 @@ class TestConnectionManager(unittest.TestCase):
         async def test():
             connect_handler = AsyncMock(return_value=True)
             disconnect_handler = AsyncMock()
-            
+
             self.manager.set_connect_handler(connect_handler)
             self.manager.set_disconnect_handler(disconnect_handler)
-            
+
             await self.manager.start()
             await self.manager.connect()
             await self.manager.disconnect()
-            
+
             self.assertEqual(self.manager.status, ConnectionStatus.DISCONNECTED)
             disconnect_handler.assert_called_once()
-            
+
             await self.manager.stop()
 
         self.loop.run_until_complete(test())
@@ -499,29 +497,30 @@ class TestConnectionManager(unittest.TestCase):
         """測試指數退避重連"""
         async def test():
             call_count = 0
+
             async def connect_handler():
                 nonlocal call_count
                 call_count += 1
                 return True  # 第一次就成功
-            
+
             self.manager.set_connect_handler(connect_handler)
-            
+
             await self.manager.start()
-            
+
             # 觸發重連
             result = await self.manager.reconnect()
-            
+
             self.assertTrue(result)
             self.assertEqual(self.manager.status, ConnectionStatus.CONNECTED)
             self.assertEqual(call_count, 1)
-            
+
             # 驗證重連延遲計算（指數退避）
             self.manager._state.reconnect_attempts = 1
             delay1 = self.manager._calculate_reconnect_delay()
             self.manager._state.reconnect_attempts = 3
             delay3 = self.manager._calculate_reconnect_delay()
             self.assertLess(delay1, delay3)
-            
+
             await self.manager.stop()
 
         self.loop.run_until_complete(test())
@@ -531,16 +530,16 @@ class TestConnectionManager(unittest.TestCase):
         async def test():
             connect_handler = AsyncMock(return_value=False)
             self.manager.set_connect_handler(connect_handler)
-            
+
             await self.manager.start()
-            
+
             # 多次重連嘗試
             for _ in range(4):
                 await self.manager.reconnect()
-            
+
             # 應該達到 FAILED 狀態
             self.assertEqual(self.manager.status, ConnectionStatus.FAILED)
-            
+
             await self.manager.stop()
 
         self.loop.run_until_complete(test())
@@ -550,17 +549,17 @@ class TestConnectionManager(unittest.TestCase):
         async def test():
             callback = AsyncMock()
             self.manager.add_callback(callback)
-            
+
             connect_handler = AsyncMock(return_value=True)
             self.manager.set_connect_handler(connect_handler)
-            
+
             await self.manager.start()
             await self.manager.connect()
-            
+
             callback.assert_called()
             call_args = callback.call_args
             self.assertEqual(call_args[0][1], ConnectionStatus.CONNECTED)
-            
+
             await self.manager.stop()
 
         self.loop.run_until_complete(test())
@@ -570,15 +569,15 @@ class TestConnectionManager(unittest.TestCase):
         async def test():
             connect_handler = AsyncMock(return_value=True)
             self.manager.set_connect_handler(connect_handler)
-            
+
             await self.manager.start()
             await self.manager.connect()
-            
+
             health = await self.manager.health_check()
-            
+
             self.assertEqual(health["status"], "healthy")
             self.assertTrue(health["running"])
-            
+
             await self.manager.stop()
 
         self.loop.run_until_complete(test())
@@ -587,10 +586,10 @@ class TestConnectionManager(unittest.TestCase):
         """測試重連延遲計算"""
         self.manager._state.reconnect_attempts = 1
         delay1 = self.manager._calculate_reconnect_delay()
-        
+
         self.manager._state.reconnect_attempts = 3
         delay3 = self.manager._calculate_reconnect_delay()
-        
+
         # 延遲應該指數增長（考慮抖動）
         self.assertLess(delay1, delay3)
 
@@ -614,7 +613,7 @@ class TestConnectionPool(unittest.TestCase):
         """測試添加和取得連線"""
         conn = ConnectionManager(name="test")
         self.pool.add(conn)
-        
+
         result = self.pool.get("test")
         self.assertIs(result, conn)
 
@@ -622,10 +621,10 @@ class TestConnectionPool(unittest.TestCase):
         """測試移除連線"""
         conn = ConnectionManager(name="test")
         self.pool.add(conn)
-        
+
         removed = self.pool.remove("test")
         self.assertIs(removed, conn)
-        
+
         result = self.pool.get("test")
         self.assertIsNone(result)
 
@@ -634,15 +633,15 @@ class TestConnectionPool(unittest.TestCase):
         async def test():
             conn1 = ConnectionManager(name="conn1")
             conn2 = ConnectionManager(name="conn2")
-            
+
             self.pool.add(conn1)
             self.pool.add(conn2)
-            
+
             results = await self.pool.start_all()
-            
+
             self.assertTrue(results["conn1"])
             self.assertTrue(results["conn2"])
-            
+
             await self.pool.stop_all()
 
         self.loop.run_until_complete(test())
@@ -652,19 +651,19 @@ class TestConnectionPool(unittest.TestCase):
         async def test():
             conn1 = ConnectionManager(name="conn1")
             conn2 = ConnectionManager(name="conn2")
-            
+
             conn1.set_connect_handler(AsyncMock(return_value=True))
             conn2.set_connect_handler(AsyncMock(return_value=False))
-            
+
             self.pool.add(conn1)
             self.pool.add(conn2)
-            
+
             await self.pool.start_all()
             results = await self.pool.connect_all()
-            
+
             self.assertTrue(results["conn1"])
             self.assertFalse(results["conn2"])
-            
+
             await self.pool.stop_all()
 
         self.loop.run_until_complete(test())
@@ -673,13 +672,13 @@ class TestConnectionPool(unittest.TestCase):
         """測試取得已連線數量"""
         conn1 = ConnectionManager(name="conn1")
         conn2 = ConnectionManager(name="conn2")
-        
+
         conn1._state.status = ConnectionStatus.CONNECTED
         conn2._state.status = ConnectionStatus.DISCONNECTED
-        
+
         self.pool.add(conn1)
         self.pool.add(conn2)
-        
+
         self.assertEqual(self.pool.get_connected_count(), 1)
         self.assertEqual(self.pool.get_disconnected_count(), 1)
 
@@ -703,19 +702,19 @@ class TestSharedStateManagerOffline(unittest.TestCase):
         async def test():
             manager = SharedStateManager()
             await manager.start()
-            
+
             # 更新為離線
             result = await manager.update_network_status(
                 is_online=False,
                 details={"checked_endpoint": "google.com"},
             )
-            
+
             self.assertTrue(result)
-            
+
             # 檢查狀態
             status = await manager.get_network_status()
             self.assertFalse(status["is_online"])
-            
+
             await manager.stop()
 
         self.loop.run_until_complete(test())
@@ -725,16 +724,16 @@ class TestSharedStateManagerOffline(unittest.TestCase):
         async def test():
             manager = SharedStateManager()
             await manager.start()
-            
+
             # 預設應該是 True
             is_online = await manager.is_network_online()
             self.assertTrue(is_online)
-            
+
             # 設為離線
             await manager.update_network_status(is_online=False)
             is_online = await manager.is_network_online()
             self.assertFalse(is_online)
-            
+
             await manager.stop()
 
         self.loop.run_until_complete(test())
@@ -744,24 +743,25 @@ class TestSharedStateManagerOffline(unittest.TestCase):
         async def test():
             manager = SharedStateManager()
             await manager.start()
-            
+
             events = []
+
             async def handler(event):
                 events.append(event)
-            
+
             await manager.subscribe(EventTopics.NETWORK_OFFLINE, handler)
-            
+
             # 先設為在線
             await manager.update_network_status(is_online=True)
-            
+
             # 再設為離線，應該觸發事件
             await manager.update_network_status(is_online=False)
-            
+
             # 等待事件處理
             await asyncio.sleep(0.1)
-            
+
             self.assertEqual(len(events), 1)
-            
+
             await manager.stop()
 
         self.loop.run_until_complete(test())
@@ -771,17 +771,17 @@ class TestSharedStateManagerOffline(unittest.TestCase):
         async def test():
             manager = SharedStateManager()
             await manager.start()
-            
+
             result = await manager.update_offline_buffer_status({
                 "pending": 5,
                 "is_online": False,
             })
-            
+
             self.assertTrue(result)
-            
+
             status = await manager.get_offline_buffer_status()
             self.assertEqual(status["pending"], 5)
-            
+
             await manager.stop()
 
         self.loop.run_until_complete(test())
@@ -791,19 +791,19 @@ class TestSharedStateManagerOffline(unittest.TestCase):
         async def test():
             manager = SharedStateManager()
             await manager.start()
-            
+
             result = await manager.update_connection_status(
                 connection_name="mqtt-broker",
                 status="connected",
                 details={"latency_ms": 50},
             )
-            
+
             self.assertTrue(result)
-            
+
             status = await manager.get_connection_status("mqtt-broker")
             self.assertEqual(status["status"], "connected")
             self.assertEqual(status["connection_name"], "mqtt-broker")
-            
+
             await manager.stop()
 
         self.loop.run_until_complete(test())
@@ -813,16 +813,16 @@ class TestSharedStateManagerOffline(unittest.TestCase):
         async def test():
             manager = SharedStateManager()
             await manager.start()
-            
+
             await manager.update_connection_status("conn1", "connected")
             await manager.update_connection_status("conn2", "disconnected")
-            
+
             all_status = await manager.get_all_connections_status()
-            
+
             self.assertEqual(len(all_status), 2)
             self.assertIn("conn1", all_status)
             self.assertIn("conn2", all_status)
-            
+
             await manager.stop()
 
         self.loop.run_until_complete(test())
@@ -849,50 +849,51 @@ class TestOfflineModeIntegration(unittest.TestCase):
             shared_state = SharedStateManager()
             network_monitor = NetworkMonitor(check_interval=0.5)
             offline_buffer = OfflineBuffer(db_path=":memory:")
-            
+
             await shared_state.start()
             await offline_buffer.start()
-            
+
             # 設定網路監控回呼
             async def on_network_change(old_status, new_status, state):
                 is_online = new_status == NetworkStatus.ONLINE
                 offline_buffer.set_online(is_online)
                 await shared_state.update_network_status(is_online=is_online)
-            
+
             network_monitor.add_callback(on_network_change)
-            
+
             # 模擬離線
             with patch.object(network_monitor, '_check_endpoint', new_callable=AsyncMock) as mock_check:
                 mock_check.return_value = False
                 await network_monitor.check_connection()
                 await network_monitor.check_connection()  # 達到閾值
-            
+
             # 離線時緩衝指令
             message = Message(id="offline-cmd", payload={"action": "test"})
             await offline_buffer.buffer(message)
-            
+
             # 確認已緩衝
             size = await offline_buffer.size()
             self.assertEqual(size, 1)
-            
+
             # 模擬恢復在線
             sent_messages = []
+
             async def send_handler(msg):
                 sent_messages.append(msg)
                 return True
-            
+
             offline_buffer.set_send_handler(send_handler)
-            
+
             with patch.object(network_monitor, '_check_endpoint', new_callable=AsyncMock) as mock_check:
                 mock_check.return_value = True
                 await network_monitor.check_connection()
-            
+
             # 清空緩衝
             result = await offline_buffer.flush()
-            
+
             self.assertEqual(result["sent"], 1)
             self.assertEqual(len(sent_messages), 1)
-            
+
             await offline_buffer.stop()
             await shared_state.stop()
 
@@ -901,37 +902,37 @@ class TestOfflineModeIntegration(unittest.TestCase):
     def test_command_buffered_when_queue_service_unavailable(self):
         """
         測試佇列服務不可用時指令被緩衝
-        
+
         當 Edge 使用網路佇列服務（Redis/RabbitMQ）連接到 Runner 時，
         網路斷開會導致佇列服務不可用，指令需要被緩衝到本地。
         """
         async def test():
             from robot_service.queue.offline_queue_service import OfflineQueueService
-            
+
             service = OfflineQueueService()
             await service.start()
-            
+
             # 確認佇列服務不可用（預設狀態）
             self.assertFalse(service.is_queue_service_available)
-            
+
             # 提交指令（佇列服務不可用，應該被緩衝）
             msg_id = await service.submit_command(
                 payload={"command": "go_forward", "robot_id": "robot-001"},
             )
-            
+
             # 指令應該成功（被緩衝）
             self.assertIsNotNone(msg_id)
-            
+
             # 指令緩衝應該有訊息
             buffer_size = await service.command_buffer.size()
             self.assertEqual(buffer_size, 1)
-            
+
             # 統計應該正確
             stats = await service.get_statistics()
             self.assertEqual(stats["stats"]["commands_submitted"], 1)
             self.assertEqual(stats["stats"]["commands_buffered"], 1)
             self.assertEqual(stats["stats"]["commands_sent_direct"], 0)
-            
+
             await service.stop()
 
         self.loop.run_until_complete(test())
@@ -945,48 +946,48 @@ class TestOfflineModeIntegration(unittest.TestCase):
                 OfflineQueueService,
                 QueueServiceStatus,
             )
-            
+
             sent_commands = []
-            
+
             async def queue_send_handler(msg):
                 sent_commands.append(msg)
                 return True
-            
+
             async def queue_health_check():
                 return True
-            
+
             service = OfflineQueueService()
             service.set_queue_send_handler(queue_send_handler)
             service.set_queue_health_check_handler(queue_health_check)
-            
+
             await service.start()
-            
+
             # 手動設定佇列服務可用
             await service._set_queue_service_status(QueueServiceStatus.AVAILABLE)
-            
+
             # 確認佇列服務可用
             self.assertTrue(service.is_queue_service_available)
-            
+
             # 提交指令（應該直接發送）
             msg_id = await service.submit_command(
                 payload={"command": "go_forward", "robot_id": "robot-001"},
             )
-            
+
             # 指令應該成功
             self.assertIsNotNone(msg_id)
-            
+
             # 指令應該被直接發送
             self.assertEqual(len(sent_commands), 1)
-            
+
             # 指令緩衝應該為空
             buffer_size = await service.command_buffer.size()
             self.assertEqual(buffer_size, 0)
-            
+
             # 統計應該正確
             stats = await service.get_statistics()
             self.assertEqual(stats["stats"]["commands_sent_direct"], 1)
             self.assertEqual(stats["stats"]["commands_buffered"], 0)
-            
+
             await service.stop()
 
         self.loop.run_until_complete(test())
@@ -1000,18 +1001,18 @@ class TestOfflineModeIntegration(unittest.TestCase):
                 OfflineQueueService,
                 QueueServiceStatus,
             )
-            
+
             sent_commands = []
-            
+
             async def queue_send_handler(msg):
                 sent_commands.append(msg)
                 return True
-            
+
             service = OfflineQueueService(auto_flush_on_online=True)
             service.set_queue_send_handler(queue_send_handler)
-            
+
             await service.start()
-            
+
             # 佇列服務不可用，提交指令（被緩衝）
             await service.submit_command(
                 payload={"command": "cmd1", "robot_id": "robot-001"},
@@ -1019,24 +1020,24 @@ class TestOfflineModeIntegration(unittest.TestCase):
             await service.submit_command(
                 payload={"command": "cmd2", "robot_id": "robot-001"},
             )
-            
+
             # 確認緩衝
             buffer_size = await service.command_buffer.size()
             self.assertEqual(buffer_size, 2)
-            
+
             # 模擬佇列服務恢復
             await service._set_queue_service_status(QueueServiceStatus.AVAILABLE)
-            
+
             # 等待自動同步
             await asyncio.sleep(0.1)
-            
+
             # 指令應該已發送
             self.assertEqual(len(sent_commands), 2)
-            
+
             # 緩衝應該清空
             buffer_size = await service.command_buffer.size()
             self.assertEqual(buffer_size, 0)
-            
+
             await service.stop()
 
         self.loop.run_until_complete(test())
@@ -1046,20 +1047,20 @@ class TestOfflineModeIntegration(unittest.TestCase):
         測試網路離線時雲端同步資料被緩衝
         """
         async def test():
-            from robot_service.queue.offline_queue_service import OfflineQueueService, SyncDataType
-            
+            from robot_service.queue.offline_queue_service import OfflineQueueService
+
             service = OfflineQueueService()
             await service.start()
-            
+
             # 模擬網路離線
             with patch.object(service._network_monitor, '_check_endpoint', new_callable=AsyncMock) as mock_check:
                 mock_check.return_value = False
                 await service._network_monitor.check_connection()
                 await service._network_monitor.check_connection()
-            
+
             # 確認網路離線
             self.assertFalse(service.is_network_online)
-            
+
             # 記錄指令執行結果（這會被緩衝）
             log_id = await service.log_command_execution(
                 command_id="cmd-001",
@@ -1067,17 +1068,17 @@ class TestOfflineModeIntegration(unittest.TestCase):
                 command="go_forward",
                 success=True,
             )
-            
+
             self.assertIsNotNone(log_id)
-            
+
             # 同步緩衝應該有資料
             buffer_size = await service.sync_buffer.size()
             self.assertEqual(buffer_size, 1)
-            
+
             # 統計應該正確
             stats = await service.get_statistics()
             self.assertEqual(stats["stats"]["sync_data_buffered"], 1)
-            
+
             await service.stop()
 
         self.loop.run_until_complete(test())

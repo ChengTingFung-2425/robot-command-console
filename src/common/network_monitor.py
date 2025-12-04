@@ -187,6 +187,7 @@ class NetworkMonitor:
             try:
                 await self._monitor_task
             except asyncio.CancelledError:
+                # 協程被取消時屬預期行為，安全忽略
                 pass
             self._monitor_task = None
 
@@ -233,8 +234,8 @@ class NetworkMonitor:
             self._state.consecutive_successes += 1
             self._state.consecutive_failures = 0
 
-            if (old_status != NetworkStatus.ONLINE and
-                    self._state.consecutive_successes >= self._recovery_threshold):
+            if (old_status != NetworkStatus.ONLINE
+                    and self._state.consecutive_successes >= self._recovery_threshold):
                 self._state.status = NetworkStatus.ONLINE
                 self._state.last_online_at = utc_now()
                 await self._notify_status_change(old_status, NetworkStatus.ONLINE)
@@ -254,8 +255,8 @@ class NetworkMonitor:
             self._state.consecutive_failures += 1
             self._state.consecutive_successes = 0
 
-            if (old_status != NetworkStatus.OFFLINE and
-                    self._state.consecutive_failures >= self._failure_threshold):
+            if (old_status != NetworkStatus.OFFLINE
+                    and self._state.consecutive_failures >= self._failure_threshold):
                 self._state.status = NetworkStatus.OFFLINE
                 self._state.last_offline_at = utc_now()
                 await self._notify_status_change(old_status, NetworkStatus.OFFLINE)

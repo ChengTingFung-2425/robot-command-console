@@ -203,6 +203,7 @@ class ConnectionManager:
             try:
                 await self._health_check_task
             except asyncio.CancelledError:
+                # 任務被取消屬預期行為，安全忽略
                 pass
             self._health_check_task = None
 
@@ -212,6 +213,7 @@ class ConnectionManager:
             try:
                 await self._reconnect_task
             except asyncio.CancelledError:
+                # 任務被取消屬預期行為，安全忽略
                 pass
             self._reconnect_task = None
 
@@ -315,6 +317,7 @@ class ConnectionManager:
             try:
                 await self._health_check_task
             except asyncio.CancelledError:
+                # 健康檢查任務被取消時屬預期行為，安全忽略
                 pass
             self._health_check_task = None
 
@@ -356,8 +359,8 @@ class ConnectionManager:
             return False
 
         # 檢查重連次數限制
-        if (self._max_reconnect_attempts > 0 and
-                self._state.reconnect_attempts >= self._max_reconnect_attempts):
+        if (self._max_reconnect_attempts > 0
+                and self._state.reconnect_attempts >= self._max_reconnect_attempts):
             old_status = self._state.status
             self._state.status = ConnectionStatus.FAILED
             await self._notify_status_change(old_status, ConnectionStatus.FAILED)
@@ -371,7 +374,6 @@ class ConnectionManager:
 
             return False
 
-        old_status = self._state.status
         self._state.status = ConnectionStatus.RECONNECTING
         self._state.reconnect_attempts += 1
 
@@ -491,8 +493,8 @@ class ConnectionManager:
 
     async def _auto_reconnect(self) -> None:
         """自動重連循環"""
-        while (self._running and
-               self._state.status not in [ConnectionStatus.CONNECTED, ConnectionStatus.FAILED]):
+        while (self._running
+               and self._state.status not in [ConnectionStatus.CONNECTED, ConnectionStatus.FAILED]):
             success = await self.reconnect()
 
             if success:
@@ -538,8 +540,8 @@ class ConnectionManager:
             健康狀態資訊
         """
         is_healthy = (
-            self._running and
-            self._state.status == ConnectionStatus.CONNECTED
+            self._running
+            and self._state.status == ConnectionStatus.CONNECTED
         )
 
         return {

@@ -247,6 +247,7 @@ class OfflineBuffer:
             try:
                 await self._flush_task
             except asyncio.CancelledError:
+                # 協程取消屬預期行為，安全忽略
                 pass
             self._flush_task = None
 

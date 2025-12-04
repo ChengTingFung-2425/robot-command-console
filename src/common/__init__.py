@@ -10,6 +10,8 @@
 - state_store: 本地狀態存儲
 - event_bus: 事件匯流排
 - shared_state: 服務間狀態共享管理器
+- network_monitor: 網路連線監控
+- connection_manager: 服務連線管理
 
 環境隔離：
 - Edge: 運行於本地/邊緣設備（Electron、CLI）
@@ -53,6 +55,19 @@ from .token_manager import (
     TokenRotationEvent,
     get_edge_token_manager,
     reset_edge_token_manager,
+)
+from .network_monitor import (
+    NetworkMonitor,
+    NetworkStatus,
+    NetworkState,
+    get_network_monitor,
+    reset_network_monitor,
+)
+from .connection_manager import (
+    ConnectionManager,
+    ConnectionPool,
+    ConnectionStatus,
+    ConnectionState,
 )
 
 __version__ = "1.0.0"
@@ -98,4 +113,15 @@ __all__ = [
     "TokenRotationEvent",
     "get_edge_token_manager",
     "reset_edge_token_manager",
+    # 網路監控
+    "NetworkMonitor",
+    "NetworkStatus",
+    "NetworkState",
+    "get_network_monitor",
+    "reset_network_monitor",
+    # 連線管理
+    "ConnectionManager",
+    "ConnectionPool",
+    "ConnectionStatus",
+    "ConnectionState",
 ]

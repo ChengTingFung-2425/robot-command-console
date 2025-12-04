@@ -1,0 +1,6 @@
+[flake8]
+max-line-length = 120
+exclude = .git, __pycache__, .venv, build, dist, node_modules
+# W503 和 W504 是互斥的，根據 PEP 8 最新建議，選擇在運算符之前換行
+# 因此忽略 W503（line break before binary operator）
+ignore = W503

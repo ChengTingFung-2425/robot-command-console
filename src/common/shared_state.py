@@ -32,6 +32,10 @@ class StateKeys:
     SERVICE_STATUS = "service:{service_name}:status"
     LLM_PROVIDER = "llm:provider"
     LLM_MODEL = "llm:model"
+    # 離線模式相關
+    NETWORK_STATUS = "network:status"
+    OFFLINE_BUFFER_STATUS = "offline:buffer:status"
+    CONNECTION_STATUS = "connection:{connection_name}:status"
 
 
 # 預定義的事件主題
@@ -44,11 +48,20 @@ class EventTopics:
     COMMAND_SUBMITTED = "command.submitted"
     COMMAND_COMPLETED = "command.completed"
     COMMAND_FAILED = "command.failed"
+    COMMAND_BUFFERED = "command.buffered"  # 離線模式：指令已緩衝
     SERVICE_STARTED = "service.started"
     SERVICE_STOPPED = "service.stopped"
     SERVICE_HEALTH_CHANGED = "service.health.changed"
     USER_SETTINGS_UPDATED = "user.settings.updated"
     LLM_PROVIDER_CHANGED = "llm.provider.changed"
+    # 離線模式相關
+    NETWORK_ONLINE = "network.online"
+    NETWORK_OFFLINE = "network.offline"
+    NETWORK_STATUS_CHANGED = "network.status.changed"
+    OFFLINE_BUFFER_FLUSHED = "offline.buffer.flushed"
+    CONNECTION_CONNECTED = "connection.connected"
+    CONNECTION_DISCONNECTED = "connection.disconnected"
+    CONNECTION_RECONNECTING = "connection.reconnecting"
 
 
 @dataclass
@@ -591,6 +604,255 @@ class SharedStateManager:
             },
             source=source,
         )
+
+    # ==================== 離線模式管理 ====================
+
+    async def update_network_status(
+        self,
+        is_online: bool,
+        details: Optional[Dict[str, Any]] = None,
+        source: Optional[str] = None,
+    ) -> bool:
+        """
+        更新網路狀態
+
+        Args:
+            is_online: 是否在線
+            details: 額外詳細資訊（如延遲、檢測端點等）
+            source: 更新來源
+
+        Returns:
+            是否成功更新
+        """
+        key = StateKeys.NETWORK_STATUS
+
+        # 取得舊狀態以比較
+        old_data = await self._state_store.get(key)
+        old_online = old_data.get("is_online", None) if old_data else None
+
+        data = {
+            "is_online": is_online,
+            "details": details or {},
+            "updated_at": utc_now().isoformat(),
+        }
+
+        success = await self._state_store.set(key, data)
+
+        if success:
+            # 發布狀態變更事件
+            await self._event_bus.publish(
+                EventTopics.NETWORK_STATUS_CHANGED,
+                {"is_online": is_online, "details": details},
+                source=source,
+            )
+
+            # 發布上線/離線事件
+            if old_online is not None and old_online != is_online:
+                topic = EventTopics.NETWORK_ONLINE if is_online else EventTopics.NETWORK_OFFLINE
+                await self._event_bus.publish(
+                    topic,
+                    {"previous_status": "online" if old_online else "offline"},
+                    source=source,
+                )
+
+        return success
+
+    async def get_network_status(self) -> Dict[str, Any]:
+        """
+        取得網路狀態
+
+        Returns:
+            網路狀態資訊
+        """
+        return await self._state_store.get(StateKeys.NETWORK_STATUS) or {
+            "is_online": True,  # 預設假設在線
+            "details": {},
+            "updated_at": utc_now().isoformat(),
+        }
+
+    async def is_network_online(self) -> bool:
+        """
+        檢查網路是否在線
+
+        Returns:
+            是否在線
+        """
+        status = await self.get_network_status()
+        return status.get("is_online", True)
+
+    async def update_offline_buffer_status(
+        self,
+        status: Dict[str, Any],
+        source: Optional[str] = None,
+    ) -> bool:
+        """
+        更新離線緩衝區狀態
+
+        Args:
+            status: 緩衝區狀態資料
+            source: 更新來源
+
+        Returns:
+            是否成功更新
+        """
+        key = StateKeys.OFFLINE_BUFFER_STATUS
+        status = {**status, "updated_at": utc_now().isoformat()}
+
+        success = await self._state_store.set(key, status)
+
+        if success:
+            await self._event_bus.publish(
+                "offline.buffer.status.updated",
+                {"status": status},
+                source=source,
+            )
+
+        return success
+
+    async def get_offline_buffer_status(self) -> Optional[Dict[str, Any]]:
+        """
+        取得離線緩衝區狀態
+
+        Returns:
+            緩衝區狀態資訊
+        """
+        return await self._state_store.get(StateKeys.OFFLINE_BUFFER_STATUS)
+
+    async def notify_buffer_flushed(
+        self,
+        result: Dict[str, Any],
+        source: Optional[str] = None,
+    ) -> None:
+        """
+        通知緩衝區已清空
+
+        Args:
+            result: 清空結果（sent、failed、remaining 等）
+            source: 來源
+        """
+        await self._event_bus.publish(
+            EventTopics.OFFLINE_BUFFER_FLUSHED,
+            {
+                "result": result,
+                "timestamp": utc_now().isoformat(),
+            },
+            source=source,
+        )
+
+    async def notify_command_buffered(
+        self,
+        command_id: str,
+        robot_id: str,
+        command: str,
+        source: Optional[str] = None,
+    ) -> None:
+        """
+        通知指令已緩衝（離線模式）
+
+        Args:
+            command_id: 指令 ID
+            robot_id: 目標機器人 ID
+            command: 指令內容
+            source: 來源
+        """
+        await self._event_bus.publish(
+            EventTopics.COMMAND_BUFFERED,
+            {
+                "command_id": command_id,
+                "robot_id": robot_id,
+                "command": command,
+                "timestamp": utc_now().isoformat(),
+            },
+            source=source,
+        )
+
+    async def update_connection_status(
+        self,
+        connection_name: str,
+        status: str,
+        details: Optional[Dict[str, Any]] = None,
+        source: Optional[str] = None,
+    ) -> bool:
+        """
+        更新連線狀態
+
+        Args:
+            connection_name: 連線名稱
+            status: 狀態值（如 connected, disconnected, reconnecting）
+            details: 額外詳細資訊
+            source: 更新來源
+
+        Returns:
+            是否成功更新
+        """
+        key = StateKeys.CONNECTION_STATUS.format(connection_name=connection_name)
+
+        # 取得舊狀態
+        old_data = await self._state_store.get(key)
+        old_status = old_data.get("status") if old_data else None
+
+        data = {
+            "connection_name": connection_name,
+            "status": status,
+            "details": details or {},
+            "updated_at": utc_now().isoformat(),
+        }
+
+        success = await self._state_store.set(key, data)
+
+        if success and old_status != status:
+            # 發布連線狀態事件
+            if status == "connected":
+                await self._event_bus.publish(
+                    EventTopics.CONNECTION_CONNECTED,
+                    {"connection_name": connection_name, "details": details},
+                    source=source,
+                )
+            elif status == "disconnected":
+                await self._event_bus.publish(
+                    EventTopics.CONNECTION_DISCONNECTED,
+                    {"connection_name": connection_name, "details": details},
+                    source=source,
+                )
+            elif status == "reconnecting":
+                await self._event_bus.publish(
+                    EventTopics.CONNECTION_RECONNECTING,
+                    {"connection_name": connection_name, "details": details},
+                    source=source,
+                )
+
+        return success
+
+    async def get_connection_status(self, connection_name: str) -> Optional[Dict[str, Any]]:
+        """
+        取得連線狀態
+
+        Args:
+            connection_name: 連線名稱
+
+        Returns:
+            連線狀態資訊
+        """
+        key = StateKeys.CONNECTION_STATUS.format(connection_name=connection_name)
+        return await self._state_store.get(key)
+
+    async def get_all_connections_status(self) -> Dict[str, Dict[str, Any]]:
+        """
+        取得所有連線狀態
+
+        Returns:
+            連線名稱 -> 狀態的字典
+        """
+        prefix = "connection:"
+        all_data = await self._state_store.get_by_prefix(prefix)
+
+        result = {}
+        for key, value in all_data.items():
+            if ":status" in key and isinstance(value, dict) and "connection_name" in value:
+                connection_name = value["connection_name"]
+                result[connection_name] = value
+
+        return result
 
     # ==================== 訂閱管理 ====================
 

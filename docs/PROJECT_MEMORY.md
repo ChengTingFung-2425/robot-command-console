@@ -649,6 +649,27 @@ headers: {
 2. 包含 `@param`、`@returns`、`@throws` 說明
 3. 提高代碼可維護性和 IDE 自動完成支援
 
+### 7.13 共用函式統一化
+
+```javascript
+// ❌ 在每個頁面重複定義相同函式
+// dashboard.html
+function showToast(message, type) { ... }
+
+// llm_settings.html
+function showToast(message, type) { ... }
+
+// ✅ 統一使用共用模組
+// 使用 edge-common.js 中定義的 window.EdgeUI.showToast
+window.EdgeUI.showToast('操作成功', 'success');
+```
+
+**經驗教訓**：
+1. 通用函式應定義在共用 JS 檔案（如 `edge-common.js`）
+2. 透過 `window.EdgeUI.showToast()` 等命名空間存取
+3. 避免在多個頁面重複定義相同函式
+4. 保持程式碼 DRY（Don't Repeat Yourself）原則
+
 ---
 
 **最後更新**：2025-12-04

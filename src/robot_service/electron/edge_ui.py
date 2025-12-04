@@ -12,6 +12,7 @@ Edge 功能包括：
 import json
 import logging
 import os
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from flask import (
@@ -57,8 +58,56 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
 # 目前使用記憶體存儲用於 POC 驗證
 # ============================================================
 
+# 配置常數
+MAX_HEALTH_HISTORY_SIZE = 20  # 每個機器人保留的最大健康歷史記錄數
+
 # 本地機器人資料存儲（簡化版）
 _local_robots: Dict[str, Dict[str, Any]] = {}
+
+# 機器人健康檢查記錄
+_robot_health_history: Dict[str, List[Dict[str, Any]]] = {}
+
+# 機器人 ID 計數器（避免刪除後的 ID 衝突）
+_robot_id_counter: int = 0
+
+# 機器人類型定義（用於圖示和能力）
+ROBOT_TYPES: Dict[str, Dict[str, Any]] = {
+    'humanoid': {
+        'display_name': '人形機器人',
+        'icon': '🤖',
+        'default_capabilities': [
+            'go_forward', 'back_fast', 'turn_left', 'turn_right',
+            'stand', 'bow', 'wave', 'squat', 'dance_two'
+        ],
+    },
+    'agv': {
+        'display_name': 'AGV 搬運車',
+        'icon': '🚗',
+        'default_capabilities': [
+            'go_forward', 'back_fast', 'turn_left', 'turn_right',
+            'stop', 'pause', 'resume'
+        ],
+    },
+    'arm': {
+        'display_name': '機械手臂',
+        'icon': '🦾',
+        'default_capabilities': [
+            'grab', 'release', 'rotate', 'extend', 'retract'
+        ],
+    },
+    'drone': {
+        'display_name': '無人機',
+        'icon': '🚁',
+        'default_capabilities': [
+            'takeoff', 'land', 'hover', 'fly_forward', 'fly_back'
+        ],
+    },
+    'other': {
+        'display_name': '其他',
+        'icon': '⚙️',
+        'default_capabilities': ['stop'],
+    },
+}
 
 
 def get_local_robots() -> List[Dict[str, Any]]:
@@ -73,21 +122,39 @@ def get_local_robot(robot_id: str) -> Optional[Dict[str, Any]]:
 
 def register_local_robot(robot_data: Dict[str, Any]) -> Dict[str, Any]:
     """註冊本地機器人"""
-    robot_id = robot_data.get('id') or f"robot_{len(_local_robots) + 1}"
+    global _robot_id_counter
+    
+    # 使用計數器生成唯一 ID，避免刪除後的 ID 衝突
+    if robot_data.get('id'):
+        robot_id = robot_data['id']
+    else:
+        _robot_id_counter += 1
+        robot_id = f"robot_{_robot_id_counter}"
+    
+    robot_type = robot_data.get('type', 'humanoid')
+    type_info = ROBOT_TYPES.get(robot_type, ROBOT_TYPES['other'])
+
+    now = datetime.now(timezone.utc).isoformat()
     robot = {
         'id': robot_id,
         'name': robot_data.get('name', f'Robot {robot_id}'),
-        'type': robot_data.get('type', 'humanoid'),
+        'type': robot_type,
+        'type_display': type_info['display_name'],
+        'icon': type_info['icon'],
         'status': 'idle',
         'battery': 100,
         'location': robot_data.get('location'),
-        'capabilities': robot_data.get('capabilities', [
-            'go_forward', 'back_fast', 'turn_left', 'turn_right',
-            'stand', 'bow', 'wave'
-        ]),
+        'capabilities': robot_data.get('capabilities', type_info['default_capabilities']),
         'connected': False,
+        'last_seen': None,
+        'health_status': 'unknown',
+        'error_count': 0,
+        'command_count': 0,
+        'created_at': now,
+        'updated_at': now,
     }
     _local_robots[robot_id] = robot
+    _robot_health_history[robot_id] = []
     logger.info(f'Registered local robot: {robot_id}')
     return robot
 
@@ -96,8 +163,120 @@ def update_robot_status(robot_id: str, status: Dict[str, Any]) -> Optional[Dict[
     """更新機器人狀態"""
     if robot_id not in _local_robots:
         return None
+
+    # 更新時間戳
+    status['updated_at'] = datetime.now(timezone.utc).isoformat()
+
+    # 如果連線狀態變更，記錄 last_seen
+    if status.get('connected'):
+        status['last_seen'] = status['updated_at']
+
     _local_robots[robot_id].update(status)
     return _local_robots[robot_id]
+
+
+def delete_local_robot(robot_id: str) -> bool:
+    """刪除本地機器人"""
+    if robot_id not in _local_robots:
+        return False
+    del _local_robots[robot_id]
+    if robot_id in _robot_health_history:
+        del _robot_health_history[robot_id]
+    logger.info(f'Deleted local robot: {robot_id}')
+    return True
+
+
+def perform_robot_health_check(robot_id: str) -> Dict[str, Any]:
+    """執行機器人健康檢查"""
+    robot = _local_robots.get(robot_id)
+    if not robot:
+        return {'status': 'not_found', 'robot_id': robot_id}
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    # 執行各項健康檢查
+    checks = {
+        'connectivity': robot.get('connected', False),
+        'battery_ok': robot.get('battery', 0) > 20,
+        'no_errors': robot.get('error_count', 0) == 0,
+    }
+
+    # 根據所有檢查結果決定健康狀態
+    if not checks['connectivity']:
+        health_status = 'disconnected'
+    elif all(checks.values()):
+        health_status = 'healthy'
+    else:
+        health_status = 'warning'
+
+    # 模擬健康檢查結果（在實際環境中會連接機器人）
+    health_result = {
+        'timestamp': now,
+        'robot_id': robot_id,
+        'connected': robot.get('connected', False),
+        'battery': robot.get('battery', 0),
+        'status': health_status,
+        'response_time_ms': 50 if robot.get('connected') else None,
+        'checks': checks,
+    }
+
+    # 更新機器人健康狀態
+    _local_robots[robot_id]['health_status'] = health_status
+
+    # 記錄健康檢查歷史
+    if robot_id not in _robot_health_history:
+        _robot_health_history[robot_id] = []
+    _robot_health_history[robot_id].append(health_result)
+    # 使用常數限制歷史記錄大小
+    if len(_robot_health_history[robot_id]) > MAX_HEALTH_HISTORY_SIZE:
+        _robot_health_history[robot_id] = _robot_health_history[robot_id][-MAX_HEALTH_HISTORY_SIZE:]
+
+    return health_result
+
+
+def get_robot_health_history(robot_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+    """取得機器人健康檢查歷史"""
+    history = _robot_health_history.get(robot_id, [])
+    return history[-limit:] if limit else history
+
+
+def get_dashboard_summary() -> Dict[str, Any]:
+    """取得儀表板摘要資料"""
+    robots = list(_local_robots.values())
+    total = len(robots)
+    connected = sum(1 for r in robots if r.get('connected'))
+    healthy = sum(1 for r in robots if r.get('health_status') == 'healthy')
+    warning = sum(1 for r in robots if r.get('health_status') == 'warning')
+    low_battery = sum(1 for r in robots if (r.get('battery') or 100) < 20)
+
+    return {
+        'total_robots': total,
+        'connected': connected,
+        'disconnected': total - connected,
+        'healthy': healthy,
+        'warning': warning,
+        'low_battery': low_battery,
+        'by_type': _count_by_type(robots),
+        'by_status': _count_by_status(robots),
+    }
+
+
+def _count_by_type(robots: List[Dict[str, Any]]) -> Dict[str, int]:
+    """按類型統計機器人數量"""
+    counts: Dict[str, int] = {}
+    for robot in robots:
+        robot_type = robot.get('type', 'other')
+        counts[robot_type] = counts.get(robot_type, 0) + 1
+    return counts
+
+
+def _count_by_status(robots: List[Dict[str, Any]]) -> Dict[str, int]:
+    """按狀態統計機器人數量"""
+    counts: Dict[str, int] = {}
+    for robot in robots:
+        status = robot.get('status', 'unknown')
+        counts[status] = counts.get(status, 0) + 1
+    return counts
 
 
 # ============================================================
@@ -207,6 +386,75 @@ def api_get_robot_capabilities(robot_id: str):
     return jsonify({
         'robot_id': robot_id,
         'capabilities': robot.get('capabilities', []),
+        'request_id': getattr(g, 'request_id', None),
+    })
+
+
+@edge_ui.route('/api/edge/robots/<robot_id>', methods=['DELETE'])
+def api_delete_robot(robot_id: str):
+    """刪除機器人"""
+    success = delete_local_robot(robot_id)
+    if not success:
+        return jsonify({'error': 'Robot not found'}), 404
+
+    return jsonify({
+        'success': True,
+        'message': f'Robot {robot_id} deleted',
+        'request_id': getattr(g, 'request_id', None),
+    })
+
+
+@edge_ui.route('/api/edge/robots/<robot_id>/health', methods=['GET'])
+def api_robot_health_check(robot_id: str):
+    """執行機器人健康檢查"""
+    robot = get_local_robot(robot_id)
+    if not robot:
+        return jsonify({'error': 'Robot not found'}), 404
+
+    health_result = perform_robot_health_check(robot_id)
+    return jsonify({
+        'health': health_result,
+        'request_id': getattr(g, 'request_id', None),
+    })
+
+
+@edge_ui.route('/api/edge/robots/<robot_id>/health/history', methods=['GET'])
+def api_robot_health_history(robot_id: str):
+    """取得機器人健康檢查歷史"""
+    robot = get_local_robot(robot_id)
+    if not robot:
+        return jsonify({'error': 'Robot not found'}), 404
+
+    limit = request.args.get('limit', 10, type=int)
+    history = get_robot_health_history(robot_id, limit)
+    return jsonify({
+        'robot_id': robot_id,
+        'history': history,
+        'count': len(history),
+        'request_id': getattr(g, 'request_id', None),
+    })
+
+
+@edge_ui.route('/api/edge/dashboard/summary', methods=['GET'])
+def api_dashboard_summary():
+    """取得儀表板摘要資料"""
+    summary = get_dashboard_summary()
+    return jsonify({
+        'summary': summary,
+        'request_id': getattr(g, 'request_id', None),
+    })
+
+
+@edge_ui.route('/api/edge/robot-types', methods=['GET'])
+def api_robot_types():
+    """取得支援的機器人類型列表"""
+    types_list = [
+        {'id': key, **value}
+        for key, value in ROBOT_TYPES.items()
+    ]
+    return jsonify({
+        'types': types_list,
+        'count': len(types_list),
         'request_id': getattr(g, 'request_id', None),
     })
 

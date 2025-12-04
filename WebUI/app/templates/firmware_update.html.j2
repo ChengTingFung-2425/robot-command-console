@@ -4,6 +4,9 @@
     <h1>固件更新 <small>管理機器人固件版本</small></h1>
 </div>
 
+<!-- CSRF Token for API requests -->
+<meta name="csrf-token" content="{{ csrf_token() if csrf_token is defined else '' }}">
+
 <!-- 機器人選擇 -->
 <div class="panel panel-default">
     <div class="panel-heading">
@@ -216,6 +219,28 @@
     var currentUpdateId = null;
     var pollInterval = null;
     
+    /**
+     * 取得 CSRF Token 用於 API 請求
+     * @returns {string} CSRF token 或空字串
+     */
+    function getCsrfToken() {
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        return meta ? meta.getAttribute('content') : '';
+    }
+    
+    /**
+     * 取得包含 CSRF Token 的請求標頭
+     * @returns {Object} 包含 Content-Type 和 X-CSRFToken 的標頭物件
+     */
+    function getRequestHeaders() {
+        var headers = { 'Content-Type': 'application/json' };
+        var csrfToken = getCsrfToken();
+        if (csrfToken) {
+            headers['X-CSRFToken'] = csrfToken;
+        }
+        return headers;
+    }
+    
     // 狀態對應樣式
     var STATUS_CONFIG = {
         'pending': { cssClass: 'label label-default', text: '等待中' },
@@ -418,7 +443,8 @@
         
         fetch('/api/firmware/update', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getRequestHeaders(),
+            credentials: 'same-origin',
             body: JSON.stringify({
                 robot_id: selectedRobotId,
                 firmware_version_id: versionId
@@ -538,7 +564,9 @@
         }
         
         fetch('/api/firmware/cancel/' + currentUpdateId, {
-            method: 'POST'
+            method: 'POST',
+            headers: getRequestHeaders(),
+            credentials: 'same-origin'
         })
         .then(function(response) { return response.json(); })
         .then(function(data) {

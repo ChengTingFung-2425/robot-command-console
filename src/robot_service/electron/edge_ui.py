@@ -56,18 +56,23 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
 # 本地機器人管理（Edge 功能）
 # TODO: 遷移到 SQLite 持久化存儲（Phase 3.3）
 # 目前使用記憶體存儲用於 POC 驗證
+#
+# ⚠️ 並發安全說明：
+# 以下全域變數（_local_robots、_robot_health_history、_robot_id_counter）
+# 未使用執行緒鎖保護，僅適用於單執行緒開發環境。
+# 在生產環境使用 WSGI 伺服器時，應遷移到 SQLite 或使用適當的同步機制。
 # ============================================================
 
 # 配置常數
 MAX_HEALTH_HISTORY_SIZE = 20  # 每個機器人保留的最大健康歷史記錄數
 
-# 本地機器人資料存儲（簡化版）
+# 本地機器人資料存儲（簡化版，單執行緒環境專用）
 _local_robots: Dict[str, Dict[str, Any]] = {}
 
-# 機器人健康檢查記錄
+# 機器人健康檢查記錄（單執行緒環境專用）
 _robot_health_history: Dict[str, List[Dict[str, Any]]] = {}
 
-# 機器人 ID 計數器（避免刪除後的 ID 衝突）
+# 機器人 ID 計數器（避免刪除後的 ID 衝突，單執行緒環境專用）
 _robot_id_counter: int = 0
 
 # 機器人類型定義（用於圖示和能力）
@@ -433,6 +438,12 @@ def api_robot_health_history(robot_id: str):
         return jsonify({'error': 'Robot not found'}), 404
 
     limit = request.args.get('limit', 10, type=int)
+    # 驗證 limit 範圍
+    if limit < 0:
+        return jsonify({'error': 'Limit must be non-negative'}), 400
+    if limit > MAX_HEALTH_HISTORY_SIZE:
+        limit = MAX_HEALTH_HISTORY_SIZE
+
     history = get_robot_health_history(robot_id, limit)
     return jsonify({
         'robot_id': robot_id,

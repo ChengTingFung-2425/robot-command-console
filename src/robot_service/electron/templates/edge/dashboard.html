@@ -603,7 +603,7 @@ function renderDetails(robot, healthHistory) {
                 </div>
                 <div class="details-row">
                     <span class="details-label">建立時間</span>
-                    <span class="details-value">${robot.created_at ? window.EdgeUI.formatDateTime(robot.created_at) : '-'}</span>
+                    <span class="details-value">${robot.created_at ? escapeHtml(window.EdgeUI.formatDateTime(robot.created_at)) : '-'}</span>
                 </div>
             </div>
             
@@ -627,7 +627,7 @@ function renderDetails(robot, healthHistory) {
                 </div>
                 <div class="details-row">
                     <span class="details-label">最後連線</span>
-                    <span class="details-value">${robot.last_seen ? window.EdgeUI.formatDateTime(robot.last_seen) : '-'}</span>
+                    <span class="details-value">${robot.last_seen ? escapeHtml(window.EdgeUI.formatDateTime(robot.last_seen)) : '-'}</span>
                 </div>
             </div>
         </div>
@@ -646,7 +646,7 @@ function renderDetails(robot, healthHistory) {
             <div class="health-history">
                 ${healthHistory.length > 0 ? healthHistory.map(h => `
                     <div class="health-history-item status-${escapeHtml(h.status)}">
-                        <strong>${escapeHtml(h.status)}</strong> - ${window.EdgeUI.formatDateTime(h.timestamp)}
+                        <strong>${escapeHtml(h.status)}</strong> - ${escapeHtml(window.EdgeUI.formatDateTime(h.timestamp))}
                         ${h.response_time_ms ? `(${escapeHtml(h.response_time_ms)}ms)` : ''}
                     </div>
                 `).join('') : '<p>尚無健康檢查記錄</p>'}
@@ -677,7 +677,7 @@ async function confirmDeleteRobot() {
         if (data.success) {
             hideDetailsModal();
             refreshRobots();
-            window.EdgeUI.showToast('機器人已刪除');
+            window.EdgeUI.showToast('機器人已刪除', 'success');
         } else {
             window.EdgeUI.showToast('刪除失敗: ' + (data.error || '未知錯誤'), 'error');
         }

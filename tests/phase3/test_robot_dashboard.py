@@ -521,6 +521,23 @@ class TestFlaskAPIEndpoints:
         assert data['robot_id'] == robot_id
         assert len(data['history']) == 2
 
+    def test_robot_health_history_api_limit_validation(self, client):
+        """測試機器人健康歷史 API 的 limit 參數驗證"""
+        # 先註冊
+        reg_response = client.post('/api/edge/robots', json={
+            'name': 'Test Robot',
+        })
+        robot_id = reg_response.get_json()['robot']['id']
+        
+        # 測試負數 limit
+        response = client.get(f'/api/edge/robots/{robot_id}/health/history?limit=-1')
+        assert response.status_code == 400
+        assert 'error' in response.get_json()
+        
+        # 測試超大 limit（應該被截斷）
+        response = client.get(f'/api/edge/robots/{robot_id}/health/history?limit=1000')
+        assert response.status_code == 200
+
     def test_dashboard_summary_api(self, client):
         """測試儀表板摘要 API"""
         # 先註冊幾個機器人

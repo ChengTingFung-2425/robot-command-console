@@ -6,7 +6,6 @@ Phase 3.2 - 機器人監控儀表板 API 測試
 
 import importlib
 import pytest
-import sys
 
 
 def get_edge_ui_module():
@@ -249,6 +248,7 @@ class TestRobotHealthCheck:
         health = perform_robot_health_check(robot_id)
         
         assert health['checks']['battery_ok'] is False
+        assert health['status'] == 'warning'
         
         # 確認機器人狀態更新為警告
         assert module._local_robots[robot_id]['health_status'] == 'warning'
@@ -312,6 +312,7 @@ class TestDashboardSummary:
         assert summary['healthy'] == 0
         assert summary['warning'] == 0
         assert summary['low_battery'] == 0
+        assert summary['needs_attention'] == 0
 
     def test_summary_with_robots(self):
         """測試有機器人的儀表板摘要"""
@@ -351,6 +352,8 @@ class TestDashboardSummary:
         assert summary['healthy'] == 1
         assert summary['warning'] == 1
         assert summary['low_battery'] == 1
+        # needs_attention 是不重複計數，robot2 同時是 warning 和 low_battery，只計 1 次
+        assert summary['needs_attention'] == 1
         
         # 檢查類型統計
         assert summary['by_type']['humanoid'] == 2
@@ -399,7 +402,10 @@ class TestFlaskAPIEndpoints:
         for collector in collectors_to_remove:
             try:
                 REGISTRY.unregister(collector)
-            except Exception:
+            except (ValueError, KeyError):
+                # ValueError: collector 尚未註冊時拋出
+                # KeyError: collector 名稱不存在時拋出
+                # 這是預期情境，可安全忽略
                 pass
         
         from src.robot_service.electron.flask_adapter import create_flask_app

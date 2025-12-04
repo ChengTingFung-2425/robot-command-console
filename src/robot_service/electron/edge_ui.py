@@ -228,8 +228,7 @@ def perform_robot_health_check(robot_id: str) -> Dict[str, Any]:
         _robot_health_history[robot_id] = []
     _robot_health_history[robot_id].append(health_result)
     # 使用常數限制歷史記錄大小
-    if len(_robot_health_history[robot_id]) > MAX_HEALTH_HISTORY_SIZE:
-        _robot_health_history[robot_id] = _robot_health_history[robot_id][-MAX_HEALTH_HISTORY_SIZE:]
+    _robot_health_history[robot_id] = _robot_health_history[robot_id][-MAX_HEALTH_HISTORY_SIZE:]
 
     return health_result
 
@@ -249,6 +248,13 @@ def get_dashboard_summary() -> Dict[str, Any]:
     warning = sum(1 for r in robots if r.get('health_status') == 'warning')
     low_battery = sum(1 for r in robots if (r.get('battery') or 100) < 20)
 
+    # 計算需要關注的機器人（避免重複計數）
+    # 一個機器人如果是 warning 或 low_battery，只計算一次
+    needs_attention = sum(
+        1 for r in robots
+        if r.get('health_status') == 'warning' or (r.get('battery') or 100) < 20
+    )
+
     return {
         'total_robots': total,
         'connected': connected,
@@ -256,6 +262,7 @@ def get_dashboard_summary() -> Dict[str, Any]:
         'healthy': healthy,
         'warning': warning,
         'low_battery': low_battery,
+        'needs_attention': needs_attention,
         'by_type': _count_by_type(robots),
         'by_status': _count_by_status(robots),
     }

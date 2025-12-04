@@ -323,6 +323,14 @@
 <script>
 let currentRobotId = null;
 
+// HTML 跳脫函式（防止 XSS）
+function escapeHtml(text) {
+    if (text === null || text === undefined) return '';
+    const div = document.createElement('div');
+    div.textContent = String(text);
+    return div.innerHTML;
+}
+
 // 頁面載入時刷新資料
 document.addEventListener('DOMContentLoaded', function() {
     refreshRobots();
@@ -342,7 +350,8 @@ async function loadSummary() {
         document.getElementById('total-robots').textContent = summary.total_robots;
         document.getElementById('connected-robots').textContent = summary.connected;
         document.getElementById('healthy-robots').textContent = summary.healthy;
-        document.getElementById('warning-robots').textContent = summary.warning + summary.low_battery;
+        // 使用後端計算的 needs_attention 避免重複計數
+        document.getElementById('warning-robots').textContent = summary.needs_attention;
     } catch (error) {
         console.error('Failed to load summary:', error);
     }
@@ -380,32 +389,32 @@ function renderRobots(robots) {
     }
     
     container.innerHTML = robots.map(robot => `
-        <div class="robot-card" data-robot-id="${robot.id}">
+        <div class="robot-card" data-robot-id="${escapeHtml(robot.id)}">
             <div class="robot-header">
-                <span class="robot-icon">${robot.icon || '🤖'}</span>
-                <h3 class="robot-name">${robot.name}</h3>
-                <span class="robot-status status-${robot.status}">
-                    ${robot.status}
+                <span class="robot-icon">${escapeHtml(robot.icon) || '🤖'}</span>
+                <h3 class="robot-name">${escapeHtml(robot.name)}</h3>
+                <span class="robot-status status-${escapeHtml(robot.status)}">
+                    ${escapeHtml(robot.status)}
                 </span>
             </div>
             <div class="robot-body">
                 <div class="robot-info">
                     <div class="info-row">
                         <span class="info-label">類型</span>
-                        <span class="info-value">${robot.type_display || robot.type}</span>
+                        <span class="info-value">${escapeHtml(robot.type_display || robot.type)}</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">電量</span>
                         <div class="battery-bar">
                             <div class="battery-level battery-${robot.battery > 50 ? 'high' : robot.battery > 20 ? 'medium' : 'low'}" 
-                                 style="width: ${robot.battery}%"></div>
+                                 style="width: ${Number(robot.battery) || 0}%"></div>
                         </div>
-                        <span class="info-value">${robot.battery}%</span>
+                        <span class="info-value">${escapeHtml(robot.battery)}%</span>
                     </div>
                     ${robot.location ? `
                     <div class="info-row">
                         <span class="info-label">位置</span>
-                        <span class="info-value">${robot.location}</span>
+                        <span class="info-value">${escapeHtml(robot.location)}</span>
                     </div>
                     ` : ''}
                     <div class="info-row">
@@ -425,13 +434,13 @@ function renderRobots(robots) {
                 </div>
             </div>
             <div class="robot-actions">
-                <button class="btn btn-sm btn-primary" onclick="selectRobot('${robot.id}')">
+                <button class="btn btn-sm btn-primary" onclick="selectRobot('${escapeHtml(robot.id)}')">
                     🎮 控制
                 </button>
-                <button class="btn btn-sm btn-info" onclick="showDetailsModal('${robot.id}')">
+                <button class="btn btn-sm btn-info" onclick="showDetailsModal('${escapeHtml(robot.id)}')">
                     📋 詳情
                 </button>
-                <button class="btn btn-sm btn-success" onclick="checkRobotHealth('${robot.id}')">
+                <button class="btn btn-sm btn-success" onclick="checkRobotHealth('${escapeHtml(robot.id)}')">
                     🩺 檢查
                 </button>
             </div>
@@ -539,7 +548,7 @@ async function checkAllHealth() {
         }
         
         refreshRobots();
-        window.EdgeUI.showToast('健康檢查完成');
+        window.EdgeUI.showToast('健康檢查完成', 'success');
     } catch (error) {
         console.error('Failed to check all health:', error);
         window.EdgeUI.showToast('健康檢查失敗', 'error');
@@ -575,22 +584,22 @@ function renderDetails(robot, healthHistory) {
     content.innerHTML = `
         <div class="details-grid">
             <div class="details-section">
-                <h4>${robot.icon || '🤖'} 基本資訊</h4>
+                <h4>${escapeHtml(robot.icon) || '🤖'} 基本資訊</h4>
                 <div class="details-row">
                     <span class="details-label">名稱</span>
-                    <span class="details-value">${robot.name}</span>
+                    <span class="details-value">${escapeHtml(robot.name)}</span>
                 </div>
                 <div class="details-row">
                     <span class="details-label">ID</span>
-                    <span class="details-value">${robot.id}</span>
+                    <span class="details-value">${escapeHtml(robot.id)}</span>
                 </div>
                 <div class="details-row">
                     <span class="details-label">類型</span>
-                    <span class="details-value">${robot.type_display || robot.type}</span>
+                    <span class="details-value">${escapeHtml(robot.type_display || robot.type)}</span>
                 </div>
                 <div class="details-row">
                     <span class="details-label">位置</span>
-                    <span class="details-value">${robot.location || '-'}</span>
+                    <span class="details-value">${escapeHtml(robot.location) || '-'}</span>
                 </div>
                 <div class="details-row">
                     <span class="details-label">建立時間</span>
@@ -602,7 +611,7 @@ function renderDetails(robot, healthHistory) {
                 <h4>📊 狀態資訊</h4>
                 <div class="details-row">
                     <span class="details-label">狀態</span>
-                    <span class="details-value">${robot.status}</span>
+                    <span class="details-value">${escapeHtml(robot.status)}</span>
                 </div>
                 <div class="details-row">
                     <span class="details-label">連線</span>
@@ -610,7 +619,7 @@ function renderDetails(robot, healthHistory) {
                 </div>
                 <div class="details-row">
                     <span class="details-label">電量</span>
-                    <span class="details-value">${robot.battery}%</span>
+                    <span class="details-value">${escapeHtml(robot.battery)}%</span>
                 </div>
                 <div class="details-row">
                     <span class="details-label">健康狀態</span>
@@ -627,7 +636,7 @@ function renderDetails(robot, healthHistory) {
             <h4>🛠️ 能力清單</h4>
             <div class="capabilities-list">
                 ${(robot.capabilities || []).map(cap => `
-                    <span class="capability-tag">${cap}</span>
+                    <span class="capability-tag">${escapeHtml(cap)}</span>
                 `).join('')}
             </div>
         </div>
@@ -636,9 +645,9 @@ function renderDetails(robot, healthHistory) {
             <h4>🩺 健康檢查歷史</h4>
             <div class="health-history">
                 ${healthHistory.length > 0 ? healthHistory.map(h => `
-                    <div class="health-history-item status-${h.status}">
-                        <strong>${h.status}</strong> - ${window.EdgeUI.formatDateTime(h.timestamp)}
-                        ${h.response_time_ms ? `(${h.response_time_ms}ms)` : ''}
+                    <div class="health-history-item status-${escapeHtml(h.status)}">
+                        <strong>${escapeHtml(h.status)}</strong> - ${window.EdgeUI.formatDateTime(h.timestamp)}
+                        ${h.response_time_ms ? `(${escapeHtml(h.response_time_ms)}ms)` : ''}
                     </div>
                 `).join('') : '<p>尚無健康檢查記錄</p>'}
             </div>

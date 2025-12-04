@@ -41,6 +41,23 @@ Phase 2（模組化重構）相關文件
 | [`robot-service-migration.md`](phase2/robot-service-migration.md) | Robot Service 遷移 |
 | [`ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md`](phase2/ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md) | 進階指令職責變更 |
 
+### 📁 phase3/
+Phase 3（ALL-in-One Edge App）相關文件
+
+| 文件 | 說明 |
+|------|------|
+| [`PHASE3_1_STATUS_REPORT.md`](phase3/PHASE3_1_STATUS_REPORT.md) | Phase 3.1 狀態報告與經驗教訓 |
+| [`TEST_PLAN_PHASE3_1.md`](phase3/TEST_PLAN_PHASE3_1.md) | Phase 3.1 測試計畫 |
+
+### 📁 development/
+開發指南與最佳實踐
+
+| 文件 | 說明 |
+|------|------|
+| [`PYTHON_LINT_GUIDE.md`](development/PYTHON_LINT_GUIDE.md) | Python 程式碼風格與 lint 修復策略 |
+| [`STARTUP_RECOVERY_GUIDE.md`](development/STARTUP_RECOVERY_GUIDE.md) | 服務啟動異常恢復指南 |
+| [`UNIFIED_LAUNCHER_GUIDE.md`](development/UNIFIED_LAUNCHER_GUIDE.md) | 統一啟動器使用指南 |
+
 ### 📁 mcp/
 MCP（Model Context Protocol）相關文件
 
@@ -88,10 +105,12 @@ JSON Schema 契約定義
 
 - **入門**：[`proposal.md`](proposal.md) → [`architecture.md`](architecture.md)
 - **Phase 狀態**：[`plans/MASTER_PLAN.md`](plans/MASTER_PLAN.md)
+- **Phase 3**：[`plans/PHASE3_EDGE_ALL_IN_ONE.md`](plans/PHASE3_EDGE_ALL_IN_ONE.md) → [`phase3/PHASE3_1_STATUS_REPORT.md`](phase3/PHASE3_1_STATUS_REPORT.md)
+- **開發指南**：[`development/`](development/)
 - **安全**：[`security/`](security/)
 - **MCP/LLM**：[`mcp/`](mcp/)
 - **測試**：[`phase1/electron-testing-guide.md`](phase1/electron-testing-guide.md)、[`features/webui-testing-guide.md`](features/webui-testing-guide.md)
 
 ---
 
-**最後更新**：2025-11-26
+**最後更新**：2025-12-04

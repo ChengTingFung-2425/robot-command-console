@@ -4,7 +4,10 @@
 
 Robot Command Console 是一個用於機器人指令管理、路由與執行的整合式控制台與服務平台。本文件說明專案的目錄結構、模組職責與設計原則。
 
-## 目錄結構（Phase 2）
+> **狀態**：Phase 3.1 已完成，Phase 3.2 準備中
+> **最後更新**：2025-12-04
+
+## 目錄結構（Phase 3）
 
 ```
 robot-command-console/
@@ -13,11 +16,19 @@ robot-command-console/
 │   │   ├── __init__.py
 │   │   ├── logging_utils.py  # 統一 JSON 日誌
 │   │   ├── datetime_utils.py # 時間處理工具
-│   │   └── config.py         # 環境配置
+│   │   ├── config.py         # 環境配置
+│   │   ├── service_types.py  # 服務類型定義 (Phase 3.1)
+│   │   ├── state_store.py    # 本地狀態存儲 (Phase 3.1)
+│   │   ├── event_bus.py      # 事件匯流排 (Phase 3.1)
+│   │   ├── shared_state.py   # 服務間狀態共享管理器 (Phase 3.1)
+│   │   └── token_manager.py  # Token 管理
 │   │
 │   └── robot_service/        # Edge 環境：模組化機器人服務
 │       ├── __init__.py
 │       ├── service_manager.py
+│       ├── service_coordinator.py  # 服務協調器 (Phase 3.1)
+│       ├── unified_launcher.py     # 統一啟動器 (Phase 3.1)
+│       ├── command_processor.py    # 指令處理器
 │       ├── cli/              # CLI 模式
 │       ├── electron/         # Electron 整合
 │       ├── queue/            # 佇列系統
@@ -37,8 +48,11 @@ robot-command-console/
 │   ├── command_handler.py    # 指令處理
 │   ├── context_manager.py    # 上下文管理
 │   ├── llm_processor.py      # LLM 處理器
+│   ├── llm_provider_manager.py  # LLM 提供商管理器
+│   ├── plugin_manager.py     # 插件管理器
 │   ├── robot_router.py       # 機器人路由
 │   ├── schema_validator.py   # Schema 驗證
+│   ├── plugins/              # 插件目錄
 │   ├── utils/                # Server 工具（重導出 common）
 │   └── requirements.txt      # MCP 依賴
 │
@@ -52,23 +66,32 @@ robot-command-console/
 │   ├── migrations/           # 資料庫遷移
 │   └── microblog.py          # WebUI 入口
 │
-├── tests/                     # 測試集合（統一）
-│   └── test_*.py
+├── tests/                     # 測試集合（統一，365+ 測試）
+│   ├── test_*.py
+│   └── phase3/               # Phase 3 測試套件
 │
 ├── config/                    # 配置管理
 │   └── README.md
 │
 ├── docs/                      # 文檔
 │   ├── architecture.md       # 本文件
+│   ├── proposal.md           # 權威規格
+│   ├── PROJECT_MEMORY.md     # 專案記憶與經驗教訓
 │   ├── phase1/               # Phase 1 文檔
+│   ├── phase2/               # Phase 2 文檔
+│   ├── phase3/               # Phase 3 文檔 (Phase 3.1)
+│   ├── development/          # 開發指南
 │   ├── plans/                # 規劃文檔
-│   ├── contract/             # JSON Schema 合約
-│   └── ...                   # 其他文檔
+│   ├── security/             # 安全文檔
+│   ├── mcp/                  # MCP 相關文檔
+│   ├── features/             # 功能文檔
+│   └── contract/             # JSON Schema 合約
 │
 ├── examples/                  # 範例代碼
 │
 ├── flask_service.py           # Edge：Flask 背景服務入口
 ├── run_service_cli.py         # Edge：CLI 模式入口
+├── unified_launcher_cli.py    # Edge：統一啟動器 CLI (Phase 3.1)
 ├── app.py                     # Server：WebUI 啟動入口
 ├── config.py                  # Flask 配置（向後相容）
 ├── requirements.txt           # Python 依賴
@@ -428,19 +451,28 @@ python3 -m pytest tests/test_queue_system.py -v
 3. **雲端同步**：Edge ↔ Cloud（進階指令、用戶設定、分析資料）
 4. **審計追蹤**：所有操作 → 本地事件日誌（含 trace_id）→ 可選上傳雲端
 
-### Phase 3+ 規劃
+### Phase 3.1 已完成功能
 
-- [ ] **Edge 重構**：將 robot_service 和 Electron 整合為 ALL-in-One Edge App
-- [ ] **雲端服務**：建立進階指令共享、討論區、授權服務
+- [x] **統一啟動器**（`unified_launcher.py`）：一鍵啟動/停止所有服務
+- [x] **服務協調器**（`service_coordinator.py`）：服務生命週期管理、健康檢查、自動重啟
+- [x] **共享狀態管理器**（`shared_state.py`）：服務間狀態共享、事件通知
+- [x] **本地狀態存儲**（`state_store.py`）：SQLite 持久化、TTL 過期支援
+- [x] **事件匯流排**（`event_bus.py`）：Pub/Sub 事件通訊
+
+### Phase 3.2+ 規劃
+
+- [ ] **WebUI 本地版**：完整的 Edge 端用戶介面
+- [ ] **固件更新介面**：機器人固件管理
+- [ ] **離線模式支援**：無網路環境下核心功能運作
+- [ ] **CLI/TUI 版本**：終端機介面支援
+- [ ] **雲端服務整合**：進階指令共享、討論區、授權服務
 - [ ] **分散式佇列**：Redis/Kafka 整合
 - [ ] **多節點部署**：Kubernetes 支援
-- [ ] **邊緣運算**：本地 LLM 推論支援（已部分完成）
 
-## 未來擴展（Phase 3+）
+## 未來擴展（Phase 3.2+）
 
 - [ ] Cloud-Edge-Runner 架構完整實作
 - [ ] Redis/Kafka 整合（分散式佇列）
-- [ ] 邊緣運算支援（本地 LLM）
 - [ ] Kubernetes 部署
 - [ ] 更多機器人類型支援
 - [ ] 進階分析與報表
@@ -449,15 +481,19 @@ python3 -m pytest tests/test_queue_system.py -v
 ## 參考文件
 
 - [README.md](../README.md) - 專案概覽與快速啟動
-- [observability.md](observability.md) - 可觀測性指南
-- [queue-architecture.md](queue-architecture.md) - 佇列架構詳解
+- [proposal.md](proposal.md) - 權威規格
+- [PROJECT_MEMORY.md](PROJECT_MEMORY.md) - 專案記憶與經驗教訓
+- [observability.md](features/observability-guide.md) - 可觀測性指南
+- [queue-architecture.md](features/queue-architecture.md) - 佇列架構詳解
 - [Robot Service README](../src/robot_service/README.md) - Robot Service 說明
 - [MCP Module](../MCP/Module.md) - MCP 模組設計
 - [Robot-Console Module](../Robot-Console/module.md) - Robot-Console 設計
 - [Python Lint 指南](development/PYTHON_LINT_GUIDE.md) - 程式碼風格與 lint 修復策略
+- [Phase 3.1 狀態報告](phase3/PHASE3_1_STATUS_REPORT.md) - Phase 3.1 完成摘要
 
 ## 版本歷史
 
 - **Phase 1** - 初始實作，功能完整性（已完成）
 - **Phase 2** - 目錄重構，模組化清晰化（已完成）
-- **Phase 3** - ALL-in-One Edge App 整合與部署（規劃中）
+- **Phase 3.1** - 基礎整合：統一啟動器、服務協調器、共享狀態（已完成）
+- **Phase 3.2** - 功能完善：WebUI 本地版、離線模式、CLI/TUI（規劃中）

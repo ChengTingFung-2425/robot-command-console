@@ -189,7 +189,7 @@ def rotate_token(self):
 3. 定期清理過期的舊 Token 以防止記憶體洩漏
 4. 輪替事件應通知所有相關訂閱者
 
-### Flask 配置遷移（2.3+）
+### 5.1 Flask 配置遷移（2.3+）
 
 ```python
 # ⚠️ 舊版本配置方式（Flask 2.3+ 已棄用）
@@ -201,7 +201,7 @@ app.json.ensure_ascii = False
 
 **原因**：Flask 2.3 更新了 JSON 配置方式，舊的配置鍵將被移除。
 
-### SQLAlchemy 2.0 遷移
+### 5.2 SQLAlchemy 2.0 遷移
 
 ```python
 # ⚠️ SQLAlchemy 1.x 風格（將棄用）
@@ -213,7 +213,7 @@ user = db.session.get(User, user_id)
 
 **原因**：`Query.get()` 在 SQLAlchemy 2.0 中已被標記為遺留 API。
 
-### datetime_utils 使用統一化
+### 5.3 datetime_utils 使用統一化
 
 ```python
 # ❌ 直接使用 datetime.now(timezone.utc)

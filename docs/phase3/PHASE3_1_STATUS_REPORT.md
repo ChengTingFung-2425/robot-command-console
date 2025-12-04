@@ -64,19 +64,19 @@ src/common/
 
 ### 測試覆蓋範圍
 
-| 測試類別 | 文件數 | 測試數（估計） | 說明 |
-|----------|--------|----------------|------|
-| 認證合規 | 1 | ~30 | `test_auth_compliance.py` |
-| 指令處理合規 | 1 | ~30 | `test_command_handler_compliance.py` |
-| 契約合規 | 1 | ~40 | `test_contract_compliance.py` |
-| 安全功能 | 1 | ~50 | `test_security_features.py` |
-| LLM 提供商 | 2 | ~50 | `test_llm_providers.py`, `test_llm_settings.py` |
-| 服務協調器 | 1 | ~45 | `test_service_coordinator.py` |
-| 共享狀態 | 1 | ~30 | `test_shared_state.py` |
-| 啟動恢復 | 1 | ~12 | `test_startup_recovery.py` |
-| 統一啟動器 | 2 | ~30 | `test_unified_launcher*.py` |
-| Phase 3.1 整合 | 1 | ~18 | `test_phase3_1_integration.py` |
-| 其他 | 多個 | ~30 | 其他測試 |
+| 測試類別 | 文件數 | 測試數 | 說明 |
+|----------|--------|--------|------|
+| 認證合規 | 1 | 30 | `test_auth_compliance.py` |
+| 指令處理合規 | 1 | 30 | `test_command_handler_compliance.py` |
+| 契約合規 | 1 | 40 | `test_contract_compliance.py` |
+| 安全功能 | 1 | 50 | `test_security_features.py` |
+| LLM 提供商 | 2 | 50 | `test_llm_providers.py`, `test_llm_settings.py` |
+| 服務協調器 | 1 | 45 | `test_service_coordinator.py` |
+| 共享狀態 | 1 | 30 | `test_shared_state.py` |
+| 啟動恢復 | 1 | 12 | `test_startup_recovery.py` |
+| 統一啟動器 | 2 | 30 | `test_unified_launcher*.py` |
+| Phase 3.1 整合 | 1 | 18 | `test_phase3_1_integration.py` |
+| 其他 | 多個 | 30 | 其他測試 |
 
 ### 測試總數變化
 
@@ -89,13 +89,15 @@ src/common/
 
 主要警告類型（234 個警告）：
 
-| 警告類型 | 數量（估計） | 來源 | 建議處理時間 |
-|----------|--------------|------|--------------|
-| `PydanticDeprecatedSince20` | ~15 | `.dict()` 應改用 `.model_dump()` | Phase 3.2 |
-| `werkzeug.urls 棄用` | ~14 | Flask-Login 內部問題 | 待第三方更新 |
+| 警告類型 | 數量 | 來源 | 建議處理時間 |
+|----------|------|------|--------------|
+| `PydanticDeprecatedSince20` | 15 | `.dict()` 應改用 `.model_dump()` | Phase 3.2 |
+| `werkzeug.urls 棄用` | 14 | Flask-Login 內部問題 | 待第三方更新 |
 | `passlib crypt 棄用` | 1 | Python 3.13 將移除 | 長期規劃 |
-| `Flask JSON_AS_ASCII` | ~183 | Flask 2.3 棄用配置 | Phase 3.2 |
-| `SQLAlchemy LegacyAPIWarning` | ~6 | Query.get() 已棄用 | Phase 3.2 |
+| `Flask JSON_AS_ASCII` | 198 | Flask 2.3 棄用配置 | Phase 3.2 |
+| `SQLAlchemy LegacyAPIWarning` | 6 | Query.get() 已棄用 | Phase 3.2 |
+
+> 注：警告數量總計 234 個，與測試輸出一致。
 
 ---
 
@@ -103,27 +105,27 @@ src/common/
 
 ### Phase 3.2 優先處理項目
 
-1. **Pydantic V2 完整遷移** [高優先級]
+1. **Pydantic V2 完整遷移** `[高優先級]`
    - [ ] 將所有 `.dict()` 改為 `.model_dump()`
    - [ ] 更新 `class Config` 為 `ConfigDict`
    - [ ] 移除 `json_encoders` 改用自定義序列化器
    - [ ] 涉及文件：`MCP/api.py`, `MCP/context_manager.py`, `MCP/command_handler.py`
 
-2. **Flask 2.3+ 相容性** [高優先級]
+2. **Flask 2.3+ 相容性** `[高優先級]`
    - [ ] 移除 `JSON_AS_ASCII` 配置
    - [ ] 更新為 `app.json.ensure_ascii`
    - [ ] 涉及文件：`WebUI/` 配置
 
-3. **datetime_utils 推廣採用** [中優先級]
+3. **datetime_utils 推廣採用** `[中優先級]`
    - [ ] 將 `MCP/api.py` 中的 `datetime.now(timezone.utc)` 統一使用 `utc_now()`
    - [ ] 將 `MCP/plugins/` 中的 datetime 調用統一化
    - [ ] 涉及文件：`MCP/api.py`, `MCP/plugins/devices/*.py`
 
-4. **SQLAlchemy 2.0 相容性** [低優先級]
+4. **SQLAlchemy 2.0 相容性** `[低優先級]`
    - [ ] 將 `Query.get()` 改為 `Session.get()`
    - [ ] 涉及文件：`WebUI/app/` 相關文件
 
-5. **錯誤處理模組化** [低優先級]
+5. **錯誤處理模組化** `[低優先級]`
    - [ ] 建立統一的錯誤處理模組 `src/common/errors.py`
    - [ ] 定義標準錯誤類別與錯誤碼
 

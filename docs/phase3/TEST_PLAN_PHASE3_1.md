@@ -206,12 +206,12 @@ python3 -m pytest tests/ --cov=src --cov=MCP --cov-report=html
 
 ### 測試分布
 
-| 測試目錄 | 測試數（估計） |
-|----------|----------------|
-| `tests/core/` | ~150 |
-| `tests/phase1/` | ~15 |
-| `tests/phase2/` | ~80 |
-| `tests/phase3/` | ~120 |
+| 測試目錄 | 測試數 |
+|----------|--------|
+| `tests/core/` | 88 |
+| `tests/phase1/` | 28 |
+| `tests/phase2/` | 84 |
+| `tests/phase3/` | 165 |
 
 ---
 

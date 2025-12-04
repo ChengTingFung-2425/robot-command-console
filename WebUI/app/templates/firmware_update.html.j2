@@ -17,7 +17,7 @@
             {% for robot in robots %}
             <div class="col-md-4 col-sm-6">
                 <div class="well robot-card" id="robot-card-{{ robot.id }}" 
-                     onclick="selectRobot({{ robot.id }}, '{{ robot.name }}', '{{ robot.type }}', '{{ robot.firmware_version or '1.0.0' }}')"
+                     onclick="selectRobot({{ robot.id }}, '{{ robot.name }}', '{{ robot.type }}', '{{ robot.firmware_version or default_firmware_version }}')"
                      style="cursor: pointer;">
                     <div class="media">
                         <div class="media-left">
@@ -28,7 +28,7 @@
                             <p class="text-muted">類型：{{ robot.type }}</p>
                             <p>
                                 <strong>固件版本：</strong>
-                                <span id="robot-version-{{ robot.id }}">{{ robot.firmware_version or '1.0.0' }}</span>
+                                <span id="robot-version-{{ robot.id }}">{{ robot.firmware_version or default_firmware_version }}</span>
                             </p>
                             <p>
                                 <span class="label label-{{ 'success' if robot.status == 'online' else 'warning' if robot.status == 'idle' else 'danger' }}">

@@ -1250,8 +1250,13 @@ def toggle_cors():
 @login_required
 def firmware_update_page():
     """固件更新管理頁面"""
+    from WebUI.app.models import DEFAULT_FIRMWARE_VERSION
     robots = Robot.query.filter_by(owner=current_user).all()
-    return render_template('firmware_update.html.j2', robots=robots)
+    return render_template(
+        'firmware_update.html.j2',
+        robots=robots,
+        default_firmware_version=DEFAULT_FIRMWARE_VERSION
+    )
 
 
 @bp.route('/api/firmware/versions', methods=['GET'])
@@ -1259,8 +1264,15 @@ def get_firmware_versions():
     """取得可用的固件版本列表
     
     Query Parameters:
-        robot_type: 篩選特定機器人類型的固件
-        stable_only: 是否只顯示穩定版本（預設 true）
+        robot_type: 篩選特定機器人類型的固件（可選）
+        stable_only: 是否只顯示穩定版本，預設為 'true'。
+                     設為 'false' 以顯示所有版本（包含測試版）
+    
+    Returns:
+        JSON 物件包含：
+        - success: 操作是否成功
+        - versions: 固件版本列表
+        - count: 版本數量
     """
     from WebUI.app.models import FirmwareVersion
     
@@ -1300,7 +1312,7 @@ def check_firmware_status(robot_id):
     
     回傳機器人當前固件版本以及是否有可用的更新
     """
-    from WebUI.app.models import FirmwareVersion
+    from WebUI.app.models import FirmwareVersion, DEFAULT_FIRMWARE_VERSION
     
     try:
         robot = Robot.query.get_or_404(robot_id)
@@ -1312,7 +1324,7 @@ def check_firmware_status(robot_id):
                 'error': '您沒有權限查看此機器人'
             }), 403
         
-        current_version = robot.firmware_version or '1.0.0'
+        current_version = robot.firmware_version or DEFAULT_FIRMWARE_VERSION
         
         # 查找該機器人類型的最新穩定版本
         latest_version = FirmwareVersion.query.filter_by(

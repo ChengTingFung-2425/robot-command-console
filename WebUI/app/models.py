@@ -8,6 +8,9 @@ import jwt
 from flask import current_app
 from WebUI.app import db, login
 
+# Constants
+DEFAULT_FIRMWARE_VERSION = '1.0.0'
+
 
 class User(UserMixin, db.Model):
     """User account model."""
@@ -228,7 +231,10 @@ class Robot(db.Model):
     status = db.Column(db.String(64), default='idle')
     battery = db.Column(db.Integer, default=100)  # 電池電量百分比 (0-100)
     location = db.Column(db.String(128))  # 機器人位置
-    firmware_version = db.Column(db.String(32), default='1.0.0')  # 目前固件版本
+    firmware_version = db.Column(
+        db.String(32),
+        default=DEFAULT_FIRMWARE_VERSION
+    )  # 目前固件版本
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
 
     def __repr__(self) -> str:

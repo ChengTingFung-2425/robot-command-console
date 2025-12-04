@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import sqlite3
+import sys
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -21,8 +22,10 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Callable, Coroutine, Dict, List, Optional
 
-from ..common.datetime_utils import utc_now
-from .interface import Message, MessagePriority
+# 確保可以正確導入 common 模組
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+from common.datetime_utils import utc_now  # noqa: E402
+from src.robot_service.queue.interface import Message  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

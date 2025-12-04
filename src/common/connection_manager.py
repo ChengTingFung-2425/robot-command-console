@@ -12,7 +12,7 @@ Connection Manager
 import asyncio
 import logging
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from typing import Any, Callable, Coroutine, Dict, List, Optional
@@ -127,7 +127,7 @@ class ConnectionManager:
         self._callbacks: List[ConnectionStatusCallback] = []
 
         logger.info("ConnectionManager initialized", extra={
-            "name": name,
+            "connection_name": name,
             "endpoint": endpoint,
             "health_check_interval": health_check_interval,
             "reconnect_enabled": reconnect_enabled,
@@ -185,7 +185,7 @@ class ConnectionManager:
         self._shutdown_event.clear()
 
         logger.info("ConnectionManager started", extra={
-            "name": self._name,
+            "connection_name": self._name,
             "service": "connection_manager"
         })
 
@@ -220,7 +220,7 @@ class ConnectionManager:
             await self.disconnect()
 
         logger.info("ConnectionManager stopped", extra={
-            "name": self._name,
+            "connection_name": self._name,
             "service": "connection_manager"
         })
 
@@ -236,7 +236,7 @@ class ConnectionManager:
 
         if not self._connect_handler:
             logger.warning("No connect handler configured", extra={
-                "name": self._name,
+                "connection_name": self._name,
                 "service": "connection_manager"
             })
             return False
@@ -245,7 +245,7 @@ class ConnectionManager:
         self._state.status = ConnectionStatus.CONNECTING
 
         logger.info("Connecting", extra={
-            "name": self._name,
+            "connection_name": self._name,
             "endpoint": self._state.endpoint,
             "service": "connection_manager"
         })
@@ -271,7 +271,7 @@ class ConnectionManager:
                     )
 
                 logger.info("Connected successfully", extra={
-                    "name": self._name,
+                    "connection_name": self._name,
                     "latency_ms": self._state.latency_ms,
                     "service": "connection_manager"
                 })
@@ -283,7 +283,7 @@ class ConnectionManager:
                 await self._notify_status_change(old_status, ConnectionStatus.DISCONNECTED)
 
                 logger.warning("Connection failed", extra={
-                    "name": self._name,
+                    "connection_name": self._name,
                     "service": "connection_manager"
                 })
 
@@ -295,7 +295,7 @@ class ConnectionManager:
             await self._notify_status_change(old_status, ConnectionStatus.DISCONNECTED)
 
             logger.error("Connection error", extra={
-                "name": self._name,
+                "connection_name": self._name,
                 "error": str(e),
                 "service": "connection_manager"
             })
@@ -323,7 +323,7 @@ class ConnectionManager:
                 await self._disconnect_handler()
             except Exception as e:
                 logger.error("Disconnect error", extra={
-                    "name": self._name,
+                    "connection_name": self._name,
                     "error": str(e),
                     "service": "connection_manager"
                 })
@@ -334,7 +334,7 @@ class ConnectionManager:
         await self._notify_status_change(old_status, ConnectionStatus.DISCONNECTED)
 
         logger.info("Disconnected", extra={
-            "name": self._name,
+            "connection_name": self._name,
             "service": "connection_manager"
         })
 
@@ -350,7 +350,7 @@ class ConnectionManager:
 
         if not self._reconnect_enabled:
             logger.debug("Reconnect disabled", extra={
-                "name": self._name,
+                "connection_name": self._name,
                 "service": "connection_manager"
             })
             return False
@@ -363,7 +363,7 @@ class ConnectionManager:
             await self._notify_status_change(old_status, ConnectionStatus.FAILED)
 
             logger.error("Max reconnect attempts reached", extra={
-                "name": self._name,
+                "connection_name": self._name,
                 "attempts": self._state.reconnect_attempts,
                 "max_attempts": self._max_reconnect_attempts,
                 "service": "connection_manager"
@@ -379,7 +379,7 @@ class ConnectionManager:
         delay = self._calculate_reconnect_delay()
 
         logger.info("Reconnecting", extra={
-            "name": self._name,
+            "connection_name": self._name,
             "attempt": self._state.reconnect_attempts,
             "delay_seconds": delay,
             "service": "connection_manager"
@@ -397,14 +397,14 @@ class ConnectionManager:
             self._state.total_reconnects += 1
 
             logger.info("Reconnected successfully", extra={
-                "name": self._name,
+                "connection_name": self._name,
                 "attempts": self._state.reconnect_attempts,
                 "total_reconnects": self._state.total_reconnects,
                 "service": "connection_manager"
             })
         else:
             logger.warning("Reconnect attempt failed", extra={
-                "name": self._name,
+                "connection_name": self._name,
                 "attempt": self._state.reconnect_attempts,
                 "service": "connection_manager"
             })
@@ -450,7 +450,7 @@ class ConnectionManager:
 
                         if not is_healthy:
                             logger.warning("Health check failed", extra={
-                                "name": self._name,
+                                "connection_name": self._name,
                                 "service": "connection_manager"
                             })
 
@@ -470,7 +470,7 @@ class ConnectionManager:
 
                     except Exception as e:
                         logger.error("Health check error", extra={
-                            "name": self._name,
+                            "connection_name": self._name,
                             "error": str(e),
                             "service": "connection_manager"
                         })
@@ -514,7 +514,7 @@ class ConnectionManager:
             return
 
         logger.info("Connection status changed", extra={
-            "name": self._name,
+            "connection_name": self._name,
             "old_status": old_status.value,
             "new_status": new_status.value,
             "service": "connection_manager"
@@ -525,7 +525,7 @@ class ConnectionManager:
                 await callback(old_status, new_status, self._state)
             except Exception as e:
                 logger.error("Error in connection status callback", extra={
-                    "name": self._name,
+                    "connection_name": self._name,
                     "error": str(e),
                     "service": "connection_manager"
                 })
@@ -588,7 +588,7 @@ class ConnectionPool:
                 results[name] = True
             except Exception as e:
                 logger.error("Failed to start connection", extra={
-                    "name": name,
+                    "connection_name": name,
                     "error": str(e),
                     "service": "connection_pool"
                 })
@@ -604,7 +604,7 @@ class ConnectionPool:
                 results[name] = True
             except Exception as e:
                 logger.error("Failed to stop connection", extra={
-                    "name": name,
+                    "connection_name": name,
                     "error": str(e),
                     "service": "connection_pool"
                 })
@@ -619,7 +619,7 @@ class ConnectionPool:
                 results[name] = await conn.connect()
             except Exception as e:
                 logger.error("Failed to connect", extra={
-                    "name": name,
+                    "connection_name": name,
                     "error": str(e),
                     "service": "connection_pool"
                 })
@@ -633,7 +633,7 @@ class ConnectionPool:
                 await conn.disconnect()
             except Exception as e:
                 logger.error("Failed to disconnect", extra={
-                    "name": name,
+                    "connection_name": name,
                     "error": str(e),
                     "service": "connection_pool"
                 })

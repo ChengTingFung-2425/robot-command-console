@@ -387,6 +387,288 @@ class RobotStatus:
 3. **文檔位置**：規劃放 `docs/plans/`，技術放 `docs/`，開發指南放 `docs/development/`，安全相關放 `docs/security/`
 4. **測試與文檔同步**：文檔路徑變更時需同步更新測試
 5. **任務完成後**：更新 `PROJECT_MEMORY.md` 記錄經驗教訓
+6. **AI 記憶存儲**：`store_memory` 工具只能在 review 模式下使用，一般開發任務請直接更新此文件記錄經驗教訓
+
+---
+
+## 🌐 Phase 3.2 Edge UI 移植經驗教訓
+
+> 📖 **詳細分析**：[phase3/WEBUI_MIGRATION_ANALYSIS.md](phase3/WEBUI_MIGRATION_ANALYSIS.md)
+
+### 7.1 Edge/Cloud 功能隔離原則
+
+```
+Edge 功能（本地）              Cloud 功能（雲端）
+══════════════════            ══════════════════
+✅ 機器人儀表板               ❌ 用戶註冊/密碼重設
+✅ 指令控制中心               ❌ 排行榜/成就系統
+✅ LLM 設定（本地提供商）     ❌ 進階指令審核/共享
+✅ 用戶偏好設定               ❌ 社群功能
+✅ 進階指令建立/執行          ❌ 雲端 LLM 服務
+```
+
+**經驗教訓**：
+1. Edge 功能必須可離線運作，不依賴網路
+2. Cloud 功能涉及多用戶數據彙整，不適合本地化
+3. 混合功能（如進階指令）需明確區分本地執行與雲端共享
+
+### 7.2 Flask Blueprint 整合模式
+
+```python
+# ✅ 使用 Blueprint 擴展現有 Flask Service
+from flask import Blueprint
+
+edge_ui = Blueprint(
+    'edge_ui',
+    __name__,
+    template_folder='templates',
+    static_folder='static',
+    static_url_path='/edge/static'
+)
+
+# 在 Flask Adapter 中註冊
+if enable_edge_ui:
+    from .edge_ui import edge_ui
+    app.register_blueprint(edge_ui)
+```
+
+**經驗教訓**：
+1. Blueprint 允許模組化擴展，保持向後相容
+2. `template_folder` 和 `static_folder` 需指向正確的相對路徑
+3. `static_url_path` 避免與主應用靜態資源衝突
+
+### 7.3 可配置端點設計
+
+```python
+# ❌ 硬編碼端點（不靈活）
+ollama_url = 'http://127.0.0.1:11434/api/tags'
+
+# ✅ 透過環境變數配置
+OLLAMA_ENDPOINT = os.environ.get('OLLAMA_ENDPOINT', 'http://127.0.0.1:11434')
+LMSTUDIO_ENDPOINT = os.environ.get('LMSTUDIO_ENDPOINT', 'http://127.0.0.1:1234')
+MCP_API_URL = os.environ.get('MCP_API_URL', 'http://localhost:8000')
+```
+
+**經驗教訓**：
+1. 所有外部服務端點應可透過環境變數配置
+2. 提供合理的預設值以簡化開發環境設定
+3. 在文檔中記錄所有可配置的環境變數
+
+### 7.4 前端用戶體驗一致性
+
+```javascript
+// ❌ 使用 browser alert（體驗不佳）
+alert('操作成功');
+
+// ✅ 使用統一的 Toast 通知
+function showToast(message, type = 'success', duration = 3000) {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), duration);
+}
+showToast('操作成功');
+```
+
+**經驗教訓**：
+1. 避免使用 `alert()`，改用自定義 Toast 通知
+2. 統一通知樣式（success/error/warning/info）
+3. 在共用 JS 文件中提供 `showToast` 函式
+
+### 7.5 移植方案選擇
+
+| 方案 | 優點 | 缺點 | 適用場景 |
+|------|------|------|----------|
+| 純 Electron 前端 | 最低延遲 | 開發工作量大 | 效能優先 |
+| 獨立 Flask 服務 | 可重用代碼 | 資源消耗增加 | 快速原型 |
+| **混合方案（推薦）** | 最小變更 | 混合路由 | 漸進式移植 |
+
+**經驗教訓**：
+1. 優先選擇最小變更原則
+2. 擴展現有服務比新建服務更易維護
+3. 漸進式移植允許逐步驗證功能
+
+### 7.6 Edge UI 路由結構
+
+| 路由 | 類型 | 說明 |
+|------|------|------|
+| `/ui` | 頁面 | Edge UI 首頁 |
+| `/ui/dashboard` | 頁面 | 機器人儀表板 |
+| `/ui/command-center` | 頁面 | 指令控制中心 |
+| `/ui/llm-settings` | 頁面 | LLM 設定 |
+| `/ui/settings` | 頁面 | 用戶設定 |
+| `/api/edge/robots` | API | 機器人管理 |
+| `/api/edge/llm/*` | API | LLM 狀態 |
+| `/api/edge/settings` | API | 用戶設定 |
+
+**經驗教訓**：
+1. UI 頁面使用 `/ui/` 前綴
+2. Edge API 使用 `/api/edge/` 前綴，與現有 API 區分
+3. 保持路由命名一致性（kebab-case）
+
+### 7.7 異常處理與日誌記錄
+
+```python
+# ❌ 靜默捕獲異常（難以除錯）
+try:
+    detect_service()
+except Exception:
+    pass
+
+# ✅ 記錄 debug 日誌以便除錯
+try:
+    detect_service()
+except Exception as e:
+    logger.debug(f'Failed to detect service at {endpoint}: {e}')
+```
+
+**經驗教訓**：
+1. 即使是預期的失敗（如服務未啟動），也應記錄 debug 日誌
+2. 避免使用空的 `except: pass`，至少記錄錯誤信息
+3. 使用 `logger.debug()` 而非 `logger.error()` 以避免正常情況下的日誌噪音
+
+### 7.8 網路連線檢查彈性設計
+
+```python
+# ❌ 硬編碼單一端點（某些網路環境可能失敗）
+def check_internet():
+    urllib.request.urlopen('https://www.google.com', timeout=3)
+
+# ✅ 使用多個備用端點
+def check_internet_connection() -> bool:
+    check_urls = [
+        'https://www.google.com',
+        'https://www.cloudflare.com',
+        'https://1.1.1.1'
+    ]
+    for url in check_urls:
+        try:
+            urllib.request.urlopen(url, timeout=3)
+            return True
+        except Exception:
+            continue
+    return False
+```
+
+**經驗教訓**：
+1. 考慮不同網路環境（中國大陸、企業內網等）
+2. 提供多個備用端點以提高可靠性
+3. 使用快速失敗策略（短超時）避免阻塞
+
+### 7.9 前端可訪問性（Accessibility）
+
+```javascript
+// ❌ 缺少 ARIA 屬性
+const toast = document.createElement('div');
+toast.textContent = message;
+
+// ✅ 添加 ARIA 屬性提升螢幕閱讀器支援
+const toast = document.createElement('div');
+toast.textContent = message;
+toast.setAttribute('role', 'alert');
+toast.setAttribute('aria-live', 'polite');
+```
+
+```html
+<!-- ❌ 缺少語意化標籤 -->
+<nav class="navbar">
+
+<!-- ✅ 添加 aria-label -->
+<nav class="navbar" aria-label="主要導航">
+```
+
+**經驗教訓**：
+1. Toast 通知需添加 `role="alert"` 和 `aria-live="polite"`
+2. 導航元素需添加 `aria-label` 描述
+3. 遵循 WCAG 可訪問性指南
+
+### 7.10 前端預設值與後端同步
+
+```javascript
+// ❌ 前端硬編碼預設值（可能與後端不同步）
+body: JSON.stringify({
+    duration_unit: 's',
+    theme: 'light'
+})
+
+// ✅ 從後端 API 取得預設值
+const defaultsRes = await fetch('/api/edge/settings/defaults');
+const defaultsData = await defaultsRes.json();
+body: JSON.stringify(defaultsData.settings)
+```
+
+**經驗教訓**：
+1. 預設值應由後端統一定義（單一真相來源）
+2. 提供 `/api/.../defaults` 端點供前端取得預設值
+3. 避免前後端預設值不同步的問題
+
+### 7.11 Electron Token 注入機制
+
+```javascript
+// ❌ 假設 Token 存在但未實作
+headers: { 
+    'Authorization': 'Bearer ???',
+    // Token 會由 Electron 注入
+}
+
+// ✅ 安全地嘗試取得 Token
+const token = (window.electronAPI && typeof window.electronAPI.getToken === 'function') 
+    ? await window.electronAPI.getToken() 
+    : '';
+headers: { 
+    'Authorization': token ? `Bearer ${token}` : '',
+}
+```
+
+**經驗教訓**：
+1. 檢查 `electronAPI` 是否存在再使用
+2. 提供空字串作為後備值
+3. 在文檔中明確說明 Token 注入機制
+
+### 7.12 JSDoc 註解規範
+
+```javascript
+// ❌ 簡單註解
+/**
+ * 通用 API 請求函式
+ */
+
+// ✅ 完整 JSDoc 註解
+/**
+ * 通用 API 請求函式
+ * @param {string} endpoint - API 端點路徑
+ * @param {Object} options - fetch 選項
+ * @returns {Promise<Object>} API 回應資料
+ * @throws {Error} 當請求失敗或回應不正常時拋出錯誤
+ */
+```
+
+**經驗教訓**：
+1. 公開 API 函式應有完整的 JSDoc 註解
+2. 包含 `@param`、`@returns`、`@throws` 說明
+3. 提高代碼可維護性和 IDE 自動完成支援
+
+### 7.13 共用函式統一化
+
+```javascript
+// ❌ 在每個頁面重複定義相同函式
+// dashboard.html
+function showToast(message, type) { ... }
+
+// llm_settings.html
+function showToast(message, type) { ... }
+
+// ✅ 統一使用共用模組
+// 使用 edge-common.js 中定義的 window.EdgeUI.showToast
+window.EdgeUI.showToast('操作成功', 'success');
+```
+
+**經驗教訓**：
+1. 通用函式應定義在共用 JS 檔案（如 `edge-common.js`）
+2. 透過 `window.EdgeUI.showToast()` 等命名空間存取
+3. 避免在多個頁面重複定義相同函式
+4. 保持程式碼 DRY（Don't Repeat Yourself）原則
 
 ---
 

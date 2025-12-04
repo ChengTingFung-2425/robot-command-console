@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Robot Console{% endblock %} - Edge</title>
+    <link rel="stylesheet" href="{{ url_for('edge_ui.static', filename='css/edge.css') }}">
+    {% block styles %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar" aria-label="主要導航">
+        <div class="nav-brand">
+            <span class="brand-icon">🤖</span>
+            <span class="brand-text">Robot Console</span>
+            <span class="brand-badge">Edge</span>
+        </div>
+        <div class="nav-links">
+            <a href="{{ url_for('edge_ui.ui_home') }}" class="nav-link {% if request.endpoint == 'edge_ui.ui_home' %}active{% endif %}">
+                🏠 首頁
+            </a>
+            <a href="{{ url_for('edge_ui.ui_dashboard') }}" class="nav-link {% if request.endpoint == 'edge_ui.ui_dashboard' %}active{% endif %}">
+                📊 儀表板
+            </a>
+            <a href="{{ url_for('edge_ui.ui_command_center') }}" class="nav-link {% if request.endpoint == 'edge_ui.ui_command_center' %}active{% endif %}">
+                🎮 指令中心
+            </a>
+            <a href="{{ url_for('edge_ui.ui_llm_settings') }}" class="nav-link {% if request.endpoint == 'edge_ui.ui_llm_settings' %}active{% endif %}">
+                🧠 LLM 設定
+            </a>
+            <a href="{{ url_for('edge_ui.ui_settings') }}" class="nav-link {% if request.endpoint == 'edge_ui.ui_settings' %}active{% endif %}">
+                ⚙️ 設定
+            </a>
+        </div>
+        <div class="nav-status">
+            <span id="connection-status" class="status-indicator status-checking">
+                ⏳ 檢查中...
+            </span>
+        </div>
+    </nav>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <p>Robot Command Console - Edge App | Phase 3.2</p>
+    </footer>
+
+    <script src="{{ url_for('edge_ui.static', filename='js/edge-common.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,254 @@
+{% extends "edge/base.html" %}
+
+{% block title %}機器人儀表板{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📊 機器人儀表板</h1>
+    <p class="subtitle">監控所有本地機器人狀態</p>
+</div>
+
+<div class="toolbar">
+    <button class="btn btn-primary" onclick="showRegisterModal()">
+        ➕ 註冊機器人
+    </button>
+    <button class="btn btn-secondary" onclick="refreshRobots()">
+        🔄 重新整理
+    </button>
+</div>
+
+<div class="robots-grid" id="robots-container">
+    {% if robots %}
+        {% for robot in robots %}
+        <div class="robot-card" data-robot-id="{{ robot.id }}">
+            <div class="robot-header">
+                <span class="robot-icon">🤖</span>
+                <h3 class="robot-name">{{ robot.name }}</h3>
+                <span class="robot-status status-{{ robot.status }}">
+                    {{ robot.status }}
+                </span>
+            </div>
+            <div class="robot-body">
+                <div class="robot-info">
+                    <div class="info-row">
+                        <span class="info-label">類型</span>
+                        <span class="info-value">{{ robot.type }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">電量</span>
+                        <div class="battery-bar">
+                            <div class="battery-level" style="width: {{ robot.battery }}%"></div>
+                        </div>
+                        <span class="info-value">{{ robot.battery }}%</span>
+                    </div>
+                    {% if robot.location %}
+                    <div class="info-row">
+                        <span class="info-label">位置</span>
+                        <span class="info-value">{{ robot.location }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="info-row">
+                        <span class="info-label">連線</span>
+                        <span class="info-value">
+                            {% if robot.connected %}
+                            <span class="status-indicator status-success">🟢 已連線</span>
+                            {% else %}
+                            <span class="status-indicator status-error">🔴 未連線</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="robot-actions">
+                <button class="btn btn-sm btn-primary" onclick="selectRobot('{{ robot.id }}')">
+                    🎮 控制
+                </button>
+                <button class="btn btn-sm btn-info" onclick="viewDetails('{{ robot.id }}')">
+                    📋 詳情
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">🤖</div>
+            <h3>尚無機器人</h3>
+            <p>點擊「註冊機器人」按鈕新增您的第一個機器人</p>
+            <button class="btn btn-primary" onclick="showRegisterModal()">
+                ➕ 註冊機器人
+            </button>
+        </div>
+    {% endif %}
+</div>
+
+<!-- 註冊機器人對話框 -->
+<div id="register-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>➕ 註冊機器人</h2>
+            <button class="modal-close" onclick="hideRegisterModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="register-form">
+                <div class="form-group">
+                    <label for="robot-name">機器人名稱</label>
+                    <input type="text" id="robot-name" name="name" required placeholder="例：我的機器人">
+                </div>
+                <div class="form-group">
+                    <label for="robot-type">類型</label>
+                    <select id="robot-type" name="type">
+                        <option value="humanoid">人形機器人</option>
+                        <option value="agv">AGV 搬運車</option>
+                        <option value="arm">機械手臂</option>
+                        <option value="drone">無人機</option>
+                        <option value="other">其他</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="robot-location">位置（可選）</label>
+                    <input type="text" id="robot-location" name="location" placeholder="例：實驗室 A">
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="hideRegisterModal()">取消</button>
+            <button class="btn btn-primary" onclick="submitRegister()">註冊</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 重新整理機器人列表
+async function refreshRobots() {
+    try {
+        const res = await fetch('/api/edge/robots');
+        const data = await res.json();
+        
+        // 無論列表是否為空都要渲染，以正確顯示空白狀態
+        renderRobots(data.robots || []);
+    } catch (error) {
+        console.error('Failed to refresh robots:', error);
+    }
+}
+
+// 渲染機器人列表
+function renderRobots(robots) {
+    const container = document.getElementById('robots-container');
+    
+    if (robots.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">🤖</div>
+                <h3>尚無機器人</h3>
+                <p>點擊「註冊機器人」按鈕新增您的第一個機器人</p>
+                <button class="btn btn-primary" onclick="showRegisterModal()">
+                    ➕ 註冊機器人
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = robots.map(robot => `
+        <div class="robot-card" data-robot-id="${robot.id}">
+            <div class="robot-header">
+                <span class="robot-icon">🤖</span>
+                <h3 class="robot-name">${robot.name}</h3>
+                <span class="robot-status status-${robot.status}">
+                    ${robot.status}
+                </span>
+            </div>
+            <div class="robot-body">
+                <div class="robot-info">
+                    <div class="info-row">
+                        <span class="info-label">類型</span>
+                        <span class="info-value">${robot.type}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">電量</span>
+                        <div class="battery-bar">
+                            <div class="battery-level" style="width: ${robot.battery}%"></div>
+                        </div>
+                        <span class="info-value">${robot.battery}%</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">連線</span>
+                        <span class="info-value">
+                            ${robot.connected 
+                                ? '<span class="status-indicator status-success">🟢 已連線</span>'
+                                : '<span class="status-indicator status-error">🔴 未連線</span>'}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="robot-actions">
+                <button class="btn btn-sm btn-primary" onclick="selectRobot('${robot.id}')">
+                    🎮 控制
+                </button>
+                <button class="btn btn-sm btn-info" onclick="viewDetails('${robot.id}')">
+                    📋 詳情
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// 顯示註冊對話框
+function showRegisterModal() {
+    document.getElementById('register-modal').style.display = 'flex';
+}
+
+// 隱藏註冊對話框
+function hideRegisterModal() {
+    document.getElementById('register-modal').style.display = 'none';
+    document.getElementById('register-form').reset();
+}
+
+// 提交註冊
+async function submitRegister() {
+    const form = document.getElementById('register-form');
+    const formData = new FormData(form);
+    
+    const robotData = {
+        name: formData.get('name'),
+        type: formData.get('type'),
+        location: formData.get('location') || null,
+    };
+    
+    try {
+        const res = await fetch('/api/edge/robots', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(robotData)
+        });
+        
+        const data = await res.json();
+        if (data.success) {
+            hideRegisterModal();
+            refreshRobots();
+            window.EdgeUI.showToast('機器人註冊成功');
+        } else {
+            window.EdgeUI.showToast('註冊失敗: ' + (data.error || '未知錯誤'), 'error');
+        }
+    } catch (error) {
+        console.error('Failed to register robot:', error);
+        window.EdgeUI.showToast('註冊失敗', 'error');
+    }
+}
+
+// 選擇機器人（導向控制中心）
+function selectRobot(robotId) {
+    window.location.href = `/ui/command-center?robot=${robotId}`;
+}
+
+// 查看詳情
+function viewDetails(robotId) {
+    window.EdgeUI.showToast('機器人詳情功能開發中...', 'info');
+}
+
+// 頁面載入時刷新
+document.addEventListener('DOMContentLoaded', refreshRobots);
+</script>
+{% endblock %}

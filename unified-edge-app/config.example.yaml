@@ -1,0 +1,89 @@
+# Unified Edge App Configuration Example
+# 統一 Edge 應用程式配置範例
+#
+# 複製此檔案為 config.yaml 並根據需求修改
+
+app:
+  name: "Robot Command Console - Edge"
+  version: "1.0.0"
+  mode: "edge"  # edge 或 cloud
+
+mcp:
+  # MCP 服務配置
+  host: "127.0.0.1"
+  port: 8000
+  
+  # LLM 整合
+  enable_llm: true
+  llm_provider: "ollama"  # ollama, lm-studio, cloud, none
+  llm_model: "llama2"  # 模型名稱（取決於提供商）
+  
+  # 插件系統
+  enable_plugins: true
+  plugins_dir: "plugins"
+
+robot_console:
+  # Robot-Console 配置
+  protocol: "queue"  # queue（本地佇列）, mqtt, http
+  
+  # MQTT 配置（如果使用 MQTT 協定）
+  mqtt:
+    broker: "localhost"
+    port: 1883
+    client_id: "unified_edge_app"
+    username: ""
+    password: ""
+    topics:
+      command: "robot/commands"
+      status: "robot/status"
+  
+  # 安全設定
+  safety:
+    enable_emergency_stop: true
+    max_command_rate: 10  # 每秒最大指令數
+    timeout_seconds: 30
+
+web_interface:
+  # Web 介面配置
+  host: "127.0.0.1"
+  port: 5000
+  
+  # 認證模式
+  auth_mode: "local"  # local（本地認證）, none（無認證）
+  
+  # 功能開關
+  enable_blockly: true  # Blockly 視覺化編程
+  enable_advanced_commands: true
+  
+  # 資料庫
+  database: "sqlite:///unified_edge_app.db"
+  
+  # UI 設定
+  ui:
+    language: "zh-TW"  # zh-TW, en-US
+    theme: "light"  # light, dark
+
+logging:
+  # 日誌配置
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  format: "json"  # json, text
+  output: "console"  # console, file, both
+  
+  # 檔案輸出配置（如果 output 包含 file）
+  file:
+    path: "logs/unified_edge_app.log"
+    max_size_mb: 100
+    backup_count: 5
+
+# 進階設定
+advanced:
+  # 效能調整
+  performance:
+    worker_threads: 4
+    queue_size: 1000
+  
+  # 網路設定
+  network:
+    timeout_seconds: 30
+    retry_attempts: 3
+    retry_delay_seconds: 1

@@ -94,24 +94,23 @@ class BackendServiceManager:
         檢查是否啟用秘密除錯模式
         
         秘密除錯模式啟用方式（開發者專用）：
+        必須同時滿足以下三個條件：
         1. 環境變數: __ROBOT_INTERNAL_DEBUG__=1
         2. 檔案標記: .robot_debug 存在於專案根目錄
         3. 特殊埠號: 環境變數 DEBUG_PORT=54321
         """
-        # 方法 1: 特殊環境變數（名稱不明顯）
-        if os.environ.get('__ROBOT_INTERNAL_DEBUG__') == '1':
-            return True
+        # 檢查方法 1: 特殊環境變數
+        has_env_var = os.environ.get('__ROBOT_INTERNAL_DEBUG__') == '1'
         
-        # 方法 2: 隱藏檔案標記
+        # 檢查方法 2: 隱藏檔案標記
         debug_file = self._detect_project_root() / '.robot_debug'
-        if debug_file.exists():
-            return True
+        has_debug_file = debug_file.exists()
         
-        # 方法 3: 特殊埠號組合
-        if os.environ.get('DEBUG_PORT') == '54321':
-            return True
+        # 檢查方法 3: 特殊埠號組合
+        has_debug_port = os.environ.get('DEBUG_PORT') == '54321'
         
-        return False
+        # 必須三個條件同時滿足
+        return has_env_var and has_debug_file and has_debug_port
     
     def _detect_project_root(self) -> Path:
         """自動偵測專案根目錄"""

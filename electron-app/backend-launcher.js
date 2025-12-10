@@ -19,28 +19,27 @@ class BackendLauncher {
 
   /**
    * 檢查秘密除錯模式（開發者專用）
-   * 檢查特殊環境變數、檔案標記或其他秘密觸發條件
+   * 必須同時滿足以下三個條件：
+   * 1. 環境變數: __ROBOT_INTERNAL_DEBUG__=1
+   * 2. 檔案標記: .robot_debug 存在
+   * 3. 特殊埠號: DEBUG_PORT=54321
    */
   _checkSecretDebugMode() {
-    // 方法 1: 特殊環境變數
-    if (process.env.__ROBOT_INTERNAL_DEBUG__ === '1') {
-      return true;
-    }
-    
-    // 方法 2: 特殊埠號組合
-    if (process.env.DEBUG_PORT === '54321') {
-      return true;
-    }
-    
-    // 方法 3: 檢查隱藏檔案
     const fs = require('fs');
     const path = require('path');
-    const debugFile = path.join(__dirname, '..', '.robot_debug');
-    if (fs.existsSync(debugFile)) {
-      return true;
-    }
     
-    return false;
+    // 檢查方法 1: 特殊環境變數
+    const hasEnvVar = process.env.__ROBOT_INTERNAL_DEBUG__ === '1';
+    
+    // 檢查方法 2: 隱藏檔案標記
+    const debugFile = path.join(__dirname, '..', '.robot_debug');
+    const hasDebugFile = fs.existsSync(debugFile);
+    
+    // 檢查方法 3: 特殊埠號組合
+    const hasDebugPort = process.env.DEBUG_PORT === '54321';
+    
+    // 必須三個條件同時滿足
+    return hasEnvVar && hasDebugFile && hasDebugPort;
   }
 
   /**

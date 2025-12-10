@@ -268,3 +268,6 @@ dmypy.json
 # Pyre type checker
 .pyre/
 *.bak
+
+# Secret debug mode marker (dev only)
+.robot_debug

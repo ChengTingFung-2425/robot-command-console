@@ -26,13 +26,13 @@ class WebEnginePage(QWebEnginePage):
 class WebViewWindow(QMainWindow):
     """主視窗"""
 
-    def __init__(self, flask_manager, parent=None):
+    def __init__(self, backend_manager, parent=None):
         super().__init__(parent)
-        self.flask_manager = flask_manager
+        self.backend_manager = backend_manager
         self.webview: Optional[QWebEngineView] = None
         
         self._init_ui()
-        self._load_flask_ui()
+        self._load_ui()
 
     def _init_ui(self):
         """初始化 UI"""
@@ -46,12 +46,17 @@ class WebViewWindow(QMainWindow):
         
         self.setCentralWidget(self.webview)
 
-    def _load_flask_ui(self):
-        """載入 Flask UI"""
+    def _load_ui(self):
+        """載入 UI"""
         try:
-            url = self.flask_manager.get_url()
-            logger.info(f"載入 UI: {url}")
-            self.webview.load(QUrl(url))
+            # 從後端管理器取得 Flask URL
+            flask_url = self.backend_manager.get_service_url('flask')
+            
+            if not flask_url:
+                raise RuntimeError("Flask 服務未啟動")
+            
+            logger.info(f"載入 UI: {flask_url}")
+            self.webview.load(QUrl(flask_url))
         except Exception as e:
             logger.error(f"載入 UI 失敗: {e}")
             QMessageBox.critical(

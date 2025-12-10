@@ -5,11 +5,10 @@
 """
 
 import logging
-from typing import Optional
 
 from PyQt6.QtWidgets import QSystemTrayIcon, QMenu
-from PyQt6.QtGui import QAction, QIcon
-from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtGui import QAction
+from PyQt6.QtCore import pyqtSignal
 
 logger = logging.getLogger(__name__)
 

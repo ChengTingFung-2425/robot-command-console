@@ -7,8 +7,7 @@ QtWebEngineView 封裝，提供 Web UI 顯示與互動
 import logging
 from typing import Optional
 
-from PyQt6.QtCore import QUrl, Qt
-from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import QUrl
 from PyQt6.QtWidgets import QMainWindow, QMessageBox
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEnginePage
@@ -46,11 +45,6 @@ class WebViewWindow(QMainWindow):
         self.webview.setPage(page)
         
         self.setCentralWidget(self.webview)
-
-        # 設定圖示 (如果有)
-        # icon_path = os.path.join(os.path.dirname(__file__), 'resources', 'icon.png')
-        # if os.path.exists(icon_path):
-        #     self.setWindowIcon(QIcon(icon_path))
 
     def _load_flask_ui(self):
         """載入 Flask UI"""

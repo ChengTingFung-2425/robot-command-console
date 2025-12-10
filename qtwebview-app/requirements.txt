@@ -8,5 +8,7 @@ pyinstaller>=6.0.0
 # HTTP 請求
 requests>=2.31.0
 
-# 繼承現有 Flask 依賴
-# 注意：運行時需要主目錄的 requirements.txt
+# 注意：運行前需先安裝主專案依賴：
+#   pip install -r ../requirements.txt
+# 或使用統一安裝：
+#   pip install -r ../requirements.txt && pip install -r requirements.txt

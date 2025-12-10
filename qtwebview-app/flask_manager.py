@@ -72,6 +72,12 @@ class FlaskManager:
                 os.path.dirname(os.path.dirname(__file__)),
                 'flask_service.py'
             )
+            
+            if not os.path.exists(flask_script):
+                raise FileNotFoundError(
+                    f"找不到 Flask 服務腳本: {flask_script}\n"
+                    f"請確認專案結構正確，flask_service.py 應位於專案根目錄"
+                )
 
             self.process = subprocess.Popen(
                 [sys.executable, flask_script],
@@ -80,6 +86,9 @@ class FlaskManager:
                 stderr=subprocess.PIPE,
                 text=True
             )
+            
+            # 啟動輸出讀取執行緒
+            self._start_output_readers()
 
             logger.info(f"Flask 服務已啟動 (PID: {self.process.pid})")
 
@@ -97,6 +106,31 @@ class FlaskManager:
         except Exception as e:
             logger.error(f"啟動 Flask 服務失敗: {e}")
             return False
+    
+    def _start_output_readers(self):
+        """啟動輸出讀取執行緒"""
+        def read_output(pipe, log_func):
+            try:
+                for line in pipe:
+                    log_func(line.strip())
+            except Exception as e:
+                logger.error(f"讀取輸出時發生錯誤: {e}")
+        
+        if self.process and self.process.stdout:
+            stdout_thread = threading.Thread(
+                target=read_output,
+                args=(self.process.stdout, logger.info),
+                daemon=True
+            )
+            stdout_thread.start()
+        
+        if self.process and self.process.stderr:
+            stderr_thread = threading.Thread(
+                target=read_output,
+                args=(self.process.stderr, logger.error),
+                daemon=True
+            )
+            stderr_thread.start()
 
     def _wait_for_ready(self, timeout: int = 30) -> bool:
         """等待服務就緒"""
@@ -111,6 +145,7 @@ class FlaskManager:
                     logger.info("Flask 服務已就緒")
                     return True
             except requests.RequestException:
+                # 健康檢查循環中預期可能失敗，略過異常並重試
                 pass
             time.sleep(0.5)
         return False
@@ -154,12 +189,58 @@ class FlaskManager:
                 if self._restart_count < self._max_restarts:
                     logger.info(f"嘗試重啟服務 (第 {self._restart_count + 1}/{self._max_restarts} 次)")
                     self._restart_count += 1
-                    self.stop()
-                    if not self.start():
+                    # 僅重啟 Flask 進程，不重啟整個 start() 流程（避免無限遞迴）
+                    if not self._restart_flask_process():
                         logger.error("重啟失敗")
                 else:
                     logger.error(f"已達最大重啟次數 ({self._max_restarts})，停止重啟")
                     break
+    
+    def _restart_flask_process(self) -> bool:
+        """重啟 Flask 進程（不重啟健康檢查）"""
+        if self.process:
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                logger.warning("Flask 服務未正常終止，強制終止")
+                self.process.kill()
+                self.process.wait()
+        
+        # 重新啟動進程（重用現有的 port 和 token）
+        flask_script = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            'flask_service.py'
+        )
+        
+        if not os.path.exists(flask_script):
+            logger.error(f"找不到 Flask 服務腳本: {flask_script}")
+            return False
+        
+        env = os.environ.copy()
+        env['PORT'] = str(self.port)
+        env['APP_TOKEN'] = self.token
+        env['FLASK_ENV'] = 'production'
+        
+        self.process = subprocess.Popen(
+            [sys.executable, flask_script],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
+        # 啟動輸出讀取執行緒
+        self._start_output_readers()
+        
+        logger.info(f"Flask 服務已重啟 (PID: {self.process.pid})")
+        
+        # 等待服務就緒
+        if not self._wait_for_ready(timeout=30):
+            logger.error("Flask 服務重啟失敗")
+            return False
+        
+        return True
 
     def is_healthy(self) -> bool:
         """檢查服務是否健康"""

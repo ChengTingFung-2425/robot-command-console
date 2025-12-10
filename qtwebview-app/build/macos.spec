@@ -2,6 +2,7 @@
 """
 macOS 平台 PyInstaller 配置
 """
+import os
 
 block_cipher = None
 

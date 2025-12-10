@@ -6,14 +6,19 @@ QWebChannel 橋接
 
 import logging
 import os
-from typing import Optional
+import platform
 
-from PyQt6.QtCore import QObject, pyqtSlot, pyqtSignal
+from PyQt6.QtCore import QObject, pyqtSlot, pyqtSignal, QUrl
 from PyQt6.QtWidgets import QFileDialog
 from PyQt6.QtGui import QDesktopServices
-from PyQt6.QtCore import QUrl
 
 logger = logging.getLogger(__name__)
+
+# 嘗試載入版本資訊
+try:
+    from __init__ import __version__
+except ImportError:
+    __version__ = "1.0.0"
 
 
 class NativeBridge(QObject):
@@ -83,14 +88,7 @@ class NativeBridge(QObject):
     @pyqtSlot(result=str)
     def getAppVersion(self) -> str:
         """取得應用程式版本"""
-        try:
-            import sys
-            import os
-            sys.path.insert(0, os.path.dirname(__file__))
-            from __init__ import __version__
-            return __version__
-        except ImportError:
-            return "1.0.0"
+        return __version__
 
     @pyqtSlot(str)
     def openExternal(self, url: str):
@@ -110,7 +108,6 @@ class NativeBridge(QObject):
     @pyqtSlot(result=str)
     def getPlatform(self) -> str:
         """取得作業系統平台"""
-        import platform
         return platform.system()
 
     @pyqtSlot(str, result=str)

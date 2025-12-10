@@ -6,6 +6,8 @@
 
 > **🚀 架構演進方向** - 本專案將演進為 **Server-Edge-Runner** 三層架構，支援分散式部署與邊緣運算。
 
+> **🎉 雙版本策略（Phase 3.2）** - 提供 **Heavy (Electron)** 與 **Tiny (PyQt)** 兩個版本，使用者可根據需求選擇。詳見 [版本選擇指引](docs/user_guide/TINY_VS_HEAVY.md)。
+
 ## 核心目的
 
 - 集中管理來自多來源的機器人指令。  
@@ -32,7 +34,8 @@
 - 負責：用戶認證、API Gateway、數據持久化
 
 ### Edge Layer（邊緣層）
-- **electron-app/** - Electron 桌面應用程序
+- **electron-app/** - Electron 桌面應用程序（Heavy 版本）
+- **qtwebview-app/** - PyQt 桌面應用程序（Tiny 版本，Phase 3.2）
 - **src/robot_service/** - 模組化機器人服務（背景服務）
 - 負責：本地佇列、離線支援、低延遲處理
 
@@ -52,7 +55,8 @@
   - 本地佇列系統（記憶體內，可擴展至 Redis/Kafka）
   - Electron 整合模式與獨立 CLI 模式
   - 清晰的 API 界限與可測試架構
-- **electron-app/** - Edge 環境：Electron 應用程序（主程序、預載入腳本、渲染器）
+- **electron-app/** - Edge 環境：Electron 應用程序（Heavy 版本，主程序、預載入腳本、渲染器）
+- **qtwebview-app/** - Edge 環境：PyQt 應用程序（Tiny 版本，輕量化桌面應用）
 - **MCP/** - Server 環境：管理核心後端服務（API、身分驗證、指令處理、上下文管理）
 - **Robot-Console/** - 機器人執行層與相關工具（action executor、decoder、pubsub）
 - **WebUI/** - Server 環境：Web 使用者介面（基於 Microblog 架構）
@@ -80,6 +84,24 @@
 - [進階指令職責變更說明](docs/phase2/ADVANCED_COMMAND_RESPONSIBILITY_CHANGE.md)
 - [遷移指南](Robot-Console/MIGRATION_GUIDE.md)
 
+## 🎯 選擇合適的版本
+
+本專案提供兩個版本的桌面應用程式：
+
+### Heavy (Electron) 版本
+- **適合**：開發者、進階使用者、需要豐富 UI 互動
+- **特點**：React 前端、完整開發工具、~150-300MB
+- **安裝包**：`npm start` 或下載預編譯版本
+
+### Tiny (PyQt) 版本
+- **適合**：生產環境、資源受限設備、快速部署
+- **特點**：輕量化、快速啟動、~40-60MB
+- **啟動**：`python qtwebview-app/main.py`
+
+**選擇指引**：[版本對比](docs/user_guide/TINY_VS_HEAVY.md) | [Tiny 安裝指引](docs/user_guide/TINY_INSTALL_GUIDE.md)
+
+---
+
 ## 快速啟動（開發者）
 
 ### 1. 安裝依賴
@@ -93,21 +115,31 @@ pip install -r MCP/requirements.txt
 
 ### 2. 啟動服務
 
-#### Electron 整合模式（預設）
+#### 選項 A: Heavy 版本（Electron）
 
 ```bash
 # 由 Electron 自動啟動 Python 服務
 npm start
 ```
 
-#### 獨立 CLI 模式
+#### 選項 B: Tiny 版本（PyQt）
 
 ```bash
-# 執行 Robot Service（不依賴 Electron）
+# 安裝額外依賴
+pip install -r qtwebview-app/requirements.txt
+
+# 啟動 Tiny 應用
+python qtwebview-app/main.py
+```
+
+#### 選項 C: 獨立 CLI 模式（無 GUI）
+
+```bash
+# 執行 Robot Service（不依賴 Electron 或 PyQt）
 python3 run_service_cli.py --queue-size 1000 --workers 5
 ```
 
-#### 手動啟動 Flask 服務
+#### 選項 D: 手動啟動 Flask 服務
 
 ```bash
 # 設定環境變數並啟動

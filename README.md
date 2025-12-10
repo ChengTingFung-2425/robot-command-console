@@ -8,6 +8,8 @@
 
 > **🎉 雙版本策略（Phase 3.2）** - 提供 **Heavy (Electron)** 與 **Tiny (PyQt)** 兩個版本，使用者可根據需求選擇。詳見 [版本選擇指引](docs/user_guide/TINY_VS_HEAVY.md)。
 
+> **✨ 統一整合完成（Phase 3.3）** - 提供統一部署套件 (`unified-edge-app/`)，一鍵啟動所有服務。雲端/社群功能已分離至 `Cloud/` 目錄。
+
 ## 核心目的
 
 - 集中管理來自多來源的機器人指令。  

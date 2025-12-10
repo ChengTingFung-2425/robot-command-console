@@ -11,9 +11,8 @@ import os
 # 將專案根目錄加入路徑
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from PyQt6.QtWidgets import QApplication, QMessageBox, QSplashScreen
-from PyQt6.QtCore import QCoreApplication, Qt, QTimer
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6.QtCore import QCoreApplication
 
 from webview_window import WebViewWindow
 

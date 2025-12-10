@@ -70,18 +70,33 @@ class BackendLauncher {
       
       let startupBuffer = '';
       let started = false;
+      let healthCheckInterval = null;
       
-      // 監聽輸出以偵測啟動完成
-      if (!this.debugMode) {
-        this.pythonProcess.stdout.on('data', (data) => {
-          startupBuffer += data.toString();
+      // 使用 HTTP 健康檢查來確認服務就緒，而非依賴字串匹配
+      const checkServicesReady = async () => {
+        try {
+          const http = require('http');
           
-          // 偵測啟動完成訊息
-          if (!started && startupBuffer.includes('所有後端服務已就緒')) {
+          // 檢查 Flask API
+          const flaskReady = await new Promise((resolve) => {
+            const req = http.get('http://127.0.0.1:5000/health', (res) => {
+              resolve(res.statusCode === 200);
+            });
+            req.on('error', () => resolve(false));
+            req.setTimeout(1000, () => {
+              req.destroy();
+              resolve(false);
+            });
+          });
+          
+          if (flaskReady && !started) {
             started = true;
             this.ready = true;
             
-            // 解析服務資訊（簡化版，實際應該透過 IPC 或檔案通訊）
+            if (healthCheckInterval) {
+              clearInterval(healthCheckInterval);
+            }
+            
             this.serviceInfo = {
               flask_url: 'http://127.0.0.1:5000',
               mcp_url: 'http://127.0.0.1:8000',
@@ -93,6 +108,31 @@ class BackendLauncher {
               ...this.serviceInfo
             });
           }
+        } catch (error) {
+          // 健康檢查失敗，繼續等待
+        }
+      };
+      
+      // 在非除錯模式下，定期檢查服務狀態
+      if (!this.debugMode) {
+        // 立即檢查一次
+        checkServicesReady();
+        
+        // 每秒檢查一次，最多 30 秒
+        let attempts = 0;
+        healthCheckInterval = setInterval(() => {
+          attempts++;
+          if (attempts > 30) {
+            clearInterval(healthCheckInterval);
+            reject(new Error('Backend services failed to start within 30 seconds'));
+            return;
+          }
+          checkServicesReady();
+        }, 1000);
+        
+        // 仍然監聽輸出以記錄錯誤
+        this.pythonProcess.stdout.on('data', (data) => {
+          // 僅用於除錯，不用於偵測啟動完成
         });
         
         this.pythonProcess.stderr.on('data', (data) => {

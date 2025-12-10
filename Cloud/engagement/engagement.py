@@ -2,12 +2,36 @@
 User Engagement & Gamification utilities.
 
 Handles point awards, achievement tracking, and level management.
+
+⚠️ 重要：此檔案已從 WebUI 移動到 Cloud 服務但尚未完成重構
+==========================================
+
+遷移狀態：已移動但功能不可用
+需要完成的工作：
+1. 在 Cloud/models.py 建立獨立的資料模型：
+   - User
+   - UserProfile
+   - Achievement
+   - UserAchievement
+2. 建立獨立的資料庫連接（PostgreSQL）
+3. 移除所有對 WebUI.app 的引用
+4. 更新所有函式的型別提示
+5. 建立 Cloud API 端點來暴露這些功能
+
+目前此檔案中的函式因缺少依賴而無法運作。
 """
 
 from typing import Optional, List
-from WebUI.app import db
-from WebUI.app.models import User, UserProfile, Achievement, UserAchievement
 
+# TODO: 此檔案需要在 Cloud 服務中重構
+# 需要建立獨立的 Cloud/models.py 和資料庫配置
+# 暫時註解掉直接依賴 WebUI 的程式碼
+
+# from WebUI.app import db  # 已移除 - 造成架構依賴問題
+# from WebUI.app.models import User, UserProfile, Achievement, UserAchievement  # 已移除
+
+# 注意：以下程式碼因缺少上述依賴而無法運作
+# 這是一個佔位符，展示需要在 Cloud 服務中實作的功能
 
 # Points award values (from design document)
 POINTS_AWARD = {

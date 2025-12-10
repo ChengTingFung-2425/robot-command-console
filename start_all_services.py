@@ -16,7 +16,6 @@ import os
 import signal
 import subprocess
 import sys
-import time
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -147,8 +146,8 @@ class ServiceManager:
                 config.command,
                 cwd=config.working_dir,
                 env=env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
                 text=True
             )
 

@@ -7,6 +7,14 @@
 2. 隱藏底層進程細節（除非啟用除錯模式）
 3. 提供簡單的啟動/停止介面
 4. 自動健康檢查與錯誤恢復
+
+秘密除錯模式：
+  開發者可以啟用詳細的診斷輸出，需要同時滿足三個條件：
+  1. 環境變數 __ROBOT_INTERNAL_DEBUG__=1
+  2. 專案根目錄存在 .robot_debug 檔案
+  3. 環境變數 DEBUG_PORT=54321
+  
+  啟用後會顯示詳細的服務啟動日誌、健康檢查結果、配置資訊等。
 """
 
 import asyncio
@@ -14,8 +22,6 @@ import logging
 import os
 import secrets
 import subprocess
-import sys
-import time
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -217,8 +223,8 @@ class BackendServiceManager:
                 config.command,
                 cwd=config.working_dir,
                 env=env,
-                stdout=subprocess.PIPE if not self.debug_mode else None,
-                stderr=subprocess.PIPE if not self.debug_mode else None,
+                stdout=subprocess.DEVNULL if not self.debug_mode else None,
+                stderr=subprocess.DEVNULL if not self.debug_mode else None,
                 text=True
             )
             
@@ -257,13 +263,15 @@ class BackendServiceManager:
     async def _health_check(self, url: str, max_retries: int = 5) -> bool:
         """執行健康檢查"""
         if aiohttp is None:
-            # 如果沒有 aiohttp，使用 urllib
+            # 如果沒有 aiohttp，使用 urllib（在執行緒中避免阻塞）
             import urllib.request
             for i in range(max_retries):
                 try:
-                    with urllib.request.urlopen(url, timeout=3) as response:
-                        if response.status == 200:
-                            return True
+                    response = await asyncio.to_thread(
+                        urllib.request.urlopen, url, timeout=3
+                    )
+                    if response.status == 200:
+                        return True
                 except Exception as e:
                     if self.debug_mode:
                         logger.debug(f"健康檢查嘗試 {i+1}/{max_retries}: {e}")

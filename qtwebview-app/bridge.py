@@ -83,8 +83,14 @@ class NativeBridge(QObject):
     @pyqtSlot(result=str)
     def getAppVersion(self) -> str:
         """取得應用程式版本"""
-        from qtwebview-app import __version__
-        return __version__
+        try:
+            import sys
+            import os
+            sys.path.insert(0, os.path.dirname(__file__))
+            from __init__ import __version__
+            return __version__
+        except ImportError:
+            return "1.0.0"
 
     @pyqtSlot(str)
     def openExternal(self, url: str):

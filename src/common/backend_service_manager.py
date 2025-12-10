@@ -464,7 +464,7 @@ if __name__ == '__main__':
             print("="*60)
             print(f"\nFlask API: {manager.get_service_url('flask')}")
             print(f"MCP Service: {manager.get_service_url('mcp')}")
-            print(f"API Token: {manager.get_api_token()[:16]}...")
+            print("API Token is generated and available for use.")
             print("\n按 Ctrl+C 停止...")
             
             # 持續運行

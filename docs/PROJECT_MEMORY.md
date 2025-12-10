@@ -1356,4 +1356,349 @@ unified-edge-app/
 
 ---
 
+## 🔍 Phase 3.2: Code Review 與 CodeQL 安全修復（2025-12-10）
+
+### PR Review 回饋處理經驗
+
+**背景**：本地指令歷史與快取功能實作完成後，收到自動化 Code Review 的 16 個建議，並發現 CodeQL 的資訊暴露安全問題。
+
+### 11.1 冗餘索引識別
+
+```python
+# ❌ 不必要的索引（PRIMARY KEY 已自動建立）
+cursor.execute('''
+    CREATE INDEX IF NOT EXISTS idx_command_history_command_id 
+    ON command_history(command_id)
+''')
+
+# ✅ 移除冗餘索引
+# PRIMARY KEY 自動建立 B-tree 索引，無需額外索引
+```
+
+**經驗教訓**：
+1. SQLite 為 PRIMARY KEY 自動建立索引
+2. 冗餘索引不會造成錯誤（IF NOT EXISTS），但增加維護成本
+3. 定期審查索引設計，移除不必要的索引
+
+---
+
+### 11.2 快取執行緒安全問題
+
+```python
+# ❌ 執行緒不安全（兩次鎖定間隔可能導致不一致）
+def get_by_trace_id(self, trace_id: str):
+    with self._lock:
+        command_id = self._trace_to_command.get(trace_id)
+        if command_id is None:
+            return None
+        return self.get(command_id)  # 離開鎖定後再次取得鎖
+
+# ✅ 在鎖定區域內處理快取失效
+def get_by_trace_id(self, trace_id: str):
+    with self._lock:
+        command_id = self._trace_to_command.get(trace_id)
+        if command_id is None:
+            return None
+        result = self.get(command_id)
+        if result is None:
+            # 快取已過期或被淘汰，清理 trace_id 映射
+            del self._trace_to_command[trace_id]
+        return result
+```
+
+**經驗教訓**：
+1. 多次鎖定/解鎖之間存在競態條件窗口
+2. 相關操作應在同一鎖定區域內完成
+3. 快取失效時需同步清理所有相關映射
+
+---
+
+### 11.3 快取淘汰時的映射同步
+
+```python
+# ❌ 子類未覆寫父類方法，導致映射不同步
+class CommandResultCache(CommandCache):
+    def __init__(self):
+        self._trace_to_command: Dict[str, str] = {}
+    # 缺少 _remove_entry() 覆寫
+
+# ✅ 覆寫 _remove_entry() 確保映射同步
+class CommandResultCache(CommandCache):
+    def _remove_entry(self, key: str):
+        """移除快取項目時，同步清理 trace_id 對應"""
+        # 找出所有 trace_id 對應此 command_id
+        to_remove = [tid for tid, cid in self._trace_to_command.items() if cid == key]
+        for tid in to_remove:
+            del self._trace_to_command[tid]
+        super()._remove_entry(key)
+```
+
+**經驗教訓**：
+1. 子類維護額外狀態時，必須覆寫所有相關方法
+2. LRU 淘汰、過期清理、手動刪除都會呼叫 `_remove_entry()`
+3. 映射不同步會導致記憶體洩漏和邏輯錯誤
+
+---
+
+### 11.4 OrderedDict 與 LRU 語義
+
+```python
+# ❌ 直接覆寫會破壞 LRU 順序
+def set(self, key, value):
+    self._cache[key] = entry  # OrderedDict 保持原位置
+
+# ✅ 先刪除再新增以移到最後
+def set(self, key, value):
+    # 如果鍵已存在，先移除以確保新增時會移到最後（維持 LRU 語義）
+    # 不能直接覆寫，因為 OrderedDict 會保持原有位置
+    if key in self._cache:
+        del self._cache[key]
+    # 新增會自動加到最後
+    self._cache[key] = entry
+```
+
+**經驗教訓**：
+1. OrderedDict 的 `[]` 賦值不會改變項目位置
+2. 必須先刪除再新增才能移到最後
+3. 註解應說明這個非顯而易見的行為
+
+---
+
+### 11.5 API 參數驗證
+
+```python
+# ❌ 靜默失敗（無效參數被忽略）
+start_time_str = request.args.get('start_time')
+if start_time_str:
+    start_time = parse_iso_datetime(start_time_str)  # 可能返回 None
+
+# ✅ 明確驗證並回傳錯誤
+start_time_str = request.args.get('start_time')
+if start_time_str:
+    start_time = parse_iso_datetime(start_time_str)
+    if start_time is None:
+        return jsonify({
+            'status': 'error',
+            'error': {
+                'code': 'INVALID_PARAMETER',
+                'message': 'Invalid start_time format'
+            }
+        }), 400
+```
+
+**經驗教訓**：
+1. API 應明確驗證所有輸入參數
+2. 無效參數應回傳 4xx 錯誤，而非靜默忽略
+3. 錯誤訊息應清楚指出哪個參數有問題
+
+---
+
+### 11.6 CodeQL 資訊暴露修復
+
+```python
+# ❌ 直接暴露異常訊息（可能包含敏感資訊）
+except Exception as e:
+    return jsonify({
+        'status': 'error',
+        'error': {
+            'code': 'QUERY_ERROR',
+            'message': str(e)  # 可能暴露檔案路徑、SQL 語句等
+        }
+    }), 500
+
+# ✅ 使用通用錯誤訊息，詳細資訊僅記錄
+except Exception as e:
+    logger.error(f"Error getting command history: {e}", exc_info=True)
+    return jsonify({
+        'status': 'error',
+        'error': {
+            'code': 'QUERY_ERROR',
+            'message': 'An internal error has occurred.'
+        }
+    }), 500
+```
+
+**經驗教訓**：
+1. **永遠不要**在 API 回應中包含 `str(e)` 或異常詳情
+2. 異常可能包含：檔案路徑、SQL 語句、資料庫結構、內部邏輯
+3. 使用通用錯誤訊息，詳細資訊僅記錄到 logger
+4. CodeQL 會檢測這類資訊暴露問題（Medium 級別）
+
+**修復範圍**：
+- `history_api.py`：6 處 `str(e)` 替換為通用訊息
+- 所有 API 端點統一錯誤處理模式
+- 確保 logger 有 `exc_info=True` 以記錄完整堆疊
+
+---
+
+### 11.7 迴圈變數作用域陷阱
+
+```python
+# ❌ 使用外層迴圈變數（變數作用域錯誤）
+for i in range(5):
+    record = create_record(f'cmd-{i}')
+    offline_commands.append(record)
+
+for record in offline_commands:  # 沒有定義新的 i
+    update_status(record.id, execution_time=1000 + i * 100)  # 使用最後的 i=4
+
+# ✅ 在內層迴圈中定義新的迴圈變數
+for i, record in enumerate(offline_commands):
+    update_status(record.id, execution_time=1000 + i * 100)
+```
+
+**經驗教訓**：
+1. Python 的迴圈變數會洩漏到外層作用域
+2. 巢狀迴圈時要特別注意變數名稱
+3. 使用 `enumerate()` 明確綁定索引與元素
+
+---
+
+### 11.8 測試中的未使用變數
+
+```python
+# ❌ 變數賦值後未使用
+def test_init_db(self, temp_db):
+    store = CommandHistoryStore(db_path=temp_db)  # 未使用
+    assert os.path.exists(temp_db)
+
+# ✅ 使用底線表示故意不使用
+def test_init_db(self, temp_db):
+    _ = CommandHistoryStore(db_path=temp_db)
+    assert os.path.exists(temp_db)
+
+# ✅ 或直接移除賦值
+def test_count_commands(self, manager):
+    for i in range(10):
+        manager.record_command(command_id=f'cmd-{i}')  # 不需要接收回傳值
+```
+
+**經驗教訓**：
+1. Linter 會標記未使用的變數
+2. 使用 `_` 表示故意不使用的回傳值
+3. 測試中如果只是觸發副作用，可不接收回傳值
+
+---
+
+### 11.9 Import 清理
+
+```python
+# ❌ 匯入但未使用
+from datetime import datetime, timedelta, timezone
+
+# ✅ 只匯入需要的
+from datetime import datetime, timedelta
+```
+
+**經驗教訓**：
+1. 定期清理未使用的 import
+2. IDE/編輯器通常會灰色標示未使用的 import
+3. Flake8 的 F401 會檢測未使用的 import
+
+---
+
+### 11.10 分頁查詢一致性
+
+```python
+# ❌ 查詢與計數的篩選條件不一致
+records = get_command_history(
+    robot_id=robot_id,
+    status=status,
+    actor_type=actor_type,  # 有此條件
+    source=source            # 有此條件
+)
+total = count_commands(
+    robot_id=robot_id,
+    status=status
+    # 缺少 actor_type 和 source
+)
+
+# ✅ 保持篩選條件一致
+total = count_commands(
+    robot_id=robot_id,
+    status=status,
+    actor_type=actor_type,
+    source=source
+)
+```
+
+**經驗教訓**：
+1. 分頁查詢的 `total` 必須使用相同篩選條件
+2. 不一致會導致 `has_more` 判斷錯誤
+3. Code Review 可發現這類邏輯錯誤
+
+---
+
+### 11.11 自動化 Code Review 價值
+
+**本次 PR Review 發現的問題類型**：
+
+| 類型 | 數量 | 嚴重性 |
+|------|------|--------|
+| 執行緒安全 | 2 | High |
+| 記憶體洩漏 | 1 | High |
+| 邏輯錯誤 | 2 | Medium |
+| 參數驗證 | 1 | Medium |
+| 程式碼清理 | 10 | Low |
+
+**經驗教訓**：
+1. 自動化 Review 能發現人工容易忽略的問題
+2. 即使測試通過，仍可能有邏輯或效能問題
+3. 執行緒安全和記憶體管理是容易遺漏的重點
+4. 應在開發階段就考慮這些問題，而非等 Review
+
+---
+
+### 11.12 完整的錯誤處理模式
+
+**API 錯誤處理最佳實踐**：
+
+```python
+@bp.route('/api/resource', methods=['POST'])
+def api_endpoint():
+    try:
+        # 1. 參數驗證
+        param = request.args.get('param')
+        if param and not validate(param):
+            return jsonify({
+                'status': 'error',
+                'error': {
+                    'code': 'INVALID_PARAMETER',
+                    'message': 'Invalid param format'
+                }
+            }), 400
+        
+        # 2. 業務邏輯
+        result = process(param)
+        
+        # 3. 成功回應
+        return jsonify({
+            'status': 'success',
+            'data': result
+        })
+    
+    except Exception as e:
+        # 4. 記錄詳細錯誤（含堆疊）
+        logger.error(f"Error in api_endpoint: {e}", exc_info=True)
+        
+        # 5. 回傳通用錯誤訊息
+        return jsonify({
+            'status': 'error',
+            'error': {
+                'code': 'INTERNAL_ERROR',
+                'message': 'An internal error has occurred.'
+            }
+        }), 500
+```
+
+**關鍵原則**：
+- ✅ 驗證在前，業務邏輯在後
+- ✅ 4xx 用於客戶端錯誤（參數問題）
+- ✅ 5xx 用於伺服器錯誤（內部問題）
+- ✅ 詳細錯誤僅記錄到 logger
+- ✅ 回應使用通用錯誤訊息
+- ✅ 統一的錯誤格式
+
+---
+
 **最後更新**：2025-12-10

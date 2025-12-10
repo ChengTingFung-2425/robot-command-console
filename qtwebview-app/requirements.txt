@@ -1,0 +1,12 @@
+# PyQt6 核心
+PyQt6>=6.6.0
+PyQt6-WebEngine>=6.6.0
+
+# 打包工具
+pyinstaller>=6.0.0
+
+# HTTP 請求
+requests>=2.31.0
+
+# 繼承現有 Flask 依賴
+# 注意：運行時需要主目錄的 requirements.txt

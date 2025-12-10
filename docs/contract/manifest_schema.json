@@ -1,0 +1,291 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://robot-command-console.local/schemas/llm-provider-manifest.json",
+  "title": "LLM Provider Manifest",
+  "description": "Schema for LLM provider registration manifest",
+  "type": "object",
+  "required": [
+    "manifest_version",
+    "provider_id",
+    "provider_name",
+    "provider_version",
+    "endpoints"
+  ],
+  "properties": {
+    "manifest_version": {
+      "type": "string",
+      "description": "Version of the manifest schema",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "example": "1.0.0"
+    },
+    "provider_id": {
+      "type": "string",
+      "description": "Unique identifier for the provider",
+      "pattern": "^[a-z0-9-]+$",
+      "minLength": 2,
+      "maxLength": 64,
+      "example": "ollama"
+    },
+    "provider_name": {
+      "type": "string",
+      "description": "Human-readable name of the provider",
+      "minLength": 1,
+      "maxLength": 128,
+      "example": "Ollama"
+    },
+    "provider_version": {
+      "type": "string",
+      "description": "Version of the provider software",
+      "pattern": "^\\d+\\.\\d+\\.\\d+.*$",
+      "example": "0.1.17"
+    },
+    "description": {
+      "type": "string",
+      "description": "Brief description of the provider",
+      "maxLength": 512,
+      "example": "Local LLM inference engine"
+    },
+    "vendor": {
+      "type": "string",
+      "description": "Vendor or organization name",
+      "maxLength": 128,
+      "example": "Ollama Team"
+    },
+    "homepage": {
+      "type": "string",
+      "format": "uri",
+      "description": "Provider homepage URL",
+      "example": "https://ollama.ai"
+    },
+    "endpoints": {
+      "type": "array",
+      "description": "List of service endpoints",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["type", "address", "protocol"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["http", "https", "unix-socket", "tcp"],
+            "description": "Type of endpoint"
+          },
+          "address": {
+            "type": "string",
+            "description": "Endpoint address (URL for HTTP/HTTPS, path for Unix socket, host:port for TCP)",
+            "minLength": 1,
+            "examples": [
+              "http://localhost:11434",
+              "/tmp/ollama.sock",
+              "localhost:8080"
+            ]
+          },
+          "protocol": {
+            "type": "string",
+            "description": "Communication protocol",
+            "enum": [
+              "openai-compatible",
+              "anthropic-compatible",
+              "custom"
+            ]
+          },
+          "health_check_path": {
+            "type": "string",
+            "description": "Path for health check endpoint",
+            "default": "/health",
+            "example": "/api/tags"
+          },
+          "timeout_ms": {
+            "type": "integer",
+            "description": "Timeout for requests in milliseconds",
+            "minimum": 100,
+            "maximum": 60000,
+            "default": 5000
+          }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "description": "List of supported capabilities",
+      "items": {
+        "type": "string",
+        "enum": [
+          "text-generation",
+          "chat-completion",
+          "embedding",
+          "model-management",
+          "streaming",
+          "function-calling"
+        ]
+      },
+      "uniqueItems": true,
+      "example": ["text-generation", "chat-completion"]
+    },
+    "models": {
+      "type": "array",
+      "description": "List of available models",
+      "items": {
+        "type": "object",
+        "required": ["id", "name"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique model identifier",
+            "example": "llama2"
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable model name",
+            "example": "Llama 2"
+          },
+          "size": {
+            "type": "string",
+            "description": "Model parameter size",
+            "example": "7B"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["chat", "completion", "embedding"],
+            "description": "Type of model"
+          },
+          "context_length": {
+            "type": "integer",
+            "description": "Maximum context length",
+            "minimum": 1,
+            "example": 4096
+          }
+        }
+      }
+    },
+    "security": {
+      "type": "object",
+      "description": "Security configuration",
+      "properties": {
+        "require_auth": {
+          "type": "boolean",
+          "description": "Whether authentication is required",
+          "default": false
+        },
+        "local_only": {
+          "type": "boolean",
+          "description": "Whether provider only accepts local connections",
+          "default": true
+        },
+        "anti_decryption": {
+          "type": "object",
+          "description": "Anti-decryption attack protection",
+          "properties": {
+            "no_prompt_logging": {
+              "type": "boolean",
+              "description": "Never log user prompts",
+              "default": true
+            },
+            "no_model_exposure": {
+              "type": "boolean",
+              "description": "Never expose model internals (weights, logits, embeddings)",
+              "default": true
+            },
+            "prompt_sanitization": {
+              "type": "boolean",
+              "description": "Sanitize prompts before processing",
+              "default": true
+            },
+            "response_filtering": {
+              "type": "boolean",
+              "description": "Filter responses to prevent prompt echo",
+              "default": true
+            },
+            "memory_cleanup": {
+              "type": "boolean",
+              "description": "Clear prompts from memory after use",
+              "default": true
+            },
+            "timing_obfuscation": {
+              "type": "boolean",
+              "description": "Add random delay to prevent timing attacks",
+              "default": false
+            }
+          },
+          "default": {
+            "no_prompt_logging": true,
+            "no_model_exposure": true,
+            "prompt_sanitization": true,
+            "response_filtering": true,
+            "memory_cleanup": true
+          }
+        },
+        "signature": {
+          "type": ["object", "null"],
+          "description": "Digital signature for manifest verification (future)",
+          "properties": {
+            "algorithm": {
+              "type": "string",
+              "enum": ["RSA-SHA256", "ECDSA-SHA256"],
+              "description": "Signature algorithm"
+            },
+            "public_key": {
+              "type": "string",
+              "description": "PEM-encoded public key"
+            },
+            "signature": {
+              "type": "string",
+              "description": "Base64-encoded signature"
+            }
+          },
+          "required": ["algorithm", "public_key", "signature"]
+        },
+        "tls": {
+          "type": "object",
+          "description": "TLS configuration (future)",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "cert_path": {
+              "type": "string",
+              "description": "Path to TLS certificate"
+            },
+            "key_path": {
+              "type": "string",
+              "description": "Path to TLS private key"
+            },
+            "ca_path": {
+              "type": "string",
+              "description": "Path to CA certificate"
+            }
+          }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata",
+      "properties": {
+        "registered_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of registration"
+        },
+        "last_seen": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of last successful health check"
+        },
+        "user_approved": {
+          "type": "boolean",
+          "description": "Whether user has approved this provider",
+          "default": false
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Custom tags for categorization"
+        }
+      }
+    }
+  }
+}

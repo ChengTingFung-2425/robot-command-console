@@ -1,0 +1,179 @@
+{% extends "base.html.j2" %}
+
+{% block app_content %}
+<div class="container-fluid">
+    <div class="row" style="margin-top: 20px;">
+        <div class="col-md-12">
+            <div class="panel panel-primary">
+                <div class="panel-heading">
+                    <h3 class="panel-title">
+                        <i class="fa fa-trophy"></i> 全球排行榜
+                    </h3>
+                </div>
+                <div class="panel-body">
+                    <!-- Sorting Buttons -->
+                    <div class="btn-group" role="group" style="margin-bottom: 15px;">
+                        <a href="{{ url_for('webui.leaderboard', sort='points') }}" 
+                           class="btn btn-sm {% if sort_by == 'points' %}btn-warning{% else %}btn-default{% endif %}">
+                            <i class="fa fa-star"></i> 按積分排序
+                        </a>
+                        <a href="{{ url_for('webui.leaderboard', sort='level') }}" 
+                           class="btn btn-sm {% if sort_by == 'level' %}btn-warning{% else %}btn-default{% endif %}">
+                            <i class="fa fa-level-up"></i> 按等級排序
+                        </a>
+                        <a href="{{ url_for('webui.leaderboard', sort='reputation') }}" 
+                           class="btn btn-sm {% if sort_by == 'reputation' %}btn-warning{% else %}btn-default{% endif %}">
+                            <i class="fa fa-heart"></i> 按聲譽排序
+                        </a>
+                        <a href="{{ url_for('webui.leaderboard', sort='commands') }}" 
+                           class="btn btn-sm {% if sort_by == 'commands' %}btn-warning{% else %}btn-default{% endif %}">
+                            <i class="fa fa-list"></i> 按指令排序
+                        </a>
+                    </div>
+
+                    <!-- Leaderboard Table -->
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr style="background-color: #f5f5f5;">
+                                    <th style="width: 60px; text-align: center;">排名</th>
+                                    <th>用戶</th>
+                                    <th style="width: 100px; text-align: center;">等級</th>
+                                    <th style="width: 100px; text-align: center;">積分</th>
+                                    <th style="width: 100px; text-align: center;">聲譽值</th>
+                                    <th style="width: 80px; text-align: center;">指令</th>
+                                    <th style="width: 80px; text-align: center;">進階</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if leaderboard %}
+                                    {% for user, profile in leaderboard %}
+                                    <tr style="cursor: pointer;" onclick="window.location.href='{{ url_for('webui.user_profile', username=user.username) }}'">
+                                        <td style="text-align: center; font-weight: bold;">
+                                            {% if loop.index == 1 %}
+                                                <span class="label label-danger">🥇 #1</span>
+                                            {% elif loop.index == 2 %}
+                                                <span class="label label-danger">🥈 #2</span>
+                                            {% elif loop.index == 3 %}
+                                                <span class="label label-danger">🥉 #3</span>
+                                            {% else %}
+                                                <span class="badge">{{ loop.index }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <strong>{{ user.username|e }}</strong>
+                                            <br>
+                                            <small style="color: #666;">{{ profile.title|e }}</small>
+                                            <br>
+                                            <small class="label" style="
+                                                {% if profile.level <= 10 %}background-color: #CD7F32;
+                                                {% elif profile.level <= 20 %}background-color: #C0C0C0;
+                                                {% elif profile.level <= 30 %}background-color: #FFD700;
+                                                {% elif profile.level <= 40 %}background-color: #E5E4E2;
+                                                {% else %}background-color: #B9F2FF;
+                                                {% endif %}
+                                                color: white; padding: 3px 6px; border-radius: 3px;">
+                                                {{ profile.get_rank_tier()|e }}
+                                            </small>
+                                        </td>
+                                        <td style="text-align: center;">
+                                            <span class="badge badge-info" style="background-color: #5bc0de; font-size: 14px;">
+                                                L{{ profile.level }}
+                                            </span>
+                                        </td>
+                                        <td style="text-align: center;">
+                                            <strong>{{ profile.points }}</strong>
+                                        </td>
+                                        <td style="text-align: center;">
+                                            <span style="color: #d9534f;">❤️ {{ profile.reputation }}</span>
+                                        </td>
+                                        <td style="text-align: center;">
+                                            <span class="badge">{{ profile.total_commands }}</span>
+                                        </td>
+                                        <td style="text-align: center;">
+                                            <span class="badge" style="background-color: #5cb85c;">
+                                                {{ profile.total_advanced_commands }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="7" style="text-align: center; padding: 40px;">
+                                            <p style="color: #999;">暫無數據</p>
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Summary -->
+    <div class="row" style="margin-top: 20px; margin-bottom: 20px;">
+        <div class="col-md-3">
+            <div class="info-box" style="background-color: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 4px; text-align: center;">
+                <i class="fa fa-users fa-2x" style="color: #5cb85c;"></i>
+                <p style="margin-top: 10px; color: #666;">
+                    <strong>活躍用戶</strong>
+                    <br>
+                    <span style="font-size: 24px; color: #5cb85c;">
+                        {{ leaderboard|length }}
+                    </span>
+                </p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="info-box" style="background-color: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 4px; text-align: center;">
+                <i class="fa fa-star fa-2x" style="color: #f0ad4e;"></i>
+                <p style="margin-top: 10px; color: #666;">
+                    <strong>最高積分</strong>
+                    <br>
+                    <span style="font-size: 24px; color: #f0ad4e;">
+                        {% if leaderboard %}{{ leaderboard[0][1].points }}{% else %}0{% endif %}
+                    </span>
+                </p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="info-box" style="background-color: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 4px; text-align: center;">
+                <i class="fa fa-level-up fa-2x" style="color: #5bc0de;"></i>
+                <p style="margin-top: 10px; color: #666;">
+                    <strong>最高等級</strong>
+                    <br>
+                    <span style="font-size: 24px; color: #5bc0de;">
+                        {% if leaderboard %}L{{ leaderboard[0][1].level }}{% else %}L1{% endif %}
+                    </span>
+                </p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="info-box" style="background-color: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 4px; text-align: center;">
+                <i class="fa fa-heart fa-2x" style="color: #d9534f;"></i>
+                <p style="margin-top: 10px; color: #666;">
+                    <strong>最高聲譽</strong>
+                    <br>
+                    <span style="font-size: 24px; color: #d9534f;">
+                        {% if leaderboard %}{{ leaderboard[0][1].reputation }}{% else %}0{% endif %}
+                    </span>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .table-hover tbody tr:hover {
+        background-color: #f9f9f9;
+    }
+    .info-box {
+        transition: all 0.3s ease;
+    }
+    .info-box:hover {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+</style>
+{% endblock %}

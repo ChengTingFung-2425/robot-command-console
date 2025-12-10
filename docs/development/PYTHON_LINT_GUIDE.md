@@ -8,8 +8,8 @@
 # 安裝 lint 工具
 pip install flake8 autopep8
 
-# 檢查所有 E 和 F 級別問題（必須修復）
-flake8 src/ MCP/ --max-line-length=120 --select=E,F
+# 檢查所有 W, E 和 F 級別問題（必須修復）
+flake8 src/ MCP/ --max-line-length=120 --select=E,F,W
 
 # 檢查所有問題
 flake8 src/ MCP/ --max-line-length=120

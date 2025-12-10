@@ -128,14 +128,14 @@ def get_local_robot(robot_id: str) -> Optional[Dict[str, Any]]:
 def register_local_robot(robot_data: Dict[str, Any]) -> Dict[str, Any]:
     """註冊本地機器人"""
     global _robot_id_counter
-    
+
     # 使用計數器生成唯一 ID，避免刪除後的 ID 衝突
     if robot_data.get('id'):
         robot_id = robot_data['id']
     else:
         _robot_id_counter += 1
         robot_id = f"robot_{_robot_id_counter}"
-    
+
     robot_type = robot_data.get('type', 'humanoid')
     type_info = ROBOT_TYPES.get(robot_type, ROBOT_TYPES['other'])
 
@@ -509,7 +509,7 @@ def api_llm_providers():
 
 def detect_local_llm_providers() -> List[Dict[str, Any]]:
     """偵測本地 LLM 提供商
-    
+
     使用環境變數配置的端點進行檢測：
     - OLLAMA_ENDPOINT: Ollama 服務端點
     - LMSTUDIO_ENDPOINT: LM Studio 服務端點

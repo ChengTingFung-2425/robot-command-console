@@ -4,8 +4,8 @@
 
 Robot Command Console 是一個用於機器人指令管理、路由與執行的整合式控制台與服務平台。本文件說明專案的目錄結構、模組職責與設計原則。
 
-> **狀態**：Phase 3.1 已完成，Phase 3.2 準備中
-> **最後更新**：2025-12-04
+> **狀態**：Phase 3.1 已完成，Phase 3.2 進行中（Tiny 版本開發）
+> **最後更新**：2025-12-10
 
 ## 目錄結構（Phase 3）
 
@@ -34,13 +34,23 @@ robot-command-console/
 │       ├── queue/            # 佇列系統
 │       └── utils/            # Edge 工具（重導出 common）
 │
-├── electron-app/              # Edge 環境：Electron 應用程序
+├── electron-app/              # Edge 環境：Electron 應用程序 (Heavy 版本)
 │   ├── main.js               # Electron 主程序
 │   ├── preload.js            # 預載入腳本（安全橋接）
 │   ├── renderer/             # 渲染器進程（UI）
 │   │   ├── index.html
 │   │   └── renderer.js
 │   └── package.json          # Electron 專用依賴
+│
+├── qtwebview-app/            # Edge 環境：PyQt 應用程序 (Tiny 版本, Phase 3.2)
+│   ├── main.py               # PyQt 主程式入口
+│   ├── webview_window.py     # QtWebEngineView 封裝
+│   ├── flask_manager.py      # Flask 服務管理器
+│   ├── bridge.py             # QWebChannel JS-Python 橋接
+│   ├── system_tray.py        # 系統托盤
+│   ├── resources/            # 圖示與資源
+│   ├── requirements.txt      # PyQt 依賴
+│   └── build/                # 打包配置
 │
 ├── MCP/                       # Server 環境：Model Context Protocol 服務
 │   ├── api.py                # FastAPI 主應用

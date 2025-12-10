@@ -20,7 +20,68 @@
 | **開發指南** | [development/](development/) |
 | **功能文件** | [features/](features/) |
 | **安全文件** | [security/TOKEN_SECURITY.md](security/TOKEN_SECURITY.md) |
-| **Phase 3 文件** | [phase3/PHASE3_1_STATUS_REPORT.md](phase3/PHASE3_1_STATUS_REPORT.md)、[phase3/TEST_PLAN_PHASE3_1.md](phase3/TEST_PLAN_PHASE3_1.md) |
+| **Phase 3 文件** | [phase3/PHASE3_1_STATUS_REPORT.md](phase3/PHASE3_1_STATUS_REPORT.md)、[phase3/TEST_PLAN_PHASE3_1.md](phase3/TEST_PLAN_PHASE3_1.md)、[phase3/PHASE3_2_QTWEBVIEW_PLAN.md](phase3/PHASE3_2_QTWEBVIEW_PLAN.md) |
+| **使用者指引** | [user_guide/TINY_VS_HEAVY.md](user_guide/TINY_VS_HEAVY.md)、[user_guide/TINY_INSTALL_GUIDE.md](user_guide/TINY_INSTALL_GUIDE.md) |
+
+---
+
+## 🚀 Phase 3.2: Tiny 版本開發經驗（2025-12-10）
+
+### 雙版本策略實作
+
+**決策**：建立 PyQt+QtWebView 輕量版本（Tiny）與 Electron 版本（Heavy）並行發布
+
+**實作重點**：
+- ✅ 使用 PyQt6 + QtWebEngine 建立輕量桌面應用
+- ✅ Flask 服務管理器：自動尋找可用埠、健康檢查、自動重啟
+- ✅ QWebChannel 橋接：JS-Python 通訊，提供原生功能
+- ✅ 跨平台打包：PyInstaller 配置（Windows/macOS/Linux）
+
+**技術選型**：
+```python
+# 選擇 PyQt6 而非 PySide6
+# 原因：更成熟的社群、更完整的文檔、GPL 授權可接受
+
+# 選擇 QtWebEngineView 而非 QWebView
+# 原因：Qt6 官方推薦、支援現代 Web 標準
+
+# 選擇 PyInstaller 而非 Nuitka/cx_Freeze
+# 原因：跨平台支援完整、社群活躍
+```
+
+**目錄結構設計**：
+```
+qtwebview-app/
+├── main.py              # 主程式入口
+├── flask_manager.py     # Flask 服務管理（含健康檢查）
+├── webview_window.py    # WebView 視窗
+├── bridge.py            # JS-Python 橋接
+├── system_tray.py       # 系統托盤
+└── build/               # 打包配置（3 個平台）
+```
+
+**健康檢查機制**：
+```python
+# 每 5 秒檢查一次 Flask 服務
+# 失敗時自動重啟（最多 3 次）
+# 使用獨立執行緒避免阻塞 UI
+```
+
+**重要經驗**：
+1. **埠號管理**：動態尋找可用埠而非固定埠號
+2. **進程管理**：使用 `subprocess.Popen` 管理 Flask，確保正確終止
+3. **.gitignore 衝突**：build/ 目錄預設被忽略，需使用 `-f` 強制加入配置檔案
+4. **Import 錯誤**：模組名稱不能包含連字號（`qtwebview-app`），需特殊處理
+
+**文件結構**：
+- 規劃文件：18KB 詳細實作指引（`PHASE3_2_QTWEBVIEW_PLAN.md`）
+- 使用者指引：版本選擇、安裝指引
+- 架構文件：加入 Tiny 版本說明
+
+**下一步**：
+- Flask Blueprint 調整（靜態資源本地化）
+- 實際測試與驗證
+- 完善打包腳本
 
 ---
 

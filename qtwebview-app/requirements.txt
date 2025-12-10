@@ -1,0 +1,14 @@
+# PyQt6 核心
+PyQt6>=6.6.0
+PyQt6-WebEngine>=6.6.0
+
+# 打包工具
+pyinstaller>=6.0.0
+
+# HTTP 請求
+requests>=2.31.0
+
+# 注意：運行前需先安裝主專案依賴：
+#   pip install -r ../requirements.txt
+# 或使用統一安裝：
+#   pip install -r ../requirements.txt && pip install -r requirements.txt

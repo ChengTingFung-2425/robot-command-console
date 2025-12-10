@@ -267,13 +267,7 @@ class CommandHistoryManager:
             record = self.history_store.get_record(command_id)
         else:
             # 透過 trace_id 查詢
-            records = self.history_store.query_records(limit=1)
-            # 簡化查詢，實際應該支援按 trace_id 查詢
-            record = None
-            for r in records:
-                if r.trace_id == trace_id:
-                    record = r
-                    break
+            record = self.history_store.get_by_trace_id(trace_id)
         
         if record and record.result:
             # 將結果加入快取

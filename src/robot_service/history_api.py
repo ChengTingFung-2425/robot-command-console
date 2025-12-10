@@ -123,19 +123,9 @@ def create_history_api_blueprint(
             JSON 格式的指令記錄
         """
         try:
-            records = history_manager.get_command_history(limit=1)
-            record = None
-            
-            # 簡單搜尋（實際應優化查詢）
-            for r in records:
-                if r.command_id == command_id:
-                    record = r
-                    break
-            
-            if record is None:
-                # 嘗試從資料庫直接取得
-                store = history_manager.history_store
-                record = store.get_record(command_id)
+            # 直接從資料庫取得
+            store = history_manager.history_store
+            record = store.get_record(command_id)
             
             if record is None:
                 return jsonify({

@@ -806,4 +806,352 @@ cancelled   failed       failed
 
 ---
 
-**最後更新**：2025-12-04
+## 🗄️ Phase 3.2: 本地指令歷史與快取實作（2025-12-10）
+
+### 功能實作總結
+
+**目標**：為 Edge 環境實作本地指令歷史記錄與快取功能，支援離線使用與效能優化。
+
+**實作模組**：
+1. **CommandHistoryStore** (`src/common/command_history.py`)
+2. **CommandCache** (`src/common/command_cache.py`)
+3. **CommandResultCache** (`src/common/command_cache.py`)
+4. **CommandHistoryManager** (`src/robot_service/command_history_manager.py`)
+5. **History API** (`src/robot_service/history_api.py`)
+
+**測試覆蓋**：57 個測試，100% 通過率
+
+---
+
+### 9.1 SQLite 索引設計
+
+```python
+# ✅ 為常用查詢欄位建立索引
+CREATE INDEX IF NOT EXISTS idx_command_history_trace_id ON command_history(trace_id)
+CREATE INDEX IF NOT EXISTS idx_command_history_robot_id ON command_history(robot_id)
+CREATE INDEX IF NOT EXISTS idx_command_history_status ON command_history(status)
+CREATE INDEX IF NOT EXISTS idx_command_history_created_at ON command_history(created_at)
+CREATE INDEX IF NOT EXISTS idx_command_history_command_id ON command_history(command_id)
+```
+
+**經驗教訓**：
+1. **主鍵索引**：command_id 作為主鍵自動建立索引
+2. **外鍵索引**：trace_id 雖非外鍵但查詢頻繁，需建立索引
+3. **查詢優化**：為所有 WHERE 子句中常用的欄位建立索引
+4. **時間範圍查詢**：created_at 索引支援時間範圍篩選
+
+---
+
+### 9.2 查詢方法設計模式
+
+```python
+# ❌ 效率低下的查詢方式
+def get_by_trace_id(trace_id):
+    records = query_records(limit=1)  # 只查 1 筆
+    for r in records:
+        if r.trace_id == trace_id:
+            return r
+    return None
+
+# ✅ 正確的查詢方式
+def get_by_trace_id(self, trace_id: str) -> Optional[CommandRecord]:
+    cursor.execute('''
+        SELECT * FROM command_history WHERE trace_id = ? LIMIT 1
+    ''', (trace_id,))
+    return cursor.fetchone()
+```
+
+**經驗教訓**：
+1. 直接使用 SQL WHERE 子句篩選，而非先查詢再在 Python 中過濾
+2. 為常用查詢模式建立專門方法（如 `get_by_trace_id`）
+3. 使用 `LIMIT 1` 優化單筆查詢
+
+---
+
+### 9.3 LRU 快取實作
+
+```python
+# ✅ 使用 OrderedDict 實作 LRU
+from collections import OrderedDict
+
+class CommandCache:
+    def __init__(self, max_size: int):
+        self._cache: OrderedDict[str, CacheEntry] = OrderedDict()
+        self.max_size = max_size
+    
+    def get(self, key: str):
+        if key in self._cache:
+            # 移到最後（標記為最近使用）
+            self._cache.move_to_end(key)
+            return self._cache[key].value
+    
+    def set(self, key: str, value: Any):
+        if len(self._cache) >= self.max_size:
+            # 移除最舊的項目（第一個）
+            self._cache.popitem(last=False)
+        self._cache[key] = CacheEntry(key, value)
+```
+
+**經驗教訓**：
+1. **OrderedDict**：Python 內建的有序字典非常適合實作 LRU
+2. **move_to_end()**：更新存取順序的高效方法
+3. **popitem(last=False)**：移除最舊項目（FIFO 方式）
+4. **執行緒安全**：使用 `threading.RLock()` 保護操作
+
+---
+
+### 9.4 TTL 過期機制設計
+
+```python
+@dataclass
+class CacheEntry:
+    key: str
+    value: Any
+    created_at: datetime = field(default_factory=utc_now)
+    expires_at: Optional[datetime] = None
+    
+    def is_expired(self) -> bool:
+        if self.expires_at is None:
+            return False
+        return utc_now() >= self.expires_at
+
+# 設定 TTL
+def set(self, key: str, value: Any, ttl_seconds: Optional[int] = None):
+    if ttl_seconds is None:
+        ttl_seconds = self.default_ttl_seconds
+    
+    expires_at = None
+    if ttl_seconds > 0:
+        expires_at = utc_now() + timedelta(seconds=ttl_seconds)
+    
+    entry = CacheEntry(key=key, value=value, expires_at=expires_at)
+    self._cache[key] = entry
+```
+
+**經驗教訓**：
+1. **可選過期**：`expires_at=None` 表示永不過期
+2. **TTL=0**：特殊值表示永不過期，與預設 TTL 區分
+3. **惰性清理**：在 get() 時檢查過期，而非主動定期掃描
+4. **主動清理**：提供 `cleanup_expired()` 方法供定期呼叫
+
+---
+
+### 9.5 統一管理介面設計
+
+```python
+# ✅ 整合歷史與快取的統一介面
+class CommandHistoryManager:
+    def __init__(self, history_db_path, cache_max_size, cache_ttl):
+        self.history_store = CommandHistoryStore(db_path=history_db_path)
+        self.result_cache = CommandResultCache(
+            max_size=cache_max_size,
+            default_ttl_seconds=cache_ttl
+        )
+    
+    def get_command_result(self, command_id, use_cache=True):
+        # 優先從快取取得
+        if use_cache:
+            cached = self.result_cache.get(command_id)
+            if cached is not None:
+                return cached
+        
+        # 快取未命中，從歷史取得
+        record = self.history_store.get_record(command_id)
+        if record and record.result:
+            # 自動加入快取
+            if use_cache:
+                self.cache_command_result(command_id, record.trace_id, record.result)
+            return record.result
+        
+        return None
+```
+
+**經驗教訓**：
+1. **統一介面**：隱藏底層實作細節，提供簡潔 API
+2. **智能快取**：從資料庫查詢時自動加入快取
+3. **可選快取**：提供 `use_cache` 參數允許繞過快取
+4. **自動同步**：更新狀態時自動更新快取
+
+---
+
+### 9.6 Flask Blueprint 設計模式
+
+```python
+# ✅ 使用工廠函式建立 Blueprint
+def create_history_api_blueprint(
+    history_manager: CommandHistoryManager,
+    url_prefix: str = '/api/commands'
+) -> Blueprint:
+    bp = Blueprint('command_history_api', __name__, url_prefix=url_prefix)
+    
+    @bp.route('/history', methods=['GET'])
+    def get_command_history():
+        # 使用閉包存取 history_manager
+        records = history_manager.get_command_history(...)
+        return jsonify({'status': 'success', 'data': records})
+    
+    return bp
+
+# 使用
+app = Flask(__name__)
+manager = CommandHistoryManager()
+history_bp = create_history_api_blueprint(manager)
+app.register_blueprint(history_bp)
+```
+
+**經驗教訓**：
+1. **工廠模式**：使用工廠函式而非直接建立 Blueprint
+2. **依賴注入**：透過參數傳入依賴（如 history_manager）
+3. **閉包**：Blueprint 內的路由函式可存取外層變數
+4. **靈活配置**：url_prefix 可自訂，方便整合
+
+---
+
+### 9.7 分頁查詢最佳實踐
+
+```python
+# ✅ 完整的分頁查詢回應
+@bp.route('/history', methods=['GET'])
+def get_command_history():
+    limit = request.args.get('limit', 100, type=int)
+    offset = request.args.get('offset', 0, type=int)
+    
+    # 查詢資料
+    records = history_manager.get_command_history(
+        limit=min(limit, 1000),  # 限制最大值
+        offset=max(offset, 0)     # 防止負數
+    )
+    
+    # 統計總數
+    total = history_manager.count_commands()
+    
+    return jsonify({
+        'status': 'success',
+        'data': {
+            'records': [r.to_dict() for r in records],
+            'pagination': {
+                'total': total,
+                'limit': limit,
+                'offset': offset,
+                'has_more': (offset + len(records)) < total
+            }
+        }
+    })
+```
+
+**經驗教訓**：
+1. **limit 上限**：防止過大的 limit 值影響效能
+2. **offset 下限**：防止負數 offset
+3. **分頁資訊**：提供 total、has_more 等資訊方便前端
+4. **獨立計數**：使用專門的 count 查詢，避免查詢所有資料
+
+---
+
+### 9.8 測試資料清理策略
+
+```python
+# ✅ 使用 fixture 管理測試資源
+@pytest.fixture
+def temp_db():
+    """建立臨時資料庫"""
+    fd, path = tempfile.mkstemp(suffix='.db')
+    os.close(fd)
+    yield path
+    # 測試結束後自動清理
+    if os.path.exists(path):
+        os.unlink(path)
+
+@pytest.fixture
+def manager(temp_db):
+    """建立測試用的 Manager"""
+    return CommandHistoryManager(history_db_path=temp_db)
+```
+
+**經驗教訓**：
+1. **臨時檔案**：使用 `tempfile.mkstemp()` 建立臨時資料庫
+2. **自動清理**：使用 `yield` 確保測試後清理資源
+3. **fixture 鏈**：manager fixture 依賴 temp_db fixture
+4. **隔離性**：每個測試使用獨立的資料庫，避免相互影響
+
+---
+
+### 9.9 dataclass 與 JSON 序列化
+
+```python
+@dataclass
+class CommandRecord:
+    command_id: str
+    created_at: datetime
+    command_params: Dict[str, Any]
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """轉換為字典格式"""
+        data = asdict(self)
+        # 手動處理 datetime 序列化
+        if isinstance(data.get('created_at'), datetime):
+            data['created_at'] = data['created_at'].isoformat()
+        # 手動處理巢狀字典（已是 dict 不需處理）
+        return data
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'CommandRecord':
+        """從字典建立實例"""
+        # 手動處理 datetime 反序列化
+        if isinstance(data.get('created_at'), str):
+            data['created_at'] = parse_iso_datetime(data['created_at'])
+        return cls(**data)
+```
+
+**經驗教訓**：
+1. **asdict() 限制**：無法自動處理 datetime、自訂類型
+2. **手動序列化**：需要明確轉換 datetime 為 ISO 字串
+3. **類型檢查**：使用 isinstance() 判斷是否需要轉換
+4. **對稱處理**：to_dict 和 from_dict 應對稱處理所有欄位
+
+---
+
+### 9.10 Code Review 回饋整合
+
+**問題 1**：查詢效率低下
+
+```python
+# ❌ Code Review 前
+def get_command_by_id(command_id):
+    records = get_command_history(limit=1)  # 只查最新一筆
+    for r in records:
+        if r.command_id == command_id:
+            return r
+
+# ✅ Code Review 後
+def get_command_by_id(command_id):
+    return history_store.get_record(command_id)  # 直接查詢
+```
+
+**問題 2**：缺少索引
+
+```python
+# ✅ 為 trace_id 加入索引
+CREATE INDEX IF NOT EXISTS idx_command_history_trace_id 
+ON command_history(trace_id)
+```
+
+**問題 3**：查詢方法不足
+
+```python
+# ✅ 新增專門的查詢方法
+def get_by_trace_id(self, trace_id: str) -> Optional[CommandRecord]:
+    cursor.execute('''
+        SELECT * FROM command_history WHERE trace_id = ? LIMIT 1
+    ''', (trace_id,))
+    return self._row_to_record(cursor.fetchone())
+```
+
+**經驗教訓**：
+1. **即時修復**：Code Review 發現問題應立即修復
+2. **根本解決**：不只修復表面問題，還要優化底層設計
+3. **完善測試**：修復後運行測試確保功能正常
+4. **文件更新**：重要變更應更新功能文件
+
+---
+
+**最後更新**：2025-12-10

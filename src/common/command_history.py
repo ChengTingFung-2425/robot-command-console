@@ -133,6 +133,10 @@ class CommandHistoryStore:
             CREATE INDEX IF NOT EXISTS idx_command_history_created_at 
             ON command_history(created_at)
         ''')
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_command_history_command_id 
+            ON command_history(command_id)
+        ''')
         
         conn.commit()
         conn.close()
@@ -257,6 +261,34 @@ class CommandHistoryStore:
             return None
         except Exception as e:
             logger.error(f"Failed to get command record: {e}")
+            return None
+    
+    def get_by_trace_id(self, trace_id: str) -> Optional[CommandRecord]:
+        """透過 trace_id 取得指令記錄
+        
+        Args:
+            trace_id: 追蹤 ID
+            
+        Returns:
+            指令記錄，若不存在則回傳 None
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                SELECT * FROM command_history WHERE trace_id = ? LIMIT 1
+            ''', (trace_id,))
+            
+            row = cursor.fetchone()
+            conn.close()
+            
+            if row:
+                return self._row_to_record(row)
+            return None
+        except Exception as e:
+            logger.error(f"Failed to get command record by trace_id: {e}")
             return None
     
     def query_records(

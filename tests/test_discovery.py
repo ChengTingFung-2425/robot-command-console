@@ -255,9 +255,24 @@ class TestSecurity:
 
     def test_memory_guard_secure_delete(self):
         """測試安全刪除"""
-        data = "sensitive data"
-        MemoryGuard.secure_delete(data)
-        # 資料應該被清除（雖然 Python 中無法完全驗證）
+        # 測試字符串（不可變，無法真正刪除）
+        data_str = "sensitive data"
+        # 驗證函數執行不會拋出異常
+        try:
+            MemoryGuard.secure_delete(data_str)
+        except Exception as e:
+            pytest.fail(f"secure_delete raised an exception: {e}")
+        
+        # 測試可變容器（可以清空）
+        data_list = ["sensitive", "data"]
+        MemoryGuard.secure_delete(data_list)
+        # 驗證列表已被清空
+        assert len(data_list) == 0, "List should be cleared"
+        
+        data_dict = {"key": "sensitive"}
+        MemoryGuard.secure_delete(data_dict)
+        # 驗證字典已被清空
+        assert len(data_dict) == 0, "Dict should be cleared"
 
     def test_memory_guard_secure_context(self):
         """測試安全上下文"""

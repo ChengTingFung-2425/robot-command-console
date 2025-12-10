@@ -5,7 +5,7 @@ LLM Copilot Discovery Service
 """
 
 import logging
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Tuple
 from datetime import datetime, timezone
 
 from .models import ProviderManifest, ProviderHealth, Skill
@@ -34,7 +34,7 @@ class DiscoveryService:
         self.scanner = FilesystemScanner()
         self.probe = EndpointProbe()
 
-    def scan_providers(self) -> List[ProviderManifest]:
+    async def scan_providers(self) -> List[ProviderManifest]:
         """
         掃描並返回所有註冊的提供商
         
@@ -199,7 +199,7 @@ class DiscoveryService:
         self,
         keyword: Optional[str] = None,
         category: Optional[str] = None
-    ) -> List[tuple[str, Skill]]:
+    ) -> List[Tuple[str, Skill]]:
         """
         搜尋技能
         

@@ -9,7 +9,7 @@ import socket
 import time
 import logging
 from datetime import datetime, timezone
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 import urllib.request
 import urllib.error
 
@@ -183,7 +183,7 @@ class EndpointProbe:
     @staticmethod
     def check_provider_health(
         provider_id: str,
-        endpoints: list[Endpoint],
+        endpoints: List[Endpoint],
         previous_failures: int = 0
     ) -> ProviderHealth:
         """

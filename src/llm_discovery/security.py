@@ -71,10 +71,10 @@ class PromptSanitizer:
             prompt: 要清除的 prompt
         """
         if prompt:
-            # Python 字符串不可變，無法直接覆寫
-            # 觸發垃圾回收以儘快釋放記憶體
+            # 此方法無法保證 prompt 會立即或安全地從記憶體中清除。
+            # 垃圾回收僅是提示，不能作為安全清除的依據。請勿將此方法用於關鍵安全場景。
+            # 調用者必須在自己的作用域中刪除所有 prompt 的引用，否則資料可能仍留在記憶體中。
             gc.collect()
-            # 注意：調用者需要在自己的作用域中刪除 prompt 引用
 
 
 class ResponseFilter:

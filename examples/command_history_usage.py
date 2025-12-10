@@ -221,10 +221,10 @@ def error_handling_example():
         result = manager.get_command_result(command_id='nonexistent-cmd')
         if result is None:
             print("⚠️  Command not found, using default value")
-            result = {'status': 'unknown'}
+            default_result = {'status': 'unknown'}
+            print(f"   Using default result: {default_result}")
     except Exception as e:
         print(f"❌ Error getting command result: {e}")
-        result = None
     
     # 2. 處理查詢錯誤
     try:
@@ -235,7 +235,6 @@ def error_handling_example():
         print(f"✅ Successfully queried {len(records)} records")
     except Exception as e:
         print(f"❌ Query failed: {e}")
-        records = []
     
     # 3. 監控快取命中率
     stats = manager.get_cache_stats()
@@ -273,7 +272,7 @@ def offline_usage_example():
         print(f"✅ Offline command recorded: {record.command_id}")
     
     # 2. 更新執行結果
-    for record in offline_commands:
+    for i, record in enumerate(offline_commands):
         manager.update_command_status(
             command_id=record.command_id,
             status='succeeded',

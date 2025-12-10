@@ -70,7 +70,7 @@ class TestCommandHistoryManager:
     
     def test_update_command_status(self, manager):
         """測試更新指令狀態"""
-        record = manager.record_command(
+        manager.record_command(
             command_id='cmd-001',
             robot_id='robot_7'
         )
@@ -194,7 +194,7 @@ class TestCommandHistoryManager:
         """測試統計指令數量"""
         # 記錄指令
         for i in range(10):
-            record = manager.record_command(
+            manager.record_command(
                 command_id=f'cmd-{i}',
                 robot_id='robot_7' if i < 6 else 'robot_3'
             )
@@ -270,7 +270,7 @@ class TestCommandHistoryManager:
         # 由於 CommandRecord 的 created_at 是在建立時設定，
         # 這裡我們直接在資料庫中操作
         for i in range(3):
-            record = manager.record_command(
+            manager.record_command(
                 command_id=f'cmd-old-{i}',
                 robot_id='robot_7'
             )

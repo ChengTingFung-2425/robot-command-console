@@ -63,11 +63,29 @@ def create_history_api_blueprint(
             start_time: Optional[datetime] = None
             end_time: Optional[datetime] = None
             
-            if request.args.get('start_time'):
-                start_time = parse_iso_datetime(request.args.get('start_time'))
+            start_time_str = request.args.get('start_time')
+            if start_time_str:
+                start_time = parse_iso_datetime(start_time_str)
+                if start_time is None:
+                    return jsonify({
+                        'status': 'error',
+                        'error': {
+                            'code': 'INVALID_PARAMETER',
+                            'message': 'Invalid start_time format'
+                        }
+                    }), 400
             
-            if request.args.get('end_time'):
-                end_time = parse_iso_datetime(request.args.get('end_time'))
+            end_time_str = request.args.get('end_time')
+            if end_time_str:
+                end_time = parse_iso_datetime(end_time_str)
+                if end_time is None:
+                    return jsonify({
+                        'status': 'error',
+                        'error': {
+                            'code': 'INVALID_PARAMETER',
+                            'message': 'Invalid end_time format'
+                        }
+                    }), 400
             
             # 查詢歷史記錄
             records = history_manager.get_command_history(
@@ -81,7 +99,7 @@ def create_history_api_blueprint(
                 offset=max(offset, 0)
             )
             
-            # 統計總數
+            # 統計總數（需包含與查詢相同的篩選條件）
             total = history_manager.count_commands(
                 robot_id=robot_id,
                 status=status,
@@ -197,7 +215,7 @@ def create_history_api_blueprint(
                 'status': 'error',
                 'error': {
                     'code': 'CLEAR_ERROR',
-                    'message': str(e)
+                    'message': 'An internal error has occurred.'
                 }
             }), 500
     
@@ -224,7 +242,7 @@ def create_history_api_blueprint(
                 'status': 'error',
                 'error': {
                     'code': 'CLEANUP_ERROR',
-                    'message': str(e)
+                    'message': 'An internal error has occurred.'
                 }
             }), 500
     
@@ -257,7 +275,7 @@ def create_history_api_blueprint(
                 'status': 'error',
                 'error': {
                     'code': 'CLEANUP_ERROR',
-                    'message': str(e)
+                    'message': 'An internal error has occurred.'
                 }
             }), 500
     
@@ -296,7 +314,7 @@ def create_history_api_blueprint(
                 'status': 'error',
                 'error': {
                     'code': 'STATS_ERROR',
-                    'message': str(e)
+                    'message': 'An internal error has occurred.'
                 }
             }), 500
     

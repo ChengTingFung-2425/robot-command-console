@@ -4,7 +4,7 @@
 
 import os
 import tempfile
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -75,7 +75,7 @@ class TestCommandHistoryStore:
     
     def test_init_db(self, temp_db):
         """測試資料庫初始化"""
-        store = CommandHistoryStore(db_path=temp_db)
+        _ = CommandHistoryStore(db_path=temp_db)
         assert os.path.exists(temp_db)
     
     def test_add_record(self, history_store, sample_record):

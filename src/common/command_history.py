@@ -133,10 +133,6 @@ class CommandHistoryStore:
             CREATE INDEX IF NOT EXISTS idx_command_history_created_at 
             ON command_history(created_at)
         ''')
-        cursor.execute('''
-            CREATE INDEX IF NOT EXISTS idx_command_history_command_id 
-            ON command_history(command_id)
-        ''')
         
         conn.commit()
         conn.close()

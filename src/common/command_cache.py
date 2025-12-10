@@ -144,7 +144,8 @@ class CommandCache:
                 if ttl_seconds > 0:
                     expires_at = utc_now() + timedelta(seconds=ttl_seconds)
                 
-                # 如果鍵已存在，先移除
+                # 如果鍵已存在，先移除以確保新增時會移到最後（維持 LRU 語義）
+                # 不能直接覆寫，因為 OrderedDict 會保持原有位置
                 if key in self._cache:
                     del self._cache[key]
                 
@@ -291,6 +292,14 @@ class CommandResultCache(CommandCache):
         # trace_id 到 command_id 的對應
         self._trace_to_command: Dict[str, str] = {}
     
+    def _remove_entry(self, key: str):
+        """移除快取項目時，同步清理 trace_id 對應"""
+        # 找出所有 trace_id 對應此 command_id
+        to_remove = [tid for tid, cid in self._trace_to_command.items() if cid == key]
+        for tid in to_remove:
+            del self._trace_to_command[tid]
+        super()._remove_entry(key)
+    
     def set_command_result(
         self,
         command_id: str,
@@ -328,7 +337,11 @@ class CommandResultCache(CommandCache):
             command_id = self._trace_to_command.get(trace_id)
             if command_id is None:
                 return None
-            return self.get(command_id)
+            result = self.get(command_id)
+            if result is None:
+                # 快取已過期或被淘汰，清理 trace_id 映射
+                del self._trace_to_command[trace_id]
+            return result
     
     def delete_by_trace_id(self, trace_id: str) -> bool:
         """透過 trace ID 刪除指令結果

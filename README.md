@@ -113,7 +113,24 @@ pip install -r requirements.txt
 pip install -r MCP/requirements.txt
 ```
 
-### 2. 啟動服務
+### 2. 啟動整合系統
+
+#### 🚀 推薦：一鍵啟動所有服務
+
+```bash
+# 啟動完整整合系統（Flask + MCP + WebUI）
+python3 start_all_services.py
+
+# 或使用統一啟動器
+python3 unified_launcher_cli.py
+```
+
+這會自動啟動：
+- **Flask API** (port 5000) - Edge 本地服務
+- **MCP Service** (port 8000) - 指令中介層
+- **WebUI** (port 8080) - Web 管理介面
+
+詳細說明請參閱：[完整整合指南](docs/INTEGRATION_GUIDE.md)
 
 #### 選項 A: Heavy 版本（Electron）
 
@@ -139,33 +156,78 @@ python qtwebview-app/main.py
 python3 run_service_cli.py --queue-size 1000 --workers 5
 ```
 
-#### 選項 D: 手動啟動 Flask 服務
+#### 選項 D: 手動啟動各服務
 
 ```bash
-# 設定環境變數並啟動
+# 終端 1: 啟動 Flask 服務
 APP_TOKEN=your-token-here PORT=5000 python3 flask_service.py
-```
 
-### 3. 啟動其他元件
-
-```bash
-# 啟動 MCP 服務
+# 終端 2: 啟動 MCP 服務
 cd MCP
 python3 start.py
 
-# 啟動 WebUI
+# 終端 3: 啟動 WebUI
 cd WebUI
 python microblog.py
 ```
 
-### 4. 執行測試
+### 3. 執行測試
 
 ```bash
 # 在專案根目錄執行所有測試
 python3 -m pytest tests/ -v
 
+# 執行端到端整合測試
+python3 -m pytest tests/test_e2e_integration.py -v
+
 # 執行特定測試
 python3 -m pytest tests/test_queue_system.py -v
+
+# JavaScript 整合測試（Electron POC）
+node test_integration.js
+```
+
+## 🔗 WebUI/MCP/Robot-Console 整合
+
+本專案實現了三大模組的完整整合：
+
+### 資料流向
+
+```
+WebUI（使用者介面）
+    ↓ HTTP REST API
+MCP（指令中介層）
+    ↓ 本地佇列 / MQTT
+Robot-Console（執行層）
+    ↓
+機器人硬體
+```
+
+### 整合方式
+
+1. **WebUI → MCP**：透過 HTTP REST API 呼叫（如 `/api/command`）
+2. **MCP → Robot-Console**：
+   - 方式 1：本地佇列（推薦，低延遲）
+   - 方式 2：MQTT（分散式環境）
+   - 方式 3：直接呼叫（同進程）
+
+### 關鍵文件
+
+- 📘 [完整整合指南](docs/INTEGRATION_GUIDE.md) - 詳細資料流向、整合點、配置說明
+- 🏗️ [系統架構](docs/architecture.md) - Server-Edge-Runner 三層架構
+- 📋 [權威規格](docs/proposal.md) - 資料契約、API 端點定義
+
+### 快速驗證整合
+
+```bash
+# 1. 啟動所有服務
+python3 start_all_services.py
+
+# 2. 執行端到端測試
+python3 -m pytest tests/test_e2e_integration.py -v
+
+# 3. 存取 WebUI（瀏覽器）
+open http://localhost:8080
 ```
 
 ## 專案約定與延伸

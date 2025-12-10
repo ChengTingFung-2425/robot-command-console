@@ -133,14 +133,20 @@ class FilesystemScanner:
             registry_path = FilesystemScanner.get_registry_path()
             file_path = registry_path / f"{manifest.provider_id}.json"
 
-            # 確保安全配置啟用
+            # 檢查安全配置（不自動修改，而是拒絕不安全的 manifest）
             if not manifest.anti_decryption.no_prompt_logging:
-                logger.warning(f"強制啟用 no_prompt_logging for {manifest.provider_id}")
-                manifest.anti_decryption.no_prompt_logging = True
+                logger.error(
+                    f"安全錯誤：Provider {manifest.provider_id} 未啟用 no_prompt_logging。"
+                    "為了保護用戶隱私，此配置必須啟用。註冊被拒絕。"
+                )
+                return False
 
             if not manifest.anti_decryption.no_model_exposure:
-                logger.warning(f"強制啟用 no_model_exposure for {manifest.provider_id}")
-                manifest.anti_decryption.no_model_exposure = True
+                logger.error(
+                    f"安全錯誤：Provider {manifest.provider_id} 未啟用 no_model_exposure。"
+                    "為了防止模型解密攻擊，此配置必須啟用。註冊被拒絕。"
+                )
+                return False
 
             # 寫入檔案
             with open(file_path, "w", encoding="utf-8") as f:

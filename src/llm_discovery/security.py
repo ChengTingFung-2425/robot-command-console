@@ -64,14 +64,17 @@ class PromptSanitizer:
         """
         從記憶體中清除 prompt
         
+        注意：Python 字符串是不可變的，此方法只能觸發垃圾回收，
+        無法保證立即從記憶體中清除。調用者應確保不保留對 prompt 的引用。
+        
         Args:
             prompt: 要清除的 prompt
         """
         if prompt:
-            # 覆寫變數
-            prompt = None
-            # 強制垃圾回收
+            # Python 字符串不可變，無法直接覆寫
+            # 觸發垃圾回收以儘快釋放記憶體
             gc.collect()
+            # 注意：調用者需要在自己的作用域中刪除 prompt 引用
 
 
 class ResponseFilter:
@@ -227,23 +230,17 @@ class MemoryGuard:
         """
         安全刪除資料
         
+        注意：此方法只能清空可變容器（list, dict），
+        對於不可變類型（str）無法真正清除記憶體。
+        
         Args:
-            data: 要刪除的資料
+            data: 要刪除的資料（應為可變容器）
         """
-        if isinstance(data, str):
-            # 覆寫字符串
-            data = "0" * len(data)
-        elif isinstance(data, (list, dict)):
-            # 清空容器
-            if isinstance(data, list):
-                data.clear()
-            else:
-                data.clear()
-
-        # 刪除引用
-        data = None
-
-        # 強制垃圾回收
+        if isinstance(data, (list, dict)):
+            # 清空可變容器
+            data.clear()
+        # 對於字符串等不可變類型，無法安全刪除
+        # 只能觸發垃圾回收
         gc.collect()
 
     @staticmethod

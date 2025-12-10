@@ -34,7 +34,7 @@ class DiscoveryService:
         self.scanner = FilesystemScanner()
         self.probe = EndpointProbe()
 
-    async def scan_providers(self) -> List[ProviderManifest]:
+    def scan_providers(self) -> List[ProviderManifest]:
         """
         掃描並返回所有註冊的提供商
         

@@ -9,7 +9,7 @@ import socket
 import time
 import logging
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, Tuple
 import urllib.request
 import urllib.error
 
@@ -23,7 +23,7 @@ class EndpointProbe:
     """端點活躍性探測器"""
 
     @staticmethod
-    def check_http_endpoint(endpoint: Endpoint) -> tuple[bool, float, Optional[str]]:
+    def check_http_endpoint(endpoint: Endpoint) -> Tuple[bool, float, Optional[str]]:
         """
         檢查 HTTP/HTTPS 端點
         
@@ -70,7 +70,7 @@ class EndpointProbe:
         return is_available, elapsed_time, error_message
 
     @staticmethod
-    def check_unix_socket(endpoint: Endpoint) -> tuple[bool, float, Optional[str]]:
+    def check_unix_socket(endpoint: Endpoint) -> Tuple[bool, float, Optional[str]]:
         """
         檢查 Unix socket 端點
         
@@ -110,7 +110,7 @@ class EndpointProbe:
         return is_available, elapsed_time, error_message
 
     @staticmethod
-    def check_tcp_endpoint(endpoint: Endpoint) -> tuple[bool, float, Optional[str]]:
+    def check_tcp_endpoint(endpoint: Endpoint) -> Tuple[bool, float, Optional[str]]:
         """
         檢查 TCP 端點
         
@@ -161,7 +161,7 @@ class EndpointProbe:
         return is_available, elapsed_time, error_message
 
     @staticmethod
-    def probe_endpoint(endpoint: Endpoint) -> tuple[bool, float, Optional[str]]:
+    def probe_endpoint(endpoint: Endpoint) -> Tuple[bool, float, Optional[str]]:
         """
         探測端點（自動選擇方法）
         

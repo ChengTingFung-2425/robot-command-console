@@ -5,7 +5,7 @@ LLM Copilot Discovery Service
 """
 
 import logging
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from datetime import datetime, timezone
 
 from .models import ProviderManifest, ProviderHealth, Skill

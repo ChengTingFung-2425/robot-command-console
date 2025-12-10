@@ -172,7 +172,7 @@ def create_history_api_blueprint(
                 'status': 'error',
                 'error': {
                     'code': 'STATS_ERROR',
-                    'message': str(e)
+                    'message': 'An internal error has occurred.'
                 }
             }), 500
     

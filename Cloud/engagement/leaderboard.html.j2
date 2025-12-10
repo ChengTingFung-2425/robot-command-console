@@ -61,9 +61,9 @@
                                             {% endif %}
                                         </td>
                                         <td>
-                                            <strong>{{ user.username }}</strong>
+                                            <strong>{{ user.username|e }}</strong>
                                             <br>
-                                            <small style="color: #666;">{{ profile.title }}</small>
+                                            <small style="color: #666;">{{ profile.title|e }}</small>
                                             <br>
                                             <small class="label" style="
                                                 {% if profile.level <= 10 %}background-color: #CD7F32;
@@ -73,7 +73,7 @@
                                                 {% else %}background-color: #B9F2FF;
                                                 {% endif %}
                                                 color: white; padding: 3px 6px; border-radius: 3px;">
-                                                {{ profile.get_rank_tier() }}
+                                                {{ profile.get_rank_tier()|e }}
                                             </small>
                                         </td>
                                         <td style="text-align: center;">

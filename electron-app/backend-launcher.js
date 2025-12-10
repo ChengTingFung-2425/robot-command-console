@@ -68,7 +68,6 @@ class BackendLauncher {
         env: { ...process.env }
       });
       
-      let startupBuffer = '';
       let started = false;
       let healthCheckInterval = null;
       

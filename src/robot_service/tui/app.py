@@ -17,6 +17,7 @@ from textual.reactive import reactive
 from ..service_coordinator import ServiceCoordinator
 from ..command_history_manager import CommandHistoryManager
 from ..service_manager import ServiceManager
+from ..llm_command_processor import LLMCommandProcessor
 from common.service_types import ServiceStatus
 from common.shared_state import SharedStateManager, EventTopics
 from .command_sender import CommandSender
@@ -205,7 +206,8 @@ class RobotConsoleTUI(App):
         coordinator: Optional[ServiceCoordinator] = None,
         state_manager: Optional[SharedStateManager] = None,
         history_manager: Optional[CommandHistoryManager] = None,
-        service_manager: Optional[ServiceManager] = None
+        service_manager: Optional[ServiceManager] = None,
+        llm_processor: Optional[LLMCommandProcessor] = None
     ):
         """
         初始化 TUI 應用
@@ -215,6 +217,7 @@ class RobotConsoleTUI(App):
             state_manager: 共享狀態管理器
             history_manager: 指令歷史管理器
             service_manager: 服務管理器（用於指令發送）
+            llm_processor: LLM 指令處理器（用於自然語言指令）
         """
         super().__init__()
         
@@ -222,6 +225,7 @@ class RobotConsoleTUI(App):
         self.state_manager = state_manager
         self.history_manager = history_manager
         self.service_manager = service_manager
+        self.llm_processor = llm_processor
         
         # 建立指令發送器
         self.command_sender = CommandSender(
@@ -232,6 +236,7 @@ class RobotConsoleTUI(App):
         # 內部狀態
         self._update_task: Optional[asyncio.Task] = None
         self._running = False
+        self._llm_mode = False  # LLM 模式開關
     
     def compose(self) -> ComposeResult:
         """組成 UI 元件"""
@@ -292,6 +297,21 @@ class RobotConsoleTUI(App):
         # 清空輸入
         event.input.value = ""
         
+        # 檢查是否切換 LLM 模式
+        if command.lower() == "llm:on":
+            self._llm_mode = True
+            self.notify("LLM mode enabled - 自然語言指令模式已啟用", severity="information")
+            return
+        elif command.lower() == "llm:off":
+            self._llm_mode = False
+            self.notify("LLM mode disabled - 切換回直接指令模式", severity="information")
+            return
+        
+        # 如果啟用 LLM 模式且有 LLM processor，使用自然語言處理
+        if self._llm_mode and self.llm_processor:
+            await self._handle_llm_command(command)
+            return
+        
         # 解析指令格式
         robot_id, action = self._parse_command(command)
         
@@ -331,6 +351,42 @@ class RobotConsoleTUI(App):
         except Exception as e:
             history.add_command(timestamp, robot_id, action, "error")
             self.notify(f"Error: {str(e)}", severity="error")
+    
+    async def _handle_llm_command(self, command: str) -> None:
+        """
+        處理 LLM 自然語言指令
+        
+        Args:
+            command: 使用者輸入的自然語言指令
+        """
+        history = self.query_one("#history", CommandHistoryWidget)
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        
+        try:
+            # 透過 LLM processor 處理指令
+            result = await self.llm_processor.process_text_command(command)
+            
+            if result["success"]:
+                # 顯示 LLM 回應
+                self.notify(result["response"], severity="information")
+                
+                # 記錄執行的 functions
+                for func in result["executed_functions"]:
+                    func_name = func["function_name"]
+                    status = "sent" if func["success"] else "error"
+                    history.add_command(timestamp, "LLM", func_name, status)
+                    
+                    # 如果是機器人指令，透過 bridge 已經發送到佇列
+                    # bridge 會將指令放入佇列供真實機器人消費
+                    if func["success"]:
+                        self.notify(f"Function '{func_name}' executed via LLM bridge", severity="information")
+            else:
+                history.add_command(timestamp, "LLM", command[:20], "error")
+                self.notify(f"LLM Error: {result['error']}", severity="error")
+                
+        except Exception as e:
+            history.add_command(timestamp, "LLM", command[:20], "error")
+            self.notify(f"LLM處理失敗: {str(e)}", severity="error")
     
     def _parse_command(self, command: str) -> Tuple[str, str]:
         """

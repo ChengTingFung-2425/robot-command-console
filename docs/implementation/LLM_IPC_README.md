@@ -6,18 +6,22 @@
 
 ## 概覽
 
-LLM IPC Discovery Protocol 是一個用於 Edge 環境的 **LLM Copilot 發現與技能註冊機制**，支援：
+LLM IPC Discovery Protocol 是一個用於 Edge 環境的 **LLM Compatible Software（llm-cop）發現與技能註冊機制**，支援：
 
-1. **雙向 LLM 相容性**：
-   - **LLM → Software**：LLM 透過 OpenAI function calling 操作軟體
-   - **Software → LLM**：軟體提供資訊給 LLM 查詢
+1. **什麼是 llm-cop？**
+   - **llm-cop** = **LLM Compatible Software**（LLM 相容軟體）
+   - 讓 LLM 能夠透過技能（skills）操作軟體的相容軟體
 
-2. **防止模型解密攻擊**：
+2. **雙向互動能力**：
+   - **LLM → Software**：LLM 透過 OpenAI function calling 操作軟體功能
+   - **Software → LLM**：軟體提供資訊給 LLM 查詢和理解
+
+3. **防止模型解密攻擊**：
    - 不記錄 prompt
    - 不暴露模型內部狀態
    - 回應過濾與記憶體清理
 
-3. **跨平台支援**：
+4. **跨平台支援**：
    - Linux, macOS, Windows
    - HTTP, Unix socket, TCP
 
@@ -29,13 +33,13 @@ LLM IPC Discovery Protocol 是一個用於 Edge 環境的 **LLM Copilot 發現�
 pip install pytest jsonschema
 ```
 
-### 2. 註冊 LLM Copilot Provider
+### 2. 註冊 llm-cop Provider
 
 ```bash
 python examples/provider.py
 ```
 
-輸入 `y` 確認註冊。這會創建一個範例 LLM Copilot，包含 4 個 skills：
+輸入 `y` 確認註冊。這會創建一個範例 llm-cop（LLM Compatible Software），包含 4 個 skills：
 - `code_review` - 程式碼審查
 - `refactor` - 程式碼重構
 - `security_scan` - 安全掃描（支援資訊查詢）
@@ -48,9 +52,9 @@ python examples/llm_core.py
 ```
 
 這會掃描並顯示：
-- 所有註冊的 LLM Copilot
+- 所有註冊的 llm-cop（LLM Compatible Software）
 - 健康狀態檢查
-- Skills 列表
+- Skills 列表（LLM 可用來操作軟體的功能）
 - 可提供的資訊類型
 
 ### 4. 運行測試
@@ -90,7 +94,7 @@ tests/
 
 ### Manifest 檔案
 
-LLM Copilot 透過 manifest 檔案註冊到系統：
+llm-cop（LLM Compatible Software）透過 manifest 檔案註冊到系統：
 
 **位置**：
 - Linux: `~/.local/share/llm-providers/<provider-id>.json`

@@ -135,6 +135,14 @@ class TUIRunner:
         if not success:
             logger.error("Failed to start service coordinator")
             raise RuntimeError("Service coordinator startup failed")
+        
+        # 建立 TUI 應用並傳入 service_manager
+        self.tui_app = RobotConsoleTUI(
+            coordinator=self.coordinator,
+            state_manager=self.state_manager,
+            history_manager=self.history_manager,
+            service_manager=queue_service.manager  # 傳入 ServiceManager
+        )
     
     async def cleanup_services(self) -> None:
         """清理服務"""
@@ -150,11 +158,16 @@ class TUIRunner:
             # 設定服務
             await self.setup_services(args)
             
+            # 取得 queue_service 的 manager
+            queue_service_info = self.coordinator.get_service_info("queue_service")
+            service_manager = queue_service_info.manager if hasattr(queue_service_info, 'manager') else None
+            
             # 建立並執行 TUI
             self.tui_app = RobotConsoleTUI(
                 coordinator=self.coordinator,
                 state_manager=self.state_manager,
                 history_manager=self.history_manager,
+                service_manager=service_manager,
             )
             
             await self.tui_app.run_async()

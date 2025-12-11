@@ -16,8 +16,10 @@ from textual.reactive import reactive
 
 from ..service_coordinator import ServiceCoordinator
 from ..command_history_manager import CommandHistoryManager
+from ..service_manager import ServiceManager
 from common.service_types import ServiceStatus
 from common.shared_state import SharedStateManager, EventTopics
+from .command_sender import CommandSender
 
 
 class ServiceStatusWidget(Static):
@@ -203,12 +205,29 @@ class RobotConsoleTUI(App):
         coordinator: Optional[ServiceCoordinator] = None,
         state_manager: Optional[SharedStateManager] = None,
         history_manager: Optional[CommandHistoryManager] = None,
+        service_manager: Optional[ServiceManager] = None
     ):
+        """
+        初始化 TUI 應用
+        
+        Args:
+            coordinator: 服務協調器
+            state_manager: 共享狀態管理器
+            history_manager: 指令歷史管理器
+            service_manager: 服務管理器（用於指令發送）
+        """
         super().__init__()
         
         self.coordinator = coordinator
         self.state_manager = state_manager
         self.history_manager = history_manager
+        self.service_manager = service_manager
+        
+        # 建立指令發送器
+        self.command_sender = CommandSender(
+            service_manager=service_manager,
+            state_manager=state_manager
+        )
         
         # 內部狀態
         self._update_task: Optional[asyncio.Task] = None
@@ -287,22 +306,31 @@ class RobotConsoleTUI(App):
             return
         
         # 機器人指令發送邏輯
-        # TODO: 整合 CommandProcessor 實際發送指令到佇列
-        # 目前僅記錄到歷史，不執行實際動作
-        # 完整實作需要：
-        # 1. 與 CommandProcessor 整合
-        # 2. 佇列服務連接
-        # 3. 機器人連接驗證
-        
-        # 暫時顯示在歷史中
         history = self.query_one("#history", CommandHistoryWidget)
         timestamp = datetime.now().strftime("%H:%M:%S")
         
-        if robot_id == "all":
-            # 廣播指令到所有機器人
-            history.add_command(timestamp, "all robots", action, "pending")
-        else:
-            history.add_command(timestamp, robot_id, action, "pending")
+        try:
+            if robot_id == "all":
+                # 廣播指令到所有機器人
+                command_ids = await self.command_sender.broadcast_command(action)
+                if command_ids:
+                    history.add_command(timestamp, "all robots", action, "sent")
+                    self.notify(f"Broadcast '{action}' to {len(command_ids)} robot(s)", severity="information")
+                else:
+                    history.add_command(timestamp, "all robots", action, "error")
+                    self.notify("Failed to broadcast command", severity="error")
+            else:
+                # 發送到指定機器人
+                command_id = await self.command_sender.send_command(robot_id, action)
+                if command_id:
+                    history.add_command(timestamp, robot_id, action, "sent")
+                    self.notify(f"Command '{action}' sent to {robot_id}", severity="information")
+                else:
+                    history.add_command(timestamp, robot_id, action, "error")
+                    self.notify("Failed to send command", severity="error")
+        except Exception as e:
+            history.add_command(timestamp, robot_id, action, "error")
+            self.notify(f"Error: {str(e)}", severity="error")
     
     def _parse_command(self, command: str) -> Tuple[str, str]:
         """

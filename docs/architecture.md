@@ -474,7 +474,7 @@ python3 -m pytest tests/test_queue_system.py -v
 - [ ] **WebUI 本地版**：完整的 Edge 端用戶介面
 - [x] **固件更新介面**：機器人固件管理（UI/API 已完成）
 - [ ] **離線模式支援**：無網路環境下核心功能運作
-- [ ] **CLI/TUI 版本**：終端機介面支援
+- [x] **CLI/TUI 版本**：終端機介面支援（✅ 已完成）
 - [ ] **雲端服務整合**：進階指令共享、討論區、授權服務
 - [ ] **分散式佇列**：Redis/Kafka 整合
 - [ ] **多節點部署**：Kubernetes 支援
@@ -506,4 +506,4 @@ python3 -m pytest tests/test_queue_system.py -v
 - **Phase 1** - 初始實作，功能完整性（已完成）
 - **Phase 2** - 目錄重構，模組化清晰化（已完成）
 - **Phase 3.1** - 基礎整合：統一啟動器、服務協調器、共享狀態（已完成）
-- **Phase 3.2** - 功能完善：WebUI 本地版、離線模式、CLI/TUI（規劃中）
+- **Phase 3.2** - 功能完善：WebUI 本地版、離線模式、CLI/TUI（進行中 - TUI 已完成）

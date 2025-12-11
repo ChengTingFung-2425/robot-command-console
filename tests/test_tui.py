@@ -214,6 +214,226 @@ class TestRobotConsoleTUI:
         robot_id, action = app._parse_command("  robot-003 : wave_hand  ")
         assert robot_id == "robot-003"
         assert action == "wave_hand"
+    
+    def test_parse_command_system(self):
+        """測試系統指令解析"""
+        app = RobotConsoleTUI()
+        
+        robot_id, action = app._parse_command("system:list")
+        assert robot_id == "system"
+        assert action == "list"
+        
+        robot_id, action = app._parse_command("system:show")
+        assert robot_id == "system"
+        assert action == "show"
+        
+        robot_id, action = app._parse_command("system:healthcheck")
+        assert robot_id == "system"
+        assert action == "healthcheck"
+    
+    def test_parse_command_service(self):
+        """測試服務管理指令解析"""
+        app = RobotConsoleTUI()
+        
+        robot_id, action = app._parse_command("service:mcp.start")
+        assert robot_id == "service"
+        assert action == "mcp.start"
+        
+        robot_id, action = app._parse_command("service:queue.stop")
+        assert robot_id == "service"
+        assert action == "queue.stop"
+        
+        robot_id, action = app._parse_command("service:all.healthcheck")
+        assert robot_id == "service"
+        assert action == "all.healthcheck"
+    
+    @pytest.mark.asyncio
+    async def test_service_start(self):
+        """測試服務啟動"""
+        async def mock_start_service(name):
+            return True
+        
+        mock_coordinator = Mock()
+        mock_coordinator.start_service = mock_start_service
+        
+        app = RobotConsoleTUI(coordinator=mock_coordinator)
+        app.notify = Mock()
+        
+        await app._service_single_action("mcp_service", "start")
+        
+        app.notify.assert_called_once()
+        call_args = app.notify.call_args[0][0]
+        assert "started" in call_args
+    
+    @pytest.mark.asyncio
+    async def test_service_stop(self):
+        """測試服務停止"""
+        async def mock_stop_service(name):
+            return True
+        
+        mock_coordinator = Mock()
+        mock_coordinator.stop_service = mock_stop_service
+        
+        app = RobotConsoleTUI(coordinator=mock_coordinator)
+        app.notify = Mock()
+        
+        await app._service_single_action("queue_service", "stop")
+        
+        app.notify.assert_called_once()
+        call_args = app.notify.call_args[0][0]
+        assert "stopped" in call_args
+    
+    @pytest.mark.asyncio
+    async def test_service_restart(self):
+        """測試服務重啟"""
+        async def mock_stop_service(name):
+            return True
+        
+        async def mock_start_service(name):
+            return True
+        
+        mock_coordinator = Mock()
+        mock_coordinator.stop_service = mock_stop_service
+        mock_coordinator.start_service = mock_start_service
+        
+        app = RobotConsoleTUI(coordinator=mock_coordinator)
+        app.notify = Mock()
+        
+        await app._service_single_action("flask_service", "restart")
+        
+        app.notify.assert_called_once()
+        call_args = app.notify.call_args[0][0]
+        assert "restarted" in call_args
+    
+    @pytest.mark.asyncio
+    async def test_service_healthcheck(self):
+        """測試單一服務健康檢查"""
+        async def mock_check_health(name):
+            return {"status": "healthy"}
+        
+        mock_coordinator = Mock()
+        mock_coordinator.check_service_health = mock_check_health
+        
+        app = RobotConsoleTUI(coordinator=mock_coordinator)
+        app.notify = Mock()
+        
+        await app._service_single_action("mcp_service", "healthcheck")
+        
+        app.notify.assert_called_once()
+        call_args = app.notify.call_args[0][0]
+        assert "healthy" in call_args
+    
+    @pytest.mark.asyncio
+    async def test_service_all_start(self):
+        """測試啟動所有服務"""
+        async def mock_start():
+            return True
+        
+        mock_coordinator = Mock()
+        mock_coordinator.start = mock_start
+        mock_coordinator.get_all_services_info.return_value = {
+            "service1": Mock(),
+            "service2": Mock()
+        }
+        
+        app = RobotConsoleTUI(coordinator=mock_coordinator)
+        app.notify = Mock()
+        
+        await app._service_all_action("start")
+        
+        app.notify.assert_called_once()
+        call_args = app.notify.call_args[0][0]
+        assert "All services started" in call_args
+    
+    @pytest.mark.asyncio
+    async def test_service_all_healthcheck(self):
+        """測試所有服務健康檢查"""
+        async def mock_healthcheck():
+            return {
+                "service1": {"status": "healthy"},
+                "service2": {"status": "healthy"}
+            }
+        
+        mock_coordinator = Mock()
+        mock_coordinator.check_all_services_health = mock_healthcheck
+        mock_coordinator.get_all_services_info.return_value = {
+            "service1": Mock(),
+            "service2": Mock()
+        }
+        
+        app = RobotConsoleTUI(coordinator=mock_coordinator)
+        app.notify = Mock()
+        
+        await app._service_all_action("healthcheck")
+        
+        app.notify.assert_called_once()
+        call_args = app.notify.call_args[0][0]
+        assert "All services healthy" in call_args
+    
+    @pytest.mark.asyncio
+    async def test_system_list_robots(self):
+        """測試系統指令：列出機器人"""
+        app = RobotConsoleTUI()
+        
+        # Mock widgets
+        mock_robot_widget = Mock()
+        mock_robot_widget.robots_status = {
+            "robot-001": {"connected": True},
+            "robot-002": {"connected": True}
+        }
+        app.query_one = Mock(return_value=mock_robot_widget)
+        app.notify = Mock()
+        
+        await app._system_list_robots()
+        
+        app.notify.assert_called_once()
+        call_args = app.notify.call_args[0][0]
+        assert "Connected Robots" in call_args
+        assert "robot-001" in call_args
+        assert "robot-002" in call_args
+    
+    @pytest.mark.asyncio
+    async def test_system_show_status(self):
+        """測試系統指令：顯示狀態"""
+        mock_coordinator = Mock()
+        mock_coordinator.get_all_services_info.return_value = {
+            "service1": Mock(status=ServiceStatus.RUNNING),
+            "service2": Mock(status=ServiceStatus.RUNNING),
+            "service3": Mock(status=ServiceStatus.STOPPED)
+        }
+        
+        app = RobotConsoleTUI(coordinator=mock_coordinator)
+        app.notify = Mock()
+        
+        await app._system_show_status()
+        
+        app.notify.assert_called_once()
+        call_args = app.notify.call_args[0][0]
+        assert "System Status" in call_args
+        assert "2/3 running" in call_args
+    
+    @pytest.mark.asyncio
+    async def test_system_healthcheck(self):
+        """測試系統指令：健康檢查"""
+        async def mock_healthcheck():
+            return {
+                "service1": {"status": "healthy"},
+                "service2": {"status": "healthy"},
+                "service3": {"status": "unhealthy"}
+            }
+        
+        mock_coordinator = Mock()
+        mock_coordinator.check_all_services_health = mock_healthcheck
+        
+        app = RobotConsoleTUI(coordinator=mock_coordinator)
+        app.notify = Mock()
+        
+        await app._system_healthcheck()
+        
+        app.notify.assert_called_once()
+        call_args = app.notify.call_args[0][0]
+        assert "Health Check" in call_args
+        assert "unhealthy" in call_args
 
 
 if __name__ == '__main__':

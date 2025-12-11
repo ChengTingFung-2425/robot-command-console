@@ -275,6 +275,16 @@ class RobotConsoleTUI(App):
         # 解析指令格式
         robot_id, action = self._parse_command(command)
         
+        # 處理系統指令
+        if robot_id == "system":
+            await self._handle_system_command(action)
+            return
+        
+        # 處理服務管理指令
+        if robot_id == "service":
+            await self._handle_service_command(action)
+            return
+        
         # TODO: 實作指令發送邏輯
         # 這裡需要整合 CommandProcessor 或直接發送到佇列
         
@@ -296,6 +306,8 @@ class RobotConsoleTUI(App):
         - action_name -> (robot-001, action_name)
         - robot-002:action_name -> (robot-002, action_name)
         - all:action_name -> (all, action_name)
+        - system:command -> (system, command)
+        - service:service_name.action -> (service, service_name.action)
         
         Args:
             command: 輸入的指令字串
@@ -312,6 +324,221 @@ class RobotConsoleTUI(App):
             action = command.strip()
         
         return robot_id, action
+    
+    async def _handle_service_command(self, command: str) -> None:
+        """
+        處理服務管理指令
+        
+        支援格式：
+        - service_name.action (例如: mcp.start, queue.stop)
+        - all.action (例如: all.healthcheck)
+        
+        支援動作：
+        - start: 啟動服務
+        - stop: 停止服務
+        - restart: 重啟服務
+        - healthcheck: 健康檢查
+        
+        Args:
+            command: 服務管理指令 (service_name.action 格式)
+        """
+        history = self.query_one("#history", CommandHistoryWidget)
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        
+        # 解析服務名稱和動作
+        if "." not in command:
+            history.add_command(timestamp, "service", command, "error")
+            self.notify("Invalid service command format. Use: service:name.action", severity="error")
+            return
+        
+        service_name, action = command.split(".", 1)
+        service_name = service_name.strip()
+        action = action.strip()
+        
+        if not self.coordinator:
+            history.add_command(timestamp, f"service:{service_name}", action, "error")
+            self.notify("Coordinator not available", severity="error")
+            return
+        
+        # 執行服務動作
+        try:
+            if service_name == "all":
+                await self._service_all_action(action)
+                history.add_command(timestamp, "service:all", action, "success")
+            else:
+                await self._service_single_action(service_name, action)
+                history.add_command(timestamp, f"service:{service_name}", action, "success")
+        except Exception as e:
+            history.add_command(timestamp, f"service:{service_name}", action, "error")
+            self.notify(f"Service command failed: {e}", severity="error")
+    
+    async def _service_single_action(self, service_name: str, action: str) -> None:
+        """
+        對單一服務執行動作
+        
+        Args:
+            service_name: 服務名稱
+            action: 動作名稱 (start/stop/restart/healthcheck)
+        """
+        if action == "start":
+            success = await self.coordinator.start_service(service_name)
+            if success:
+                self.notify(f"Service '{service_name}' started", severity="information")
+            else:
+                self.notify(f"Failed to start service '{service_name}'", severity="error")
+        
+        elif action == "stop":
+            success = await self.coordinator.stop_service(service_name)
+            if success:
+                self.notify(f"Service '{service_name}' stopped", severity="information")
+            else:
+                self.notify(f"Failed to stop service '{service_name}'", severity="error")
+        
+        elif action == "restart":
+            # 先停止再啟動
+            stop_success = await self.coordinator.stop_service(service_name)
+            if stop_success:
+                start_success = await self.coordinator.start_service(service_name)
+                if start_success:
+                    self.notify(f"Service '{service_name}' restarted", severity="information")
+                else:
+                    self.notify(f"Failed to restart service '{service_name}'", severity="error")
+            else:
+                self.notify(f"Failed to stop service '{service_name}' for restart", severity="error")
+        
+        elif action == "healthcheck":
+            result = await self.coordinator.check_service_health(service_name)
+            status = result.get("status", "unknown")
+            if status == "healthy":
+                self.notify(f"Service '{service_name}' is healthy", severity="information")
+            else:
+                self.notify(f"Service '{service_name}' is {status}", severity="warning")
+        
+        else:
+            raise ValueError(f"Unknown action: {action}")
+    
+    async def _service_all_action(self, action: str) -> None:
+        """
+        對所有服務執行動作
+        
+        Args:
+            action: 動作名稱 (start/stop/healthcheck)
+        """
+        services_info = self.coordinator.get_all_services_info()
+        service_names = list(services_info.keys())
+        
+        if action == "start":
+            success = await self.coordinator.start()
+            if success:
+                self.notify(f"All services started ({len(service_names)} services)", severity="information")
+            else:
+                self.notify("Failed to start all services", severity="error")
+        
+        elif action == "stop":
+            await self.coordinator.stop()
+            self.notify(f"All services stopped ({len(service_names)} services)", severity="information")
+        
+        elif action == "healthcheck":
+            results = await self.coordinator.check_all_services_health()
+            healthy = sum(1 for r in results.values() if r.get("status") == "healthy")
+            total = len(results)
+            if healthy == total:
+                self.notify(f"All services healthy ({healthy}/{total})", severity="information")
+            else:
+                unhealthy = total - healthy
+                self.notify(f"{unhealthy} service(s) unhealthy ({healthy}/{total})", severity="warning")
+        
+        else:
+            raise ValueError(f"Action '{action}' not supported for all services")
+    
+    async def _handle_system_command(self, command: str) -> None:
+        """
+        處理系統指令
+        
+        支援指令：
+        - list: 列出所有機器人
+        - show: 顯示系統狀態
+        - healthcheck: 執行健康檢查
+        
+        Args:
+            command: 系統指令名稱
+        """
+        history = self.query_one("#history", CommandHistoryWidget)
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        
+        if command == "list":
+            # 列出所有機器人
+            await self._system_list_robots()
+            history.add_command(timestamp, "system", "list", "success")
+        
+        elif command == "show":
+            # 顯示系統狀態
+            await self._system_show_status()
+            history.add_command(timestamp, "system", "show", "success")
+        
+        elif command == "healthcheck":
+            # 執行健康檢查
+            await self._system_healthcheck()
+            history.add_command(timestamp, "system", "healthcheck", "success")
+        
+        else:
+            # 未知的系統指令
+            history.add_command(timestamp, "system", command, "error")
+    
+    async def _system_list_robots(self) -> None:
+        """系統指令：列出所有機器人"""
+        robot_widget = self.query_one("#robots", RobotStatusWidget)
+        
+        # 取得所有機器人資訊
+        robots = list(robot_widget.robots_status.keys())
+        
+        if not robots:
+            self.notify("No robots connected", severity="warning")
+            return
+        
+        # 顯示機器人清單
+        robot_list = "\n".join([f"  • {robot_id}" for robot_id in robots])
+        self.notify(f"Connected Robots ({len(robots)}):\n{robot_list}", severity="information")
+    
+    async def _system_show_status(self) -> None:
+        """系統指令：顯示系統狀態"""
+        if not self.coordinator:
+            self.notify("Coordinator not available", severity="error")
+            return
+        
+        # 取得服務資訊
+        services_info = self.coordinator.get_all_services_info()
+        
+        # 統計服務狀態
+        running = sum(1 for info in services_info.values() if info.status == ServiceStatus.RUNNING)
+        total = len(services_info)
+        
+        # 顯示系統狀態
+        status_msg = f"System Status:\n  Services: {running}/{total} running"
+        self.notify(status_msg, severity="information")
+    
+    async def _system_healthcheck(self) -> None:
+        """系統指令：執行健康檢查"""
+        if not self.coordinator:
+            self.notify("Coordinator not available", severity="error")
+            return
+        
+        # 執行健康檢查
+        results = await self.coordinator.check_all_services_health()
+        
+        # 統計結果
+        healthy = sum(1 for r in results.values() if r.get("status") == "healthy")
+        total = len(results)
+        
+        # 顯示結果
+        if healthy == total:
+            self.notify(f"Health Check: All services healthy ({healthy}/{total})", severity="information")
+        else:
+            unhealthy = total - healthy
+            self.notify(
+                f"Health Check: {unhealthy} service(s) unhealthy ({healthy}/{total})",
+                severity="warning"
+            )
     
     async def action_refresh(self) -> None:
         """刷新所有狀態"""

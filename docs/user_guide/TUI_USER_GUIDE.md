@@ -204,6 +204,43 @@ all:go_forward
 | `action` | `go_forward` | 發送到預設機器人 (robot-001) |
 | `robot-id:action` | `robot-002:turn_left` | 發送到指定機器人 |
 | `all:action` | `all:stand` | 廣播到所有機器人 |
+| `system:command` | `system:list` | 系統管理指令 |
+| `service:name.action` | `service:mcp.start` | 服務管理指令 |
+
+### 服務管理指令
+
+使用 `service:` 前綴可管理系統服務：
+
+**支援的動作：**
+- `start` - 啟動服務
+- `stop` - 停止服務
+- `restart` - 重啟服務
+- `healthcheck` - 健康檢查
+
+**使用範例：**
+```
+service:mcp.start           # 啟動 MCP 服務
+service:queue.stop          # 停止佇列服務
+service:flask.restart       # 重啟 Flask 服務
+service:mcp.healthcheck     # 檢查 MCP 服務健康狀態
+service:all.start           # 啟動所有服務
+service:all.healthcheck     # 檢查所有服務健康狀態
+```
+
+**注意事項：**
+- 服務名稱必須與已註冊的服務一致
+- 重啟操作會先停止再啟動服務
+- `all.restart` 不支援（請使用 `all.stop` 後再 `all.start`）
+
+### 系統管理指令
+
+使用 `system:` 前綴可執行系統管理功能：
+
+```
+system:list         # 列出所有連接的機器人
+system:show         # 顯示系統狀態摘要
+system:healthcheck  # 執行完整的健康檢查
+```
 
 ### 進階功能（計劃中）
 

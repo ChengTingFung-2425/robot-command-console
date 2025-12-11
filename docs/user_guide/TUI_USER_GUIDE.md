@@ -203,11 +203,48 @@ all:go_forward
 |------|------|------|
 | `action` | `go_forward` | 發送到預設機器人 (robot-001) |
 | `robot-id:action` | `robot-002:turn_left` | 發送到指定機器人 |
+| `all:action` | `all:stand` | 廣播到所有機器人 |
 | `system:command` | `system:list` | 系統管理指令 |
 | `service:name.action` | `service:mcp.start` | 單一服務管理 |
 | `service:all.action` | `service:all.start` | 所有微服務控制 |
 | `service:queue.cloud.on/off` | `service:queue.cloud.on` | 雲端路由控制 |
 | `service:llm.provider["name"]` | `service:llm.provider["ollama"]` | LLM 提供商設定 |
+
+### 機器人控制指令
+
+**基本指令：**
+在指令輸入欄位中輸入動作名稱，按 `Enter` 發送：
+
+```
+go_forward
+turn_left
+stand
+wave_hand
+```
+
+**指定機器人：**
+預設指令會發送到 `robot-001`。如需指定其他機器人，請使用以下格式：
+
+```
+robot-002:go_forward
+robot-003:turn_left
+```
+
+**廣播到所有機器人：**
+使用 `all:` 前綴可同時對所有連接的機器人執行相同動作：
+
+```
+all:stand
+all:wave_hand
+all:go_forward
+```
+
+這在需要同步控制多個機器人時非常有用，例如：
+- 集體表演或展示
+- 緊急停止所有機器人
+- 統一初始化動作
+
+**注意**：廣播指令會並行發送到所有機器人，執行時間取決於最慢的機器人。
 
 ### 服務管理指令
 

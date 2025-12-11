@@ -200,12 +200,12 @@ class TestRobotConsoleTUI:
         assert action == "turn_left"
     
     def test_parse_command_all_robots(self):
-        """測試廣播指令解析（現在使用 service:all.action）"""
+        """測試廣播指令解析（使用 all:action 格式）"""
         app = RobotConsoleTUI()
         
-        robot_id, action = app._parse_command("service:all.stand")
-        assert robot_id == "service"
-        assert action == "all.stand"
+        robot_id, action = app._parse_command("all:stand")
+        assert robot_id == "all"
+        assert action == "stand"
     
     def test_parse_command_with_spaces(self):
         """測試帶空格的指令解析"""

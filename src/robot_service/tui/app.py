@@ -291,7 +291,12 @@ class RobotConsoleTUI(App):
         # 暫時顯示在歷史中
         history = self.query_one("#history", CommandHistoryWidget)
         timestamp = datetime.now().strftime("%H:%M:%S")
-        history.add_command(timestamp, robot_id, action, "pending")
+        
+        if robot_id == "all":
+            # 廣播指令到所有機器人
+            history.add_command(timestamp, "all robots", action, "pending")
+        else:
+            history.add_command(timestamp, robot_id, action, "pending")
     
     def _parse_command(self, command: str) -> tuple[str, str]:
         """
@@ -300,6 +305,7 @@ class RobotConsoleTUI(App):
         支援格式：
         - action_name -> (robot-001, action_name)
         - robot-002:action_name -> (robot-002, action_name)
+        - all:action_name -> (all, action_name) - 廣播到所有機器人
         - system:command -> (system, command)
         - service:service_name.action -> (service, service_name.action)
         - service:all.action -> (service, all.action) - 控制所有微服務

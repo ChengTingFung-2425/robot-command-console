@@ -806,6 +806,351 @@ cancelled   failed       failed
 
 ---
 
+## 🗄️ Phase 3.2: 本地指令歷史與快取實作（2025-12-10）
+
+### 功能實作總結
+
+**目標**：為 Edge 環境實作本地指令歷史記錄與快取功能，支援離線使用與效能優化。
+
+**實作模組**：
+1. **CommandHistoryStore** (`src/common/command_history.py`)
+2. **CommandCache** (`src/common/command_cache.py`)
+3. **CommandResultCache** (`src/common/command_cache.py`)
+4. **CommandHistoryManager** (`src/robot_service/command_history_manager.py`)
+5. **History API** (`src/robot_service/history_api.py`)
+
+**測試覆蓋**：57 個測試，100% 通過率
+
+---
+
+### 9.1 SQLite 索引設計
+
+```python
+# ✅ 為常用查詢欄位建立索引
+CREATE INDEX IF NOT EXISTS idx_command_history_trace_id ON command_history(trace_id)
+CREATE INDEX IF NOT EXISTS idx_command_history_robot_id ON command_history(robot_id)
+CREATE INDEX IF NOT EXISTS idx_command_history_status ON command_history(status)
+CREATE INDEX IF NOT EXISTS idx_command_history_created_at ON command_history(created_at)
+CREATE INDEX IF NOT EXISTS idx_command_history_command_id ON command_history(command_id)
+```
+
+**經驗教訓**：
+1. **主鍵索引**：command_id 作為主鍵自動建立索引
+2. **外鍵索引**：trace_id 雖非外鍵但查詢頻繁，需建立索引
+3. **查詢優化**：為所有 WHERE 子句中常用的欄位建立索引
+4. **時間範圍查詢**：created_at 索引支援時間範圍篩選
+
+---
+
+### 9.2 查詢方法設計模式
+
+```python
+# ❌ 效率低下的查詢方式
+def get_by_trace_id(trace_id):
+    records = query_records(limit=1)  # 只查 1 筆
+    for r in records:
+        if r.trace_id == trace_id:
+            return r
+    return None
+
+# ✅ 正確的查詢方式
+def get_by_trace_id(self, trace_id: str) -> Optional[CommandRecord]:
+    cursor.execute('''
+        SELECT * FROM command_history WHERE trace_id = ? LIMIT 1
+    ''', (trace_id,))
+    return cursor.fetchone()
+```
+
+**經驗教訓**：
+1. 直接使用 SQL WHERE 子句篩選，而非先查詢再在 Python 中過濾
+2. 為常用查詢模式建立專門方法（如 `get_by_trace_id`）
+3. 使用 `LIMIT 1` 優化單筆查詢
+
+---
+
+### 9.3 LRU 快取實作
+
+```python
+# ✅ 使用 OrderedDict 實作 LRU
+from collections import OrderedDict
+
+class CommandCache:
+    def __init__(self, max_size: int):
+        self._cache: OrderedDict[str, CacheEntry] = OrderedDict()
+        self.max_size = max_size
+    
+    def get(self, key: str):
+        if key in self._cache:
+            # 移到最後（標記為最近使用）
+            self._cache.move_to_end(key)
+            return self._cache[key].value
+    
+    def set(self, key: str, value: Any):
+        if len(self._cache) >= self.max_size:
+            # 移除最舊的項目（第一個）
+            self._cache.popitem(last=False)
+        self._cache[key] = CacheEntry(key, value)
+```
+
+**經驗教訓**：
+1. **OrderedDict**：Python 內建的有序字典非常適合實作 LRU
+2. **move_to_end()**：更新存取順序的高效方法
+3. **popitem(last=False)**：移除最舊項目（FIFO 方式）
+4. **執行緒安全**：使用 `threading.RLock()` 保護操作
+
+---
+
+### 9.4 TTL 過期機制設計
+
+```python
+@dataclass
+class CacheEntry:
+    key: str
+    value: Any
+    created_at: datetime = field(default_factory=utc_now)
+    expires_at: Optional[datetime] = None
+    
+    def is_expired(self) -> bool:
+        if self.expires_at is None:
+            return False
+        return utc_now() >= self.expires_at
+
+# 設定 TTL
+def set(self, key: str, value: Any, ttl_seconds: Optional[int] = None):
+    if ttl_seconds is None:
+        ttl_seconds = self.default_ttl_seconds
+    
+    expires_at = None
+    if ttl_seconds > 0:
+        expires_at = utc_now() + timedelta(seconds=ttl_seconds)
+    
+    entry = CacheEntry(key=key, value=value, expires_at=expires_at)
+    self._cache[key] = entry
+```
+
+**經驗教訓**：
+1. **可選過期**：`expires_at=None` 表示永不過期
+2. **TTL=0**：特殊值表示永不過期，與預設 TTL 區分
+3. **惰性清理**：在 get() 時檢查過期，而非主動定期掃描
+4. **主動清理**：提供 `cleanup_expired()` 方法供定期呼叫
+
+---
+
+### 9.5 統一管理介面設計
+
+```python
+# ✅ 整合歷史與快取的統一介面
+class CommandHistoryManager:
+    def __init__(self, history_db_path, cache_max_size, cache_ttl):
+        self.history_store = CommandHistoryStore(db_path=history_db_path)
+        self.result_cache = CommandResultCache(
+            max_size=cache_max_size,
+            default_ttl_seconds=cache_ttl
+        )
+    
+    def get_command_result(self, command_id, use_cache=True):
+        # 優先從快取取得
+        if use_cache:
+            cached = self.result_cache.get(command_id)
+            if cached is not None:
+                return cached
+        
+        # 快取未命中，從歷史取得
+        record = self.history_store.get_record(command_id)
+        if record and record.result:
+            # 自動加入快取
+            if use_cache:
+                self.cache_command_result(command_id, record.trace_id, record.result)
+            return record.result
+        
+        return None
+```
+
+**經驗教訓**：
+1. **統一介面**：隱藏底層實作細節，提供簡潔 API
+2. **智能快取**：從資料庫查詢時自動加入快取
+3. **可選快取**：提供 `use_cache` 參數允許繞過快取
+4. **自動同步**：更新狀態時自動更新快取
+
+---
+
+### 9.6 Flask Blueprint 設計模式
+
+```python
+# ✅ 使用工廠函式建立 Blueprint
+def create_history_api_blueprint(
+    history_manager: CommandHistoryManager,
+    url_prefix: str = '/api/commands'
+) -> Blueprint:
+    bp = Blueprint('command_history_api', __name__, url_prefix=url_prefix)
+    
+    @bp.route('/history', methods=['GET'])
+    def get_command_history():
+        # 使用閉包存取 history_manager
+        records = history_manager.get_command_history(...)
+        return jsonify({'status': 'success', 'data': records})
+    
+    return bp
+
+# 使用
+app = Flask(__name__)
+manager = CommandHistoryManager()
+history_bp = create_history_api_blueprint(manager)
+app.register_blueprint(history_bp)
+```
+
+**經驗教訓**：
+1. **工廠模式**：使用工廠函式而非直接建立 Blueprint
+2. **依賴注入**：透過參數傳入依賴（如 history_manager）
+3. **閉包**：Blueprint 內的路由函式可存取外層變數
+4. **靈活配置**：url_prefix 可自訂，方便整合
+
+---
+
+### 9.7 分頁查詢最佳實踐
+
+```python
+# ✅ 完整的分頁查詢回應
+@bp.route('/history', methods=['GET'])
+def get_command_history():
+    limit = request.args.get('limit', 100, type=int)
+    offset = request.args.get('offset', 0, type=int)
+    
+    # 查詢資料
+    records = history_manager.get_command_history(
+        limit=min(limit, 1000),  # 限制最大值
+        offset=max(offset, 0)     # 防止負數
+    )
+    
+    # 統計總數
+    total = history_manager.count_commands()
+    
+    return jsonify({
+        'status': 'success',
+        'data': {
+            'records': [r.to_dict() for r in records],
+            'pagination': {
+                'total': total,
+                'limit': limit,
+                'offset': offset,
+                'has_more': (offset + len(records)) < total
+            }
+        }
+    })
+```
+
+**經驗教訓**：
+1. **limit 上限**：防止過大的 limit 值影響效能
+2. **offset 下限**：防止負數 offset
+3. **分頁資訊**：提供 total、has_more 等資訊方便前端
+4. **獨立計數**：使用專門的 count 查詢，避免查詢所有資料
+
+---
+
+### 9.8 測試資料清理策略
+
+```python
+# ✅ 使用 fixture 管理測試資源
+@pytest.fixture
+def temp_db():
+    """建立臨時資料庫"""
+    fd, path = tempfile.mkstemp(suffix='.db')
+    os.close(fd)
+    yield path
+    # 測試結束後自動清理
+    if os.path.exists(path):
+        os.unlink(path)
+
+@pytest.fixture
+def manager(temp_db):
+    """建立測試用的 Manager"""
+    return CommandHistoryManager(history_db_path=temp_db)
+```
+
+**經驗教訓**：
+1. **臨時檔案**：使用 `tempfile.mkstemp()` 建立臨時資料庫
+2. **自動清理**：使用 `yield` 確保測試後清理資源
+3. **fixture 鏈**：manager fixture 依賴 temp_db fixture
+4. **隔離性**：每個測試使用獨立的資料庫，避免相互影響
+
+---
+
+### 9.9 dataclass 與 JSON 序列化
+
+```python
+@dataclass
+class CommandRecord:
+    command_id: str
+    created_at: datetime
+    command_params: Dict[str, Any]
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """轉換為字典格式"""
+        data = asdict(self)
+        # 手動處理 datetime 序列化
+        if isinstance(data.get('created_at'), datetime):
+            data['created_at'] = data['created_at'].isoformat()
+        # 手動處理巢狀字典（已是 dict 不需處理）
+        return data
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'CommandRecord':
+        """從字典建立實例"""
+        # 手動處理 datetime 反序列化
+        if isinstance(data.get('created_at'), str):
+            data['created_at'] = parse_iso_datetime(data['created_at'])
+        return cls(**data)
+```
+
+**經驗教訓**：
+1. **asdict() 限制**：無法自動處理 datetime、自訂類型
+2. **手動序列化**：需要明確轉換 datetime 為 ISO 字串
+3. **類型檢查**：使用 isinstance() 判斷是否需要轉換
+4. **對稱處理**：to_dict 和 from_dict 應對稱處理所有欄位
+
+---
+
+### 9.10 Code Review 回饋整合
+
+**問題 1**：查詢效率低下
+
+```python
+# ❌ Code Review 前
+def get_command_by_id(command_id):
+    records = get_command_history(limit=1)  # 只查最新一筆
+    for r in records:
+        if r.command_id == command_id:
+            return r
+
+# ✅ Code Review 後
+def get_command_by_id(command_id):
+    return history_store.get_record(command_id)  # 直接查詢
+```
+
+**問題 2**：缺少索引
+
+```python
+# ✅ 為 trace_id 加入索引
+CREATE INDEX IF NOT EXISTS idx_command_history_trace_id 
+ON command_history(trace_id)
+```
+
+**問題 3**：查詢方法不足
+
+```python
+# ✅ 新增專門的查詢方法
+def get_by_trace_id(self, trace_id: str) -> Optional[CommandRecord]:
+    cursor.execute('''
+        SELECT * FROM command_history WHERE trace_id = ? LIMIT 1
+    ''', (trace_id,))
+    return self._row_to_record(cursor.fetchone())
+```
+
+**經驗教訓**：
+1. **即時修復**：Code Review 發現問題應立即修復
+2. **根本解決**：不只修復表面問題，還要優化底層設計
+3. **完善測試**：修復後運行測試確保功能正常
+4. **文件更新**：重要變更應更新功能文件
 ## 🌐 Phase 3.3 統一整合與雲端分離經驗教訓（2025-12-10）
 
 ### 9.1 XSS 防護：模板自動跳脫
@@ -1008,6 +1353,351 @@ unified-edge-app/
 2. 使用全域搜尋確保沒有遺漏的路由
 3. 測試所有頁面連結確保無 404 錯誤
 4. 考慮提供重定向以保持向後相容（過渡期）
+
+---
+
+## 🔍 Phase 3.2: Code Review 與 CodeQL 安全修復（2025-12-10）
+
+### PR Review 回饋處理經驗
+
+**背景**：本地指令歷史與快取功能實作完成後，收到自動化 Code Review 的 16 個建議，並發現 CodeQL 的資訊暴露安全問題。
+
+### 11.1 冗餘索引識別
+
+```python
+# ❌ 不必要的索引（PRIMARY KEY 已自動建立）
+cursor.execute('''
+    CREATE INDEX IF NOT EXISTS idx_command_history_command_id 
+    ON command_history(command_id)
+''')
+
+# ✅ 移除冗餘索引
+# PRIMARY KEY 自動建立 B-tree 索引，無需額外索引
+```
+
+**經驗教訓**：
+1. SQLite 為 PRIMARY KEY 自動建立索引
+2. 冗餘索引不會造成錯誤（IF NOT EXISTS），但增加維護成本
+3. 定期審查索引設計，移除不必要的索引
+
+---
+
+### 11.2 快取執行緒安全問題
+
+```python
+# ❌ 執行緒不安全（兩次鎖定間隔可能導致不一致）
+def get_by_trace_id(self, trace_id: str):
+    with self._lock:
+        command_id = self._trace_to_command.get(trace_id)
+        if command_id is None:
+            return None
+        return self.get(command_id)  # 離開鎖定後再次取得鎖
+
+# ✅ 在鎖定區域內處理快取失效
+def get_by_trace_id(self, trace_id: str):
+    with self._lock:
+        command_id = self._trace_to_command.get(trace_id)
+        if command_id is None:
+            return None
+        result = self.get(command_id)
+        if result is None:
+            # 快取已過期或被淘汰，清理 trace_id 映射
+            del self._trace_to_command[trace_id]
+        return result
+```
+
+**經驗教訓**：
+1. 多次鎖定/解鎖之間存在競態條件窗口
+2. 相關操作應在同一鎖定區域內完成
+3. 快取失效時需同步清理所有相關映射
+
+---
+
+### 11.3 快取淘汰時的映射同步
+
+```python
+# ❌ 子類未覆寫父類方法，導致映射不同步
+class CommandResultCache(CommandCache):
+    def __init__(self):
+        self._trace_to_command: Dict[str, str] = {}
+    # 缺少 _remove_entry() 覆寫
+
+# ✅ 覆寫 _remove_entry() 確保映射同步
+class CommandResultCache(CommandCache):
+    def _remove_entry(self, key: str):
+        """移除快取項目時，同步清理 trace_id 對應"""
+        # 找出所有 trace_id 對應此 command_id
+        to_remove = [tid for tid, cid in self._trace_to_command.items() if cid == key]
+        for tid in to_remove:
+            del self._trace_to_command[tid]
+        super()._remove_entry(key)
+```
+
+**經驗教訓**：
+1. 子類維護額外狀態時，必須覆寫所有相關方法
+2. LRU 淘汰、過期清理、手動刪除都會呼叫 `_remove_entry()`
+3. 映射不同步會導致記憶體洩漏和邏輯錯誤
+
+---
+
+### 11.4 OrderedDict 與 LRU 語義
+
+```python
+# ❌ 直接覆寫會破壞 LRU 順序
+def set(self, key, value):
+    self._cache[key] = entry  # OrderedDict 保持原位置
+
+# ✅ 先刪除再新增以移到最後
+def set(self, key, value):
+    # 如果鍵已存在，先移除以確保新增時會移到最後（維持 LRU 語義）
+    # 不能直接覆寫，因為 OrderedDict 會保持原有位置
+    if key in self._cache:
+        del self._cache[key]
+    # 新增會自動加到最後
+    self._cache[key] = entry
+```
+
+**經驗教訓**：
+1. OrderedDict 的 `[]` 賦值不會改變項目位置
+2. 必須先刪除再新增才能移到最後
+3. 註解應說明這個非顯而易見的行為
+
+---
+
+### 11.5 API 參數驗證
+
+```python
+# ❌ 靜默失敗（無效參數被忽略）
+start_time_str = request.args.get('start_time')
+if start_time_str:
+    start_time = parse_iso_datetime(start_time_str)  # 可能返回 None
+
+# ✅ 明確驗證並回傳錯誤
+start_time_str = request.args.get('start_time')
+if start_time_str:
+    start_time = parse_iso_datetime(start_time_str)
+    if start_time is None:
+        return jsonify({
+            'status': 'error',
+            'error': {
+                'code': 'INVALID_PARAMETER',
+                'message': 'Invalid start_time format'
+            }
+        }), 400
+```
+
+**經驗教訓**：
+1. API 應明確驗證所有輸入參數
+2. 無效參數應回傳 4xx 錯誤，而非靜默忽略
+3. 錯誤訊息應清楚指出哪個參數有問題
+
+---
+
+### 11.6 CodeQL 資訊暴露修復
+
+```python
+# ❌ 直接暴露異常訊息（可能包含敏感資訊）
+except Exception as e:
+    return jsonify({
+        'status': 'error',
+        'error': {
+            'code': 'QUERY_ERROR',
+            'message': str(e)  # 可能暴露檔案路徑、SQL 語句等
+        }
+    }), 500
+
+# ✅ 使用通用錯誤訊息，詳細資訊僅記錄
+except Exception as e:
+    logger.error(f"Error getting command history: {e}", exc_info=True)
+    return jsonify({
+        'status': 'error',
+        'error': {
+            'code': 'QUERY_ERROR',
+            'message': 'An internal error has occurred.'
+        }
+    }), 500
+```
+
+**經驗教訓**：
+1. **永遠不要**在 API 回應中包含 `str(e)` 或異常詳情
+2. 異常可能包含：檔案路徑、SQL 語句、資料庫結構、內部邏輯
+3. 使用通用錯誤訊息，詳細資訊僅記錄到 logger
+4. CodeQL 會檢測這類資訊暴露問題（Medium 級別）
+
+**修復範圍**：
+- `history_api.py`：6 處 `str(e)` 替換為通用訊息
+- 所有 API 端點統一錯誤處理模式
+- 確保 logger 有 `exc_info=True` 以記錄完整堆疊
+
+---
+
+### 11.7 迴圈變數作用域陷阱
+
+```python
+# ❌ 使用外層迴圈變數（變數作用域錯誤）
+for i in range(5):
+    record = create_record(f'cmd-{i}')
+    offline_commands.append(record)
+
+for record in offline_commands:  # 沒有定義新的 i
+    update_status(record.id, execution_time=1000 + i * 100)  # 使用最後的 i=4
+
+# ✅ 在內層迴圈中定義新的迴圈變數
+for i, record in enumerate(offline_commands):
+    update_status(record.id, execution_time=1000 + i * 100)
+```
+
+**經驗教訓**：
+1. Python 的迴圈變數會洩漏到外層作用域
+2. 巢狀迴圈時要特別注意變數名稱
+3. 使用 `enumerate()` 明確綁定索引與元素
+
+---
+
+### 11.8 測試中的未使用變數
+
+```python
+# ❌ 變數賦值後未使用
+def test_init_db(self, temp_db):
+    store = CommandHistoryStore(db_path=temp_db)  # 未使用
+    assert os.path.exists(temp_db)
+
+# ✅ 使用底線表示故意不使用
+def test_init_db(self, temp_db):
+    _ = CommandHistoryStore(db_path=temp_db)
+    assert os.path.exists(temp_db)
+
+# ✅ 或直接移除賦值
+def test_count_commands(self, manager):
+    for i in range(10):
+        manager.record_command(command_id=f'cmd-{i}')  # 不需要接收回傳值
+```
+
+**經驗教訓**：
+1. Linter 會標記未使用的變數
+2. 使用 `_` 表示故意不使用的回傳值
+3. 測試中如果只是觸發副作用，可不接收回傳值
+
+---
+
+### 11.9 Import 清理
+
+```python
+# ❌ 匯入但未使用
+from datetime import datetime, timedelta, timezone
+
+# ✅ 只匯入需要的
+from datetime import datetime, timedelta
+```
+
+**經驗教訓**：
+1. 定期清理未使用的 import
+2. IDE/編輯器通常會灰色標示未使用的 import
+3. Flake8 的 F401 會檢測未使用的 import
+
+---
+
+### 11.10 分頁查詢一致性
+
+```python
+# ❌ 查詢與計數的篩選條件不一致
+records = get_command_history(
+    robot_id=robot_id,
+    status=status,
+    actor_type=actor_type,  # 有此條件
+    source=source            # 有此條件
+)
+total = count_commands(
+    robot_id=robot_id,
+    status=status
+    # 缺少 actor_type 和 source
+)
+
+# ✅ 保持篩選條件一致
+total = count_commands(
+    robot_id=robot_id,
+    status=status,
+    actor_type=actor_type,
+    source=source
+)
+```
+
+**經驗教訓**：
+1. 分頁查詢的 `total` 必須使用相同篩選條件
+2. 不一致會導致 `has_more` 判斷錯誤
+3. Code Review 可發現這類邏輯錯誤
+
+---
+
+### 11.11 自動化 Code Review 價值
+
+**本次 PR Review 發現的問題類型**：
+
+| 類型 | 數量 | 嚴重性 |
+|------|------|--------|
+| 執行緒安全 | 2 | High |
+| 記憶體洩漏 | 1 | High |
+| 邏輯錯誤 | 2 | Medium |
+| 參數驗證 | 1 | Medium |
+| 程式碼清理 | 10 | Low |
+
+**經驗教訓**：
+1. 自動化 Review 能發現人工容易忽略的問題
+2. 即使測試通過，仍可能有邏輯或效能問題
+3. 執行緒安全和記憶體管理是容易遺漏的重點
+4. 應在開發階段就考慮這些問題，而非等 Review
+
+---
+
+### 11.12 完整的錯誤處理模式
+
+**API 錯誤處理最佳實踐**：
+
+```python
+@bp.route('/api/resource', methods=['POST'])
+def api_endpoint():
+    try:
+        # 1. 參數驗證
+        param = request.args.get('param')
+        if param and not validate(param):
+            return jsonify({
+                'status': 'error',
+                'error': {
+                    'code': 'INVALID_PARAMETER',
+                    'message': 'Invalid param format'
+                }
+            }), 400
+        
+        # 2. 業務邏輯
+        result = process(param)
+        
+        # 3. 成功回應
+        return jsonify({
+            'status': 'success',
+            'data': result
+        })
+    
+    except Exception as e:
+        # 4. 記錄詳細錯誤（含堆疊）
+        logger.error(f"Error in api_endpoint: {e}", exc_info=True)
+        
+        # 5. 回傳通用錯誤訊息
+        return jsonify({
+            'status': 'error',
+            'error': {
+                'code': 'INTERNAL_ERROR',
+                'message': 'An internal error has occurred.'
+            }
+        }), 500
+```
+
+**關鍵原則**：
+- ✅ 驗證在前，業務邏輯在後
+- ✅ 4xx 用於客戶端錯誤（參數問題）
+- ✅ 5xx 用於伺服器錯誤（內部問題）
+- ✅ 詳細錯誤僅記錄到 logger
+- ✅ 回應使用通用錯誤訊息
+- ✅ 統一的錯誤格式
 
 ---
 

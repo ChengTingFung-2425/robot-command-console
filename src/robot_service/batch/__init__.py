@@ -9,7 +9,10 @@ from .models import (
     BatchCommand,
     BatchOptions,
     BatchResult,
-    CommandResult
+    CommandResult,
+    ExecutionMode,
+    CommandStatus,
+    BatchStatus,
 )
 from .parser import BatchParser
 from .executor import BatchExecutor
@@ -23,6 +26,10 @@ __all__ = [
     "BatchOptions",
     "BatchResult",
     "CommandResult",
+    # Enums
+    "ExecutionMode",
+    "CommandStatus",
+    "BatchStatus",
     # Components
     "BatchParser",
     "BatchExecutor",

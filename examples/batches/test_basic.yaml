@@ -1,0 +1,47 @@
+batch_id: test-basic-actions
+description: 自動化測試 - 基本動作序列
+robots:
+  - robot-001
+
+commands:
+  - robot_id: robot-001
+    action: stand
+    params: {}
+    priority: normal
+    timeout_ms: 5000
+  
+  - robot_id: robot-001
+    action: go_forward
+    params:
+      duration_ms: 2000
+    priority: normal
+    timeout_ms: 5000
+  
+  - robot_id: robot-001
+    action: turn_left
+    params:
+      duration_ms: 1000
+    priority: normal
+    timeout_ms: 5000
+  
+  - robot_id: robot-001
+    action: turn_right
+    params:
+      duration_ms: 1000
+    priority: normal
+    timeout_ms: 5000
+  
+  - robot_id: robot-001
+    action: stop
+    params: {}
+    priority: high
+    timeout_ms: 3000
+
+options:
+  execution_mode: sequential
+  stop_on_error: true
+  retry_on_failure: 1
+  retry_backoff_factor: 1.5
+  delay_between_commands_ms: 1000
+  max_parallel: 1
+  dry_run: false

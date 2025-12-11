@@ -156,6 +156,9 @@ python qtwebview-app/main.py
 ```bash
 # 執行 Robot Service（不依賴 Electron 或 PyQt）
 python3 run_service_cli.py --queue-size 1000 --workers 5
+
+# 執行批次操作 CLI（無頭部署，批次指令執行）
+python3 run_batch_cli.py --file examples/batches/demo_sequence.json --monitor
 ```
 
 #### 選項 D: 手動啟動各服務
@@ -184,6 +187,9 @@ python3 -m pytest tests/test_e2e_integration.py -v
 
 # 執行特定測試
 python3 -m pytest tests/test_queue_system.py -v
+
+# 執行批次操作測試
+python3 -m pytest tests/test_batch_operations.py -v
 
 # JavaScript 整合測試（Electron POC）
 node test_integration.js

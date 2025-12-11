@@ -1,0 +1,6 @@
+robot_id,action,params_json,priority,timeout_ms
+robot-001,stand,{},normal,5000
+robot-001,wave,"{""duration_ms"": 3000}",normal,5000
+robot-002,bow,{},normal,5000
+robot-003,kung_fu,{},normal,8000
+all,stop,{},high,3000

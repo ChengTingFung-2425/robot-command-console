@@ -2,12 +2,16 @@
 LLM Command Processor
 
 處理原生語音/文字指令，透過 LLM IPC Bridge 與 LLM 互動
+整合追蹤功能，記錄完整的處理流程
 """
 
 import asyncio
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+import time
+
+from .llm_trace_manager import LLMTraceManager, TraceEventType
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +32,8 @@ class LLMCommandProcessor:
         self,
         bridge=None,
         llm_provider: Optional[str] = None,
-        enable_speech: bool = False
+        enable_speech: bool = False,
+        trace_manager: Optional[LLMTraceManager] = None
     ):
         """
         初始化 LLM 指令處理器
@@ -37,10 +42,12 @@ class LLMCommandProcessor:
             bridge: LLMIPCBridge 實例
             llm_provider: LLM 提供商（如 "openai", "anthropic" 等）
             enable_speech: 是否啟用語音處理
+            trace_manager: 追蹤管理器（用於記錄處理流程）
         """
         self.bridge = bridge
         self.llm_provider = llm_provider or "openai"
         self.enable_speech = enable_speech
+        self.trace_manager = trace_manager or LLMTraceManager()
         self._conversation_history: List[Dict[str, Any]] = []
         self._available_functions: List[Dict[str, Any]] = []
         

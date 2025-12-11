@@ -38,3 +38,6 @@ python-json-logger>=2.0.7
 
 # Async HTTP client for health checks
 aiohttp>=3.9.0
+
+# TUI (Terminal User Interface)
+textual>=0.47.0

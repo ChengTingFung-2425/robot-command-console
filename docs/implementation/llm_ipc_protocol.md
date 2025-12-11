@@ -6,15 +6,15 @@
 
 ## 概覽
 
-LLM IPC Discovery Protocol 是一個跨平台的 LLM Copilot 發現與技能註冊機制，專為 Edge 環境設計。它允許本地運行的 LLM Copilot 實例（llm-cop）自動註冊其技能集（skills），並被 MCP/Robot Service 發現和安全使用。
+LLM IPC Discovery Protocol 是一個跨平台的 LLM 發現與技能註冊機制，專為 Edge 環境設計。它允許本地運行的 **LLM Compatible Software（llm-cop）** 實例自動註冊其技能集（skills），並被 MCP/Robot Service 發現和安全使用。
 
-**llm-cop 完全相容標準 LLM API**（如 OpenAI API），使得現有的 LLM 客戶端可以無縫使用 Copilot 提供的專業技能。
+**llm-cop（LLM Compatible Software）** 是指能夠讓 LLM 透過技能（skills）來操作軟體的相容軟體。它完全相容標準 LLM API（如 OpenAI API），使得 LLM 能夠透過 function calling 等機制來操作軟體功能，同時軟體也能提供資訊給 LLM 查詢和理解。
 
 ### 核心目標
 
-1. **LLM Copilot 發現**：自動偵測本地運行的 llm-cop 軟體實例
-2. **技能註冊**：Copilot 可註冊和共享其可執行的技能清單
-3. **LLM 相容性**：提供標準 OpenAI-compatible API 介面
+1. **LLM Compatible Software 發現**：自動偵測本地運行的 llm-cop（LLM Compatible Software）實例
+2. **技能註冊**：llm-cop 可註冊和共享其可執行的技能清單，讓 LLM 能夠操作軟體
+3. **LLM 相容性**：提供標準 OpenAI-compatible API 介面，支援 function calling
 4. **隱私保護**：防止 LLM 模型洩密攻擊，確保敏感資料不外洩
 5. **Edge 隔離**：所有通訊限於本地 Edge 環境，不對外暴露
 
@@ -31,8 +31,8 @@ LLM IPC Discovery Protocol 是一個跨平台的 LLM Copilot 發現與技能註�
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                   LLM Copilot Discovery Core                         │
-│  (MCP/Robot Service - Edge Layer - 負責發現與管理 LLM Copilot)       │
+│                   LLM Compatible Software Discovery Core             │
+│  (MCP/Robot Service - Edge Layer - 負責發現與管理 llm-cop)           │
 ├─────────────────────────────────────────────────────────────────────┤
 │  ┌──────────────────┐    ┌──────────────────────────────┐          │
 │  │ Filesystem       │    │ Endpoint Liveness Probe      │          │
@@ -42,7 +42,7 @@ LLM IPC Discovery Protocol 是一個跨平台的 LLM Copilot 發現與技能註�
 │           └──────────┬───────────────┘                              │
 │                      │                                               │
 │             ┌────────▼───────────┐                                  │
-│             │  Copilot Manager   │                                  │
+│             │  Software Manager  │                                  │
 │             │  • Discovery       │                                  │
 │             │  • Skill Registry  │                                  │
 │             │  • Privacy Guard   │                                  │
@@ -52,9 +52,9 @@ LLM IPC Discovery Protocol 是一個跨平台的 LLM Copilot 發現與技能註�
                        │ IPC (localhost only - HTTP/Unix Socket)
                        │
 ┌─────────────────────▼─────────────────────────────────────────────┐
-│                   LLM Copilot Instances (llm-cop)                  │
+│              LLM Compatible Software Instances (llm-cop)           │
 │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐│
-│  │  LLM-Cop-1       │  │  LLM-Cop-2       │  │  LLM-Cop-N       ││
+│  │  llm-cop-1       │  │  llm-cop-2       │  │  llm-cop-N       ││
 │  │  Skills:         │  │  Skills:         │  │  Skills:         ││
 │  │  • code_review   │  │  • test_gen      │  │  • doc_gen       ││
 │  │  • refactor      │  │  • bug_fix       │  │  • translate     ││
@@ -68,7 +68,8 @@ LLM IPC Discovery Protocol 是一個跨平台的 LLM Copilot 發現與技能註�
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│        LLM Copilot (llm-cop) - 多層安全防護                  │
+│   LLM Compatible Software (llm-cop) - 多層安全防護           │
+│   (讓 LLM 透過 skills 操作軟體)                              │
 │                                                              │
 │  ┌────────────────────────────────────────────────────────┐ │
 │  │  Layer 1: Prompt Sanitization                          │ │
@@ -506,14 +507,16 @@ ALLOWED_APIS = [
 - 高頻健康檢查
 - 記憶體洩漏檢測
 
-## LLM 相容性（LLM Compatible）
+## LLM Compatible Software（llm-cop）定義
 
-### 定義
+### 什麼是 llm-cop？
 
-**LLM Compatible** 意味著軟體支援雙向互動：
+**llm-cop（LLM Compatible Software）** 是指能夠讓 LLM 透過技能（skills）來操作的相容軟體。它支援雙向互動：
 
 1. **LLM → Software (操作)**：LLM 可以透過 skills (function calling) 來操作軟體功能
 2. **Software → LLM (資訊)**：軟體可以透過標準 API 提供資訊給 LLM，供其理解和處理
+
+這使得 LLM 不僅能理解軟體的資訊，還能實際操作軟體執行任務。
 
 ### API 介面標準
 

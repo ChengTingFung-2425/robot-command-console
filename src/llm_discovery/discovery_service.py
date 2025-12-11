@@ -1,7 +1,8 @@
 """
-LLM Copilot Discovery Service
+LLM Compatible Software (llm-cop) Discovery Service
 
 統一的發現服務介面，整合 scanner 和 probe
+讓 LLM 能夠透過 skills 發現和操作相容軟體
 """
 
 import logging
@@ -19,13 +20,14 @@ logger = logging.getLogger(__name__)
 
 class DiscoveryService:
     """
-    LLM Copilot 發現服務
+    LLM Compatible Software (llm-cop) 發現服務
     
     負責：
-    - 掃描並發現本地註冊的 LLM Copilot
+    - 掃描並發現本地註冊的 llm-cop（LLM Compatible Software）
     - 探測端點健康狀態
-    - 管理提供商註冊
-    - 提供技能查詢介面
+    - 管理 llm-cop 註冊
+    - 提供技能（skills）查詢介面
+    - 讓 LLM 透過 function calling/skills 操作軟體
     """
 
     def __init__(self):
@@ -36,12 +38,12 @@ class DiscoveryService:
 
     async def scan_providers(self) -> List[ProviderManifest]:
         """
-        掃描並返回所有註冊的提供商
+        掃描並返回所有註冊的 llm-cop（LLM Compatible Software）
         
         Returns:
             ProviderManifest 列表
         """
-        logger.info("開始掃描 LLM Copilot 提供商")
+        logger.info("開始掃描 llm-cop（LLM Compatible Software）")
 
         # 使用 scanner 掃描 filesystem
         manifests = self.scanner.scan_manifests()
@@ -49,23 +51,23 @@ class DiscoveryService:
         # 更新內部快取
         self._providers = {m.provider_id: m for m in manifests}
 
-        logger.info(f"發現 {len(manifests)} 個提供商")
+        logger.info(f"發現 {len(manifests)} 個 llm-cop")
 
         return manifests
 
     async def check_health(self, provider_id: str) -> Optional[ProviderHealth]:
         """
-        檢查特定提供商的健康狀態
+        檢查特定 llm-cop 的健康狀態
         
         Args:
-            provider_id: 提供商 ID
+            provider_id: llm-cop provider ID
             
         Returns:
-            ProviderHealth 或 None（如果提供商不存在）
+            ProviderHealth 或 None（如果 llm-cop 不存在）
         """
         manifest = self._providers.get(provider_id)
         if not manifest:
-            logger.warning(f"提供商不存在: {provider_id}")
+            logger.warning(f"llm-cop 不存在: {provider_id}")
             return None
 
         # 獲取之前的失敗次數
@@ -86,7 +88,7 @@ class DiscoveryService:
 
     async def check_all_health(self) -> Dict[str, ProviderHealth]:
         """
-        檢查所有提供商的健康狀態
+        檢查所有 llm-cop 的健康狀態
         
         Returns:
             provider_id -> ProviderHealth 的字典
@@ -102,15 +104,15 @@ class DiscoveryService:
 
     async def get_available_providers(self) -> List[str]:
         """
-        返回所有可用的提供商 ID
+        返回所有可用的 llm-cop ID
         
         Returns:
-            提供商 ID 列表
+            llm-cop provider ID 列表
         """
-        # 檢查所有提供商的健康狀態
+        # 檢查所有 llm-cop 的健康狀態
         health_results = await self.check_all_health()
 
-        # 篩選可用的提供商
+        # 篩選可用的 llm-cop
         available = [
             provider_id
             for provider_id, health in health_results.items()
@@ -125,10 +127,10 @@ class DiscoveryService:
         user_approved: bool = False
     ) -> bool:
         """
-        註冊新的提供商（需用戶同意）
+        註冊新的 llm-cop（需用戶同意）
         
         Args:
-            manifest: 提供商 manifest
+            manifest: llm-cop manifest
             user_approved: 是否經用戶批准
             
         Returns:
@@ -140,7 +142,7 @@ class DiscoveryService:
 
         # 檢查是否已存在
         if manifest.provider_id in self._providers:
-            logger.warning(f"提供商已存在: {manifest.provider_id}")
+            logger.warning(f"llm-cop 已存在: {manifest.provider_id}")
             return False
 
         # 更新 metadata
@@ -153,16 +155,16 @@ class DiscoveryService:
         if success:
             # 更新內部快取
             self._providers[manifest.provider_id] = manifest
-            logger.info(f"成功註冊提供商: {manifest.provider_id}")
+            logger.info(f"成功註冊 llm-cop: {manifest.provider_id}")
 
         return success
 
     async def unregister_provider(self, provider_id: str) -> bool:
         """
-        取消註冊提供商
+        取消註冊 llm-cop
         
         Args:
-            provider_id: 提供商 ID
+            provider_id: llm-cop provider ID
             
         Returns:
             成功返回 True，失敗返回 False
@@ -174,23 +176,23 @@ class DiscoveryService:
             # 從內部快取移除
             self._providers.pop(provider_id, None)
             self._health_cache.pop(provider_id, None)
-            logger.info(f"成功取消註冊提供商: {provider_id}")
+            logger.info(f"成功取消註冊 llm-cop: {provider_id}")
 
         return success
 
     async def get_provider_skills(self, provider_id: str) -> List[Skill]:
         """
-        獲取提供商的技能列表
+        獲取 llm-cop 的技能（skills）列表
         
         Args:
-            provider_id: 提供商 ID
+            provider_id: llm-cop provider ID
             
         Returns:
             Skill 列表
         """
         manifest = self._providers.get(provider_id)
         if not manifest:
-            logger.warning(f"提供商不存在: {provider_id}")
+            logger.warning(f"llm-cop 不存在: {provider_id}")
             return []
 
         return manifest.skills
@@ -201,7 +203,7 @@ class DiscoveryService:
         category: Optional[str] = None
     ) -> List[Tuple[str, Skill]]:
         """
-        搜尋技能
+        搜尋技能（skills）
         
         Args:
             keyword: 關鍵字（搜尋名稱和描述）
@@ -233,13 +235,13 @@ class DiscoveryService:
 
     def get_provider_info(self, provider_id: str) -> Optional[Dict]:
         """
-        獲取提供商資訊（不包含敏感資料）
+        獲取 llm-cop 資訊（不包含敏感資料）
         
         Args:
-            provider_id: 提供商 ID
+            provider_id: llm-cop provider ID
             
         Returns:
-            提供商資訊字典
+            llm-cop 資訊字典
         """
         manifest = self._providers.get(provider_id)
         if not manifest:

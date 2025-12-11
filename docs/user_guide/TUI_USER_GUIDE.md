@@ -210,9 +210,10 @@ all:go_forward
 | `service:queue.cloud.on/off` | `service:queue.cloud.on` | 雲端路由控制 |
 | `service:llm.provider["name"]` | `service:llm.provider["ollama"]` | LLM 提供商設定 |
 
-### 機器人控制指令
+## 發送指令
 
-**基本指令：**
+### 基本指令
+
 在指令輸入欄位中輸入動作名稱，按 `Enter` 發送：
 
 ```
@@ -222,7 +223,8 @@ stand
 wave_hand
 ```
 
-**指定機器人：**
+### 指定機器人
+
 預設指令會發送到 `robot-001`。如需指定其他機器人，請使用以下格式：
 
 ```
@@ -230,7 +232,8 @@ robot-002:go_forward
 robot-003:turn_left
 ```
 
-**廣播到所有機器人：**
+### 廣播到所有機器人
+
 使用 `all:` 前綴可同時對所有連接的機器人執行相同動作：
 
 ```

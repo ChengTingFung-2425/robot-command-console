@@ -6,7 +6,7 @@ Robot Console TUI Application
 
 import asyncio
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 
 from textual.app import App, ComposeResult
 from textual.containers import Container, ScrollableContainer
@@ -15,9 +15,9 @@ from textual.binding import Binding
 from textual.reactive import reactive
 
 from ..service_coordinator import ServiceCoordinator
+from ..command_history_manager import CommandHistoryManager
 from common.service_types import ServiceStatus
 from common.shared_state import SharedStateManager, EventTopics
-from ..command_history_manager import CommandHistoryManager
 
 
 class ServiceStatusWidget(Static):
@@ -260,6 +260,7 @@ class RobotConsoleTUI(App):
             try:
                 await self._update_task
             except asyncio.CancelledError:
+                # 任務取消時屬預期行為，安全忽略
                 pass
     
     async def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -285,8 +286,13 @@ class RobotConsoleTUI(App):
             await self._handle_service_command(action)
             return
         
-        # TODO: 實作指令發送邏輯
-        # 這裡需要整合 CommandProcessor 或直接發送到佇列
+        # 機器人指令發送邏輯
+        # TODO: 整合 CommandProcessor 實際發送指令到佇列
+        # 目前僅記錄到歷史，不執行實際動作
+        # 完整實作需要：
+        # 1. 與 CommandProcessor 整合
+        # 2. 佇列服務連接
+        # 3. 機器人連接驗證
         
         # 暫時顯示在歷史中
         history = self.query_one("#history", CommandHistoryWidget)
@@ -298,7 +304,7 @@ class RobotConsoleTUI(App):
         else:
             history.add_command(timestamp, robot_id, action, "pending")
     
-    def _parse_command(self, command: str) -> tuple[str, str]:
+    def _parse_command(self, command: str) -> Tuple[str, str]:
         """
         解析指令格式
         
@@ -420,19 +426,26 @@ class RobotConsoleTUI(App):
         
         Args:
             action: on 或 off
+        
+        Note:
+            目前為模擬功能，僅顯示通知訊息。
+            完整實作需要與 OfflineQueueService 或 NetworkMonitor 整合。
         """
         if action not in ["on", "off"]:
             raise ValueError(f"Invalid cloud action: {action}. Use 'on' or 'off'")
         
         enabled = (action == "on")
         
-        # TODO: 實作實際的雲端路由控制
-        # 這裡需要與 OfflineQueueService 或 NetworkMonitor 整合
+        # TODO: 與 OfflineQueueService 或 NetworkMonitor 整合
+        # 需要實作：
+        # 1. 取得 OfflineQueueService 實例
+        # 2. 呼叫其雲端路由控制方法
+        # 3. 驗證設定是否成功套用
         
         if enabled:
-            self.notify("Cloud routing enabled - forcing internet routing", severity="information")
+            self.notify("Cloud routing enabled (preview) - forcing internet routing", severity="information")
         else:
-            self.notify("Cloud routing disabled - using local-only mode", severity="information")
+            self.notify("Cloud routing disabled (preview) - using local-only mode", severity="information")
     
     async def _handle_llm_provider(self, provider_name: str) -> None:
         """
@@ -440,9 +453,17 @@ class RobotConsoleTUI(App):
         
         Args:
             provider_name: 提供商名稱 (例如: ollama, lmstudio)
+        
+        Note:
+            目前為模擬功能，僅驗證提供商名稱和顯示通知。
+            完整實作需要與 LLMProviderManager 整合。
         """
-        # TODO: 實作實際的 LLM 提供商設定
-        # 這裡需要與 LLMProviderManager 整合
+        # TODO: 與 LLMProviderManager 整合
+        # 需要實作：
+        # 1. 取得 LLMProviderManager 實例
+        # 2. 呼叫 select_provider 方法
+        # 3. 驗證提供商是否可用
+        # 4. 更新系統設定
         
         valid_providers = ["ollama", "lmstudio", "openai", "anthropic"]
         if provider_name.lower() not in valid_providers:
@@ -452,7 +473,7 @@ class RobotConsoleTUI(App):
             )
             return
         
-        self.notify(f"LLM provider set to: {provider_name}", severity="information")
+        self.notify(f"LLM provider set to: {provider_name} (preview)", severity="information")
     
     async def _service_single_action(self, service_name: str, action: str) -> None:
         """
@@ -628,8 +649,23 @@ class RobotConsoleTUI(App):
     
     async def action_services(self) -> None:
         """顯示服務詳細資訊"""
-        # TODO: 實作服務詳細資訊彈窗
-        pass
+        if not self.coordinator:
+            self.notify("Coordinator not available", severity="error")
+            return
+        
+        services_info = self.coordinator.get_all_services_info()
+        if not services_info:
+            self.notify("No services found", severity="warning")
+            return
+        
+        # 組合服務詳情文字
+        details = ["服務詳情："]
+        for name, info in services_info.items():
+            status = info.status.value if hasattr(info, 'status') else "unknown"
+            details.append(f"  • {name}: [{status}]")
+        
+        details_text = "\n".join(details)
+        self.notify(details_text, severity="information")
     
     async def _periodic_update(self) -> None:
         """定期更新狀態"""
@@ -661,14 +697,28 @@ class RobotConsoleTUI(App):
             service_widget.update_service_status(service_name, info.status)
     
     async def _refresh_robots(self) -> None:
-        """刷新機器人狀態"""
+        """
+        刷新機器人狀態
+        
+        Note:
+            目前顯示範例資料。完整實作需要：
+            1. 從 SharedStateManager 取得實際機器人清單
+            2. 查詢每個機器人的即時狀態
+            3. 更新顯示
+        """
         if not self.state_manager:
             return
         
         robot_widget = self.query_one("#robots", RobotStatusWidget)
         
-        # 從共享狀態取得機器人清單
-        # TODO: 實作取得所有機器人的方法
+        # TODO: 從共享狀態取得實際機器人清單
+        # 目前使用範例資料
+        # 完整實作：
+        # robots = await self.state_manager.get_all_robots()
+        # for robot_id in robots:
+        #     status = await self.state_manager.get(StateKeys.ROBOT_STATUS.format(robot_id=robot_id))
+        #     robot_widget.update_robot_status(robot_id, status)
+        
         # 暫時使用範例資料
         robot_widget.update_robot_status("robot-001", {
             "connected": True,

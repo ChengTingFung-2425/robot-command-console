@@ -7,13 +7,14 @@ TUI Runner
 import argparse
 import asyncio
 import logging
+import os
 import sys
 from typing import Optional
 
 from ..service_coordinator import ServiceCoordinator, QueueService
+from ..command_history_manager import CommandHistoryManager
 from common.service_types import ServiceConfig
 from common.shared_state import SharedStateManager
-from ..command_history_manager import CommandHistoryManager
 from .app import RobotConsoleTUI
 
 
@@ -86,6 +87,9 @@ class TUIRunner:
     def setup_logging(self, level: str) -> None:
         """設定日誌"""
         # TUI 模式下，將日誌輸出到檔案避免干擾畫面
+        # 確保 logs 目錄存在
+        os.makedirs('logs', exist_ok=True)
+        
         logging.basicConfig(
             level=getattr(logging, level),
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -108,7 +112,6 @@ class TUIRunner:
         # 建立服務協調器
         self.coordinator = ServiceCoordinator(
             health_check_interval=args.health_check_interval,
-            state_manager=self.state_manager,
         )
         
         # 建立並註冊佇列服務

@@ -2,6 +2,7 @@
 LLM 處理器模組
 用於處理音訊轉文字與指令解析
 整合本地 LLM 提供商（Ollama, LM Studio 等）
+整合 LLM IPC Discovery（發現 llm-cop）
 支援網路不可用時自動回退到本地 LLM
 """
 
@@ -21,6 +22,7 @@ class LLMProcessor:
     """
     LLM 處理器，負責語音辨識與指令解析
     支援透過 MCP 注入本地 LLM 提供商
+    支援 LLM IPC Discovery（發現 llm-cop）
     支援網路不可用時自動回退到本地 LLM
     """
 
@@ -38,7 +40,8 @@ class LLMProcessor:
         self,
         provider_manager: Optional[LLMProviderManager] = None,
         use_local_fallback: bool = True,
-        cloud_provider_url: Optional[str] = None
+        cloud_provider_url: Optional[str] = None,
+        enable_ipc_discovery: bool = True
     ):
         """
         初始化 LLM 處理器
@@ -47,14 +50,142 @@ class LLMProcessor:
             provider_manager: LLM 提供商管理器，用於管理本地 LLM 提供商
             use_local_fallback: 當網路不可用時是否自動使用本地 LLM
             cloud_provider_url: 雲端 LLM 提供商 URL（用於網路連線檢查）
+            enable_ipc_discovery: 是否啟用 LLM IPC Discovery（發現 llm-cop）
         """
         self.provider_manager = provider_manager or LLMProviderManager()
         self.use_local_fallback = use_local_fallback
         self.cloud_provider_url = cloud_provider_url
+        self.enable_ipc_discovery = enable_ipc_discovery
         self.logger = logging.getLogger(__name__)
         self._last_internet_check = None
         self._internet_available = None
         self._warnings: List[Dict[str, Any]] = []  # 儲存警告訊息
+        
+        # LLM IPC Discovery 整合
+        self._discovery_service = None
+        self._discovered_skills: Dict[str, List[Any]] = {}  # provider_id -> skills
+        
+        if enable_ipc_discovery:
+            self._init_discovery_service()
+
+    def _init_discovery_service(self) -> None:
+        """初始化 LLM IPC Discovery 服務"""
+        try:
+            from src.llm_discovery import DiscoveryService
+            self._discovery_service = DiscoveryService()
+            self.logger.info("LLM IPC Discovery 服務已啟用")
+        except ImportError as e:
+            self.logger.warning(f"無法載入 LLM IPC Discovery: {e}，將使用基本功能")
+            self.enable_ipc_discovery = False
+
+    async def discover_llm_cop_skills(self) -> Dict[str, List[Any]]:
+        """
+        發現所有可用的 llm-cop（LLM Compatible Software）及其 skills
+        
+        Returns:
+            provider_id -> skills 的字典
+        """
+        if not self.enable_ipc_discovery or not self._discovery_service:
+            self.logger.debug("LLM IPC Discovery 未啟用")
+            return {}
+        
+        try:
+            # 掃描所有 llm-cop
+            providers = await self._discovery_service.scan_providers()
+            self.logger.info(f"發現 {len(providers)} 個 llm-cop")
+            
+            # 檢查健康狀態
+            health_results = await self._discovery_service.check_all_health()
+            
+            # 收集可用 llm-cop 的 skills
+            discovered = {}
+            for manifest in providers:
+                provider_id = manifest.provider_id
+                health = health_results.get(provider_id)
+                
+                if health and health.status == "available":
+                    discovered[provider_id] = manifest.skills
+                    self.logger.info(
+                        f"llm-cop '{provider_id}' 可用，"
+                        f"提供 {len(manifest.skills)} 個 skills"
+                    )
+                else:
+                    self.logger.debug(
+                        f"llm-cop '{provider_id}' 不可用或健康檢查失敗"
+                    )
+            
+            # 更新快取
+            self._discovered_skills = discovered
+            
+            return discovered
+            
+        except Exception as e:
+            self.logger.error(f"發現 llm-cop skills 時發生錯誤: {e}")
+            return {}
+
+    def get_available_skills(self) -> List[Dict[str, Any]]:
+        """
+        取得所有可用的 skills（OpenAI function calling 格式）
+        
+        Returns:
+            OpenAI function definitions 列表
+        """
+        skills = []
+        
+        for provider_id, provider_skills in self._discovered_skills.items():
+            for skill in provider_skills:
+                if hasattr(skill, 'function_definition') and skill.function_definition:
+                    # 轉換為 OpenAI function calling 格式
+                    func_def = skill.function_definition.copy()
+                    func_def['_provider_id'] = provider_id  # 標記來源
+                    func_def['_skill_id'] = skill.skill_id
+                    skills.append(func_def)
+        
+        return skills
+
+    async def invoke_llm_cop_skill(
+        self,
+        provider_id: str,
+        skill_id: str,
+        parameters: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        呼叫 llm-cop skill（透過 IPC Discovery）
+        
+        Args:
+            provider_id: llm-cop provider ID
+            skill_id: skill ID
+            parameters: skill 參數
+            
+        Returns:
+            skill 執行結果
+        """
+        if not self._discovery_service:
+            raise RuntimeError("LLM IPC Discovery 未啟用")
+        
+        try:
+            # 這裡應該透過 EndpointProbe 呼叫實際的 llm-cop 端點
+            # 由於 POC 階段，這裡先返回模擬結果
+            self.logger.info(
+                f"呼叫 llm-cop skill: provider={provider_id}, "
+                f"skill={skill_id}, params={parameters}"
+            )
+            
+            # TODO: 實作實際的 HTTP/IPC 呼叫
+            return {
+                "success": True,
+                "provider_id": provider_id,
+                "skill_id": skill_id,
+                "message": "Skill invoked successfully (POC mode)",
+                "parameters": parameters
+            }
+            
+        except Exception as e:
+            self.logger.error(f"呼叫 llm-cop skill 失敗: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
 
     def check_internet_connection(self, timeout: Optional[int] = None) -> bool:
         """

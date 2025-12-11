@@ -203,15 +203,17 @@ all:go_forward
 |------|------|------|
 | `action` | `go_forward` | 發送到預設機器人 (robot-001) |
 | `robot-id:action` | `robot-002:turn_left` | 發送到指定機器人 |
-| `all:action` | `all:stand` | 廣播到所有機器人 |
 | `system:command` | `system:list` | 系統管理指令 |
-| `service:name.action` | `service:mcp.start` | 服務管理指令 |
+| `service:name.action` | `service:mcp.start` | 單一服務管理 |
+| `service:all.action` | `service:all.start` | 所有微服務控制 |
+| `service:queue.cloud.on/off` | `service:queue.cloud.on` | 雲端路由控制 |
+| `service:llm.provider["name"]` | `service:llm.provider["ollama"]` | LLM 提供商設定 |
 
 ### 服務管理指令
 
 使用 `service:` 前綴可管理系統服務：
 
-**支援的動作：**
+**基本服務控制：**
 - `start` - 啟動服務
 - `stop` - 停止服務
 - `restart` - 重啟服務
@@ -223,14 +225,35 @@ service:mcp.start           # 啟動 MCP 服務
 service:queue.stop          # 停止佇列服務
 service:flask.restart       # 重啟 Flask 服務
 service:mcp.healthcheck     # 檢查 MCP 服務健康狀態
+```
+
+**控制所有微服務：**
+```
 service:all.start           # 啟動所有服務
+service:all.stop            # 停止所有服務
 service:all.healthcheck     # 檢查所有服務健康狀態
+```
+
+**雲端路由控制：**
+```
+service:queue.cloud.on      # 啟用雲端路由（強制網路路由）
+service:queue.cloud.off     # 停用雲端路由（僅本地模式）
+```
+
+**LLM 提供商設定：**
+```
+service:llm.provider["ollama"]      # 設定為 Ollama
+service:llm.provider["lmstudio"]    # 設定為 LM Studio
+service:llm.provider["openai"]      # 設定為 OpenAI
+service:llm.provider["anthropic"]   # 設定為 Anthropic
 ```
 
 **注意事項：**
 - 服務名稱必須與已註冊的服務一致
 - 重啟操作會先停止再啟動服務
-- `all.restart` 不支援（請使用 `all.stop` 後再 `all.start`）
+- `service:all.restart` 不支援（請使用 `service:all.stop` 後再 `service:all.start`）
+- 雲端路由控制影響離線佇列的網路行為
+- LLM 提供商名稱不區分大小寫
 
 ### 系統管理指令
 

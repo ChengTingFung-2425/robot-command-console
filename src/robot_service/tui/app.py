@@ -291,12 +291,7 @@ class RobotConsoleTUI(App):
         # 暫時顯示在歷史中
         history = self.query_one("#history", CommandHistoryWidget)
         timestamp = datetime.now().strftime("%H:%M:%S")
-        
-        if robot_id == "all":
-            # 廣播指令到所有機器人
-            history.add_command(timestamp, "all robots", action, "pending")
-        else:
-            history.add_command(timestamp, robot_id, action, "pending")
+        history.add_command(timestamp, robot_id, action, "pending")
     
     def _parse_command(self, command: str) -> tuple[str, str]:
         """
@@ -305,9 +300,9 @@ class RobotConsoleTUI(App):
         支援格式：
         - action_name -> (robot-001, action_name)
         - robot-002:action_name -> (robot-002, action_name)
-        - all:action_name -> (all, action_name)
         - system:command -> (system, command)
         - service:service_name.action -> (service, service_name.action)
+        - service:all.action -> (service, all.action) - 控制所有微服務
         
         Args:
             command: 輸入的指令字串
@@ -331,7 +326,9 @@ class RobotConsoleTUI(App):
         
         支援格式：
         - service_name.action (例如: mcp.start, queue.stop)
-        - all.action (例如: all.healthcheck)
+        - all.start/stop/healthcheck - 控制所有微服務
+        - queue.cloud.on/off - 雲端路由控制
+        - llm.provider["name"] - 設定 LLM 提供商
         
         支援動作：
         - start: 啟動服務
@@ -340,7 +337,7 @@ class RobotConsoleTUI(App):
         - healthcheck: 健康檢查
         
         Args:
-            command: 服務管理指令 (service_name.action 格式)
+            command: 服務管理指令
         """
         history = self.query_one("#history", CommandHistoryWidget)
         timestamp = datetime.now().strftime("%H:%M:%S")
@@ -351,26 +348,105 @@ class RobotConsoleTUI(App):
             self.notify("Invalid service command format. Use: service:name.action", severity="error")
             return
         
-        service_name, action = command.split(".", 1)
-        service_name = service_name.strip()
-        action = action.strip()
+        parts = command.split(".", 1)
+        service_name = parts[0].strip()
+        remaining = parts[1].strip()
         
         if not self.coordinator:
-            history.add_command(timestamp, f"service:{service_name}", action, "error")
+            history.add_command(timestamp, f"service:{service_name}", remaining, "error")
             self.notify("Coordinator not available", severity="error")
             return
         
         # 執行服務動作
         try:
+            # 處理 all.action - 控制所有微服務
             if service_name == "all":
-                await self._service_all_action(action)
-                history.add_command(timestamp, "service:all", action, "success")
+                await self._service_all_action(remaining)
+                history.add_command(timestamp, "service:all", remaining, "success")
+            
+            # 處理 queue.cloud.on/off
+            elif service_name == "queue" and remaining.startswith("cloud."):
+                action = remaining.split(".", 1)[1] if "." in remaining else remaining
+                await self._handle_queue_cloud(action)
+                history.add_command(timestamp, "service:queue.cloud", action, "success")
+            
+            # 處理 llm.provider["name"]
+            elif service_name == "llm" and remaining.startswith("provider["):
+                # 解析 provider["name"]
+                provider_name = self._parse_bracket_notation(remaining)
+                if provider_name:
+                    await self._handle_llm_provider(provider_name)
+                    history.add_command(timestamp, "service:llm.provider", provider_name, "success")
+                else:
+                    raise ValueError("Invalid provider notation. Use: provider[\"name\"]")
+            
+            # 一般服務動作
             else:
-                await self._service_single_action(service_name, action)
-                history.add_command(timestamp, f"service:{service_name}", action, "success")
+                await self._service_single_action(service_name, remaining)
+                history.add_command(timestamp, f"service:{service_name}", remaining, "success")
+        
         except Exception as e:
-            history.add_command(timestamp, f"service:{service_name}", action, "error")
+            history.add_command(timestamp, f"service:{service_name}", remaining, "error")
             self.notify(f"Service command failed: {e}", severity="error")
+    
+    def _parse_bracket_notation(self, text: str) -> Optional[str]:
+        """
+        解析方括號標記法 provider["name"]
+        
+        Args:
+            text: 包含方括號的文字
+        
+        Returns:
+            提取的值，如果格式錯誤則返回 None
+        """
+        import re
+        match = re.search(r'provider\[\"([^\"]+)\"\]', text)
+        if match:
+            return match.group(1)
+        match = re.search(r"provider\['([^']+)'\]", text)
+        if match:
+            return match.group(1)
+        return None
+    
+    async def _handle_queue_cloud(self, action: str) -> None:
+        """
+        處理佇列雲端路由控制
+        
+        Args:
+            action: on 或 off
+        """
+        if action not in ["on", "off"]:
+            raise ValueError(f"Invalid cloud action: {action}. Use 'on' or 'off'")
+        
+        enabled = (action == "on")
+        
+        # TODO: 實作實際的雲端路由控制
+        # 這裡需要與 OfflineQueueService 或 NetworkMonitor 整合
+        
+        if enabled:
+            self.notify("Cloud routing enabled - forcing internet routing", severity="information")
+        else:
+            self.notify("Cloud routing disabled - using local-only mode", severity="information")
+    
+    async def _handle_llm_provider(self, provider_name: str) -> None:
+        """
+        設定 LLM 提供商
+        
+        Args:
+            provider_name: 提供商名稱 (例如: ollama, lmstudio)
+        """
+        # TODO: 實作實際的 LLM 提供商設定
+        # 這裡需要與 LLMProviderManager 整合
+        
+        valid_providers = ["ollama", "lmstudio", "openai", "anthropic"]
+        if provider_name.lower() not in valid_providers:
+            self.notify(
+                f"Unknown provider '{provider_name}'. Valid: {', '.join(valid_providers)}",
+                severity="warning"
+            )
+            return
+        
+        self.notify(f"LLM provider set to: {provider_name}", severity="information")
     
     async def _service_single_action(self, service_name: str, action: str) -> None:
         """

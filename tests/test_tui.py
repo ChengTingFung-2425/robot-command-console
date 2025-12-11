@@ -200,12 +200,12 @@ class TestRobotConsoleTUI:
         assert action == "turn_left"
     
     def test_parse_command_all_robots(self):
-        """測試廣播指令解析"""
+        """測試廣播指令解析（現在使用 service:all.action）"""
         app = RobotConsoleTUI()
         
-        robot_id, action = app._parse_command("all:stand")
-        assert robot_id == "all"
-        assert action == "stand"
+        robot_id, action = app._parse_command("service:all.stand")
+        assert robot_id == "service"
+        assert action == "all.stand"
     
     def test_parse_command_with_spaces(self):
         """測試帶空格的指令解析"""
@@ -369,6 +369,58 @@ class TestRobotConsoleTUI:
         app.notify.assert_called_once()
         call_args = app.notify.call_args[0][0]
         assert "All services healthy" in call_args
+    
+    @pytest.mark.asyncio
+    async def test_handle_queue_cloud_on(self):
+        """測試啟用雲端路由"""
+        app = RobotConsoleTUI()
+        app.notify = Mock()
+        
+        await app._handle_queue_cloud("on")
+        
+        app.notify.assert_called_once()
+        call_args = app.notify.call_args[0][0]
+        assert "Cloud routing enabled" in call_args
+    
+    @pytest.mark.asyncio
+    async def test_handle_queue_cloud_off(self):
+        """測試停用雲端路由"""
+        app = RobotConsoleTUI()
+        app.notify = Mock()
+        
+        await app._handle_queue_cloud("off")
+        
+        app.notify.assert_called_once()
+        call_args = app.notify.call_args[0][0]
+        assert "Cloud routing disabled" in call_args
+    
+    @pytest.mark.asyncio
+    async def test_handle_llm_provider(self):
+        """測試設定 LLM 提供商"""
+        app = RobotConsoleTUI()
+        app.notify = Mock()
+        
+        await app._handle_llm_provider("ollama")
+        
+        app.notify.assert_called_once()
+        call_args = app.notify.call_args[0][0]
+        assert "LLM provider set to: ollama" in call_args
+    
+    def test_parse_bracket_notation(self):
+        """測試解析方括號標記法"""
+        app = RobotConsoleTUI()
+        
+        # 測試雙引號
+        result = app._parse_bracket_notation('provider["ollama"]')
+        assert result == "ollama"
+        
+        # 測試單引號
+        result = app._parse_bracket_notation("provider['lmstudio']")
+        assert result == "lmstudio"
+        
+        # 測試無效格式
+        result = app._parse_bracket_notation("provider[ollama]")
+        assert result is None
     
     @pytest.mark.asyncio
     async def test_system_list_robots(self):

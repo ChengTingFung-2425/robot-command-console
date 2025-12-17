@@ -412,6 +412,200 @@ query = query.order_by(AuditLog.timestamp.desc())
 pagination = query.paginate(page=page, per_page=per_page, error_out=False)
 ```
 
+### 21. 零信任前端原則⭐⭐⭐ (NEW - 2025-12-17)
+
+**使用頻率**：所有前後端互動
+**相關文件**：[security/threat-model.md](security/threat-model.md) v2.0, [security/edge-cloud-auth-analysis.md](security/edge-cloud-auth-analysis.md)
+
+**核心原則：所有前端資料視為不可信任**
+
+```python
+# ✅ 後端強制驗證所有輸入
+from pydantic import BaseModel, validator
+
+class UserCreateRequest(BaseModel):
+    username: str
+    email: str
+    role: str
+    
+    @validator('role')
+    def validate_role(cls, v):
+        if v not in ['admin', 'operator', 'viewer', 'auditor']:
+            raise ValueError('Invalid role')
+        return v
+
+@app.route('/api/users', methods=['POST'])
+@login_required
+def create_user():
+    # 1. Pydantic 驗證輸入（不信任前端）
+    try:
+        data = UserCreateRequest(**request.json)
+    except ValidationError:
+        return jsonify({'error': 'Invalid input'}), 400
+    
+    # 2. 後端檢查權限（不信任前端 token）
+    if current_user.role != 'admin':
+        log_permission_denied(current_user.id, 'create_user')
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    # 3. 業務邏輯在後端執行
+    user = User(username=data.username, email=data.email, role=data.role)
+    db.session.add(user)
+    
+    # 4. 記錄審計日誌
+    log_audit_event(action='user_create', user_id=current_user.id)
+```
+
+### 22. Edge-Cloud 認證同步架構⭐⭐⭐ (NEW - 2025-12-17)
+
+**使用頻率**：Edge 環境認證實作
+**相關文件**：[security/edge-cloud-auth-analysis.md](security/edge-cloud-auth-analysis.md)
+
+**推薦方案：Token 快取同步**
+- 登入在 Server 驗證，Token 快取至 Edge
+- Access Token：15 分鐘（短期，減少被盜風險）
+- Refresh Token：7 天（設備綁定）
+- 加密儲存：Fernet 或 OS keychain
+
+```python
+# Edge 端 Token 管理器
+class EdgeAuthCache:
+    def get_valid_access_token(self) -> str:
+        """獲取有效的 Access Token（自動更新過期 token）"""
+        tokens = self.load_tokens()
+        if not tokens:
+            return None
+        
+        # 檢查是否過期（提前 1 分鐘更新）
+        if not self._is_token_valid(tokens['access_token'], buffer=60):
+            # 使用 Refresh Token 自動更新
+            return self._refresh_access_token(tokens['refresh_token'])
+        
+        return tokens['access_token']
+```
+
+### 23. Edge 環境安全約束⭐⭐ (NEW - 2025-12-17)
+
+**使用頻率**：Edge 環境開發
+**相關文件**：[security/edge-cloud-auth-analysis.md](security/edge-cloud-auth-analysis.md), [security/threat-model.md](security/threat-model.md) v2.0
+
+**Edge 環境特性**：
+- **延遲敏感**：<100ms 回應時間（輕量級驗證）
+- **記憶體受限**：4-8GB RAM（本地快取限制）
+- **物理安全弱**：設備可能被竊取/篡改
+- **離線運作**：需本地快取與降級策略
+
+```python
+# ✅ Server 端重新驗證 Edge 資料（零信任）
+def sync_from_edge(edge_logs: List[Dict]):
+    for log in edge_logs:
+        # 1. Pydantic 驗證
+        validated = AuditLogSchema.validate(log)
+        
+        # 2. 完整性檢查
+        if not verify_log_signature(log):
+            continue
+        
+        # 3. 業務邏輯驗證
+        if not verify_user_exists(validated.user_id):
+            continue
+        
+        # 4. 儲存
+        db.session.add(AuditLog(**validated.dict()))
+```
+
+### 24. Token 安全實作模式⭐⭐ (NEW - 2025-12-17)
+
+**使用頻率**：認證系統實作
+**相關文件**：[security/edge-cloud-auth-analysis.md](security/edge-cloud-auth-analysis.md)
+
+**安全措施**：
+1. 短期 Access Token（15 分鐘）
+2. Refresh Token rotation（單次使用）
+3. 設備指紋綁定（Device ID）
+4. Token 撤銷清單（Server 端）
+5. 加密儲存（Fernet/OS keychain）
+
+```python
+# Server 端：登入生成 Token
+@app.route('/auth/login', methods=['POST'])
+def login():
+    # 驗證使用者
+    user = User.query.filter_by(username=username).first()
+    if not user or not user.check_password(password):
+        log_login_attempt(username, success=False)
+        return jsonify({'error': 'Invalid credentials'}), 401
+    
+    # 生成短期 Access Token (15 分鐘)
+    access_token = create_access_token(
+        user_id=user.id,
+        role=user.role,
+        expires_in=900
+    )
+    
+    # 生成 Refresh Token (7 天，設備綁定)
+    refresh_token = create_refresh_token(
+        user_id=user.id,
+        device_id=request.headers.get('X-Device-ID'),
+        expires_in=604800
+    )
+    
+    log_login_attempt(username, success=True, user_id=user.id)
+    return jsonify({
+        'access_token': access_token,
+        'refresh_token': refresh_token,
+        'user': user.to_dict()
+    })
+```
+
+### 25. 離線模式權限控管⭐⭐ (NEW - 2025-12-17)
+
+**使用頻率**：Edge 環境 API 開發
+**相關文件**：[security/edge-cloud-auth-analysis.md](security/edge-cloud-auth-analysis.md)
+
+**操作權限矩陣**：
+- ✅ 離線允許：查看狀態、執行基本指令、查看歷史
+- ❌ 離線禁止：新增使用者、權限變更、系統配置
+
+```python
+# 離線認證裝飾器
+class OfflineAuthManager:
+    def require_auth(self, allow_offline=True, offline_restricted=False):
+        def decorator(f):
+            @wraps(f)
+            def wrapper(*args, **kwargs):
+                # 嘗試線上驗證
+                online_user = self._verify_online()
+                if online_user:
+                    self.offline_mode = False
+                    return f(*args, **kwargs)
+                
+                # 降級至離線模式
+                if allow_offline:
+                    offline_user = self._verify_offline()
+                    if offline_user:
+                        if offline_restricted:
+                            return jsonify({'error': 'Requires online'}), 403
+                        return f(*args, **kwargs)
+                
+                return jsonify({'error': 'Unauthorized'}), 401
+            return wrapper
+        return decorator
+
+# 使用範例
+@app.route('/api/users', methods=['POST'])
+@auth.require_auth(offline_restricted=True)  # 需線上
+def create_user():
+    """建立使用者（需要線上連線）"""
+    ...
+
+@app.route('/api/robots/status', methods=['GET'])
+@auth.require_auth(allow_offline=True)  # 允許離線
+def get_robot_status():
+    """查看狀態（可離線）"""
+    ...
+```
+
 ---
 
 ## 📚 詳細經驗索引
@@ -462,6 +656,13 @@ pagination = query.paginate(page=page, per_page=per_page, error_out=False)
   - 統計數據與技術亮點
   - 未來增強建議
 
+- **[security/edge-cloud-auth-analysis.md](security/edge-cloud-auth-analysis.md)**（新增 2025-12-17）
+  - Edge-Cloud 認證架構分析
+  - 三種方案比較（完全雲端、Token 快取、混合認證）
+  - 推薦實作：Token 快取同步架構
+  - 實作階段規劃（5 個 Phase）
+  - 安全考量與優缺點分析
+
 ### 代碼品質經驗
 
 - **[memory/code_quality_lessons.md](memory/code_quality_lessons.md)**
@@ -473,6 +674,22 @@ pagination = query.paginate(page=page, per_page=per_page, error_out=False)
 ---
 
 ## 🔄 最近更新
+
+### 2025-12-17: Edge-Cloud 認證架構分析
+- 完成 Edge-Cloud 認證同步架構分析文件
+- 推薦方案：Token 快取同步（登入在 Server，Token 快取至 Edge）
+- Access Token 15 分鐘 + Refresh Token 7 天
+- 離線模式權限控管矩陣
+- 實作階段規劃（5 個 Phase）
+- 詳見：[security/edge-cloud-auth-analysis.md](security/edge-cloud-auth-analysis.md)
+
+### 2025-12-17: 威脅模型 v2.0 - 零信任前端
+- 更新威脅模型至 v2.0
+- 新增零信任前端核心原則
+- 新增 Edge 環境安全約束
+- 新增 4 個高優先級威脅（前端驗證繞過、資料注入、Edge 篡改、Session 劫持）
+- 重寫信任邊界模型
+- 詳見：[security/threat-model.md](security/threat-model.md)
 
 ### 2025-12-17: 安全性強化 - 審計日誌系統實作
 - 實作完整審計日誌系統（資料模型、記錄機制、查詢介面）

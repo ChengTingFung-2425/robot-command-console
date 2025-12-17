@@ -12,7 +12,6 @@ from datetime import datetime, timezone
 from .models import ProviderManifest, ProviderHealth, Skill
 from .scanner import FilesystemScanner
 from .probe import EndpointProbe
-from .security import PromptSanitizer, ResponseFilter
 
 
 logger = logging.getLogger(__name__)
@@ -21,7 +20,7 @@ logger = logging.getLogger(__name__)
 class DiscoveryService:
     """
     LLM Compatible Software (llm-cop) 發現服務
-    
+
     負責：
     - 掃描並發現本地註冊的 llm-cop（LLM Compatible Software）
     - 探測端點健康狀態
@@ -39,7 +38,7 @@ class DiscoveryService:
     async def scan_providers(self) -> List[ProviderManifest]:
         """
         掃描並返回所有註冊的 llm-cop（LLM Compatible Software）
-        
+
         Returns:
             ProviderManifest 列表
         """
@@ -58,10 +57,10 @@ class DiscoveryService:
     async def check_health(self, provider_id: str) -> Optional[ProviderHealth]:
         """
         檢查特定 llm-cop 的健康狀態
-        
+
         Args:
             provider_id: llm-cop provider ID
-            
+
         Returns:
             ProviderHealth 或 None（如果 llm-cop 不存在）
         """
@@ -89,7 +88,7 @@ class DiscoveryService:
     async def check_all_health(self) -> Dict[str, ProviderHealth]:
         """
         檢查所有 llm-cop 的健康狀態
-        
+
         Returns:
             provider_id -> ProviderHealth 的字典
         """
@@ -105,7 +104,7 @@ class DiscoveryService:
     async def get_available_providers(self) -> List[str]:
         """
         返回所有可用的 llm-cop ID
-        
+
         Returns:
             llm-cop provider ID 列表
         """
@@ -128,11 +127,11 @@ class DiscoveryService:
     ) -> bool:
         """
         註冊新的 llm-cop（需用戶同意）
-        
+
         Args:
             manifest: llm-cop manifest
             user_approved: 是否經用戶批准
-            
+
         Returns:
             成功返回 True，失敗返回 False
         """
@@ -162,10 +161,10 @@ class DiscoveryService:
     async def unregister_provider(self, provider_id: str) -> bool:
         """
         取消註冊 llm-cop
-        
+
         Args:
             provider_id: llm-cop provider ID
-            
+
         Returns:
             成功返回 True，失敗返回 False
         """
@@ -183,10 +182,10 @@ class DiscoveryService:
     async def get_provider_skills(self, provider_id: str) -> List[Skill]:
         """
         獲取 llm-cop 的技能（skills）列表
-        
+
         Args:
             provider_id: llm-cop provider ID
-            
+
         Returns:
             Skill 列表
         """
@@ -204,11 +203,11 @@ class DiscoveryService:
     ) -> List[Tuple[str, Skill]]:
         """
         搜尋技能（skills）
-        
+
         Args:
             keyword: 關鍵字（搜尋名稱和描述）
             category: 類別過濾
-            
+
         Returns:
             (provider_id, Skill) 元組列表
         """
@@ -236,10 +235,10 @@ class DiscoveryService:
     def get_provider_info(self, provider_id: str) -> Optional[Dict]:
         """
         獲取 llm-cop 資訊（不包含敏感資料）
-        
+
         Args:
             provider_id: llm-cop provider ID
-            
+
         Returns:
             llm-cop 資訊字典
         """
@@ -270,7 +269,7 @@ class DiscoveryService:
     def get_all_providers_info(self) -> List[Dict]:
         """
         獲取所有提供商資訊
-        
+
         Returns:
             提供商資訊列表
         """
@@ -278,7 +277,7 @@ class DiscoveryService:
             self.get_provider_info(provider_id)
             for provider_id in self._providers.keys()
         ]
-    
+
     async def query_skill_info(
         self,
         provider_id: str,
@@ -288,13 +287,13 @@ class DiscoveryService:
     ) -> Optional[Dict[str, Any]]:
         """
         查詢 skill 提供的資訊（軟體→LLM）
-        
+
         Args:
             provider_id: 提供商 ID
             skill_id: 技能 ID
             query_method: 查詢方法名稱
             params: 查詢參數
-            
+
         Returns:
             查詢結果
         """
@@ -302,23 +301,23 @@ class DiscoveryService:
         if not manifest:
             logger.warning(f"提供商不存在: {provider_id}")
             return None
-        
+
         # 找到對應的 skill
         skill = next((s for s in manifest.skills if s.skill_id == skill_id), None)
         if not skill:
             logger.warning(f"Skill 不存在: {skill_id}")
             return None
-        
+
         # 檢查 info_schema
         if not skill.info_schema:
             logger.warning(f"Skill {skill_id} 未提供 info_schema")
             return None
-        
+
         query_methods = skill.get_query_methods()
         if query_method not in query_methods:
             logger.warning(f"查詢方法不存在: {query_method}")
             return None
-        
+
         # 這裡應該實際呼叫 provider 的端點來獲取資訊
         # 在 PoC 階段，我們返回 schema 定義
         return {
@@ -328,22 +327,22 @@ class DiscoveryService:
             "schema": query_methods[query_method],
             "note": "In production, this would call the actual provider endpoint"
         }
-    
+
     async def get_available_info_providers(self) -> Dict[str, List[str]]:
         """
         獲取所有可提供資訊的 skills（軟體→LLM）
-        
+
         Returns:
             provider_id -> [info_types] 的字典
         """
         info_map = {}
-        
+
         for provider_id, manifest in self._providers.items():
             info_types = []
             for skill in manifest.skills:
                 info_types.extend(skill.get_info_providers())
-            
+
             if info_types:
                 info_map[provider_id] = list(set(info_types))
-        
+
         return info_map

@@ -30,10 +30,10 @@ class PromptSanitizer:
     def sanitize_for_logging(text: str) -> str:
         """
         清理文字用於日誌記錄
-        
+
         Args:
             text: 原始文字
-            
+
         Returns:
             清理後的文字（不包含敏感資訊）
         """
@@ -47,10 +47,10 @@ class PromptSanitizer:
     def remove_sensitive_info(text: str) -> str:
         """
         移除文字中的敏感資訊
-        
+
         Args:
             text: 原始文字
-            
+
         Returns:
             移除敏感資訊後的文字
         """
@@ -63,10 +63,10 @@ class PromptSanitizer:
     def clear_from_memory(prompt: str):
         """
         從記憶體中清除 prompt
-        
+
         注意：Python 字符串是不可變的，此方法只能觸發垃圾回收，
         無法保證立即從記憶體中清除。調用者應確保不保留對 prompt 的引用。
-        
+
         Args:
             prompt: 要清除的 prompt
         """
@@ -96,11 +96,11 @@ class ResponseFilter:
     def filter_prompt_echo(response: str, prompt: Optional[str] = None) -> str:
         """
         移除回應中的 prompt 回顯
-        
+
         Args:
             response: LLM 回應
             prompt: 原始 prompt（如果提供，會檢查是否被回顯）
-            
+
         Returns:
             過濾後的回應
         """
@@ -128,10 +128,10 @@ class ResponseFilter:
     def remove_metadata(response: Dict[str, Any]) -> Dict[str, Any]:
         """
         移除可能洩露資訊的元資料
-        
+
         Args:
             response: 回應字典
-            
+
         Returns:
             清理後的回應字典
         """
@@ -159,10 +159,10 @@ class ResponseFilter:
     def detect_prompt_injection(text: str) -> bool:
         """
         檢測 prompt injection 攻擊
-        
+
         Args:
             text: 要檢測的文字
-            
+
         Returns:
             True 如果檢測到攻擊，否則 False
         """
@@ -191,7 +191,7 @@ class TimingObfuscator:
     def add_random_delay(min_ms: int = 10, max_ms: int = 100):
         """
         添加隨機延遲
-        
+
         Args:
             min_ms: 最小延遲（毫秒）
             max_ms: 最大延遲（毫秒）
@@ -206,11 +206,11 @@ class TimingObfuscator:
     ) -> float:
         """
         標準化回應時間，防止時間洩露
-        
+
         Args:
             actual_time_ms: 實際處理時間
             target_time_ms: 目標回應時間
-            
+
         Returns:
             標準化後的時間（總是 >= target_time_ms）
         """
@@ -229,10 +229,10 @@ class MemoryGuard:
     def secure_delete(data: Any):
         """
         安全刪除資料
-        
+
         注意：此方法只能清空可變容器（list, dict），
         對於不可變類型（str）無法真正清除記憶體。
-        
+
         Args:
             data: 要刪除的資料（應為可變容器）
         """
@@ -247,7 +247,7 @@ class MemoryGuard:
     def create_secure_context():
         """
         創建安全上下文管理器
-        
+
         Returns:
             上下文管理器
         """

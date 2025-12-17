@@ -1,0 +1,51 @@
+{
+  "batch_id": "demo-001",
+  "description": "機器人演示序列 - 展示基本動作",
+  "robots": ["robot-001", "robot-002"],
+  "commands": [
+    {
+      "robot_id": "all",
+      "action": "stand",
+      "params": {},
+      "priority": "normal",
+      "timeout_ms": 5000
+    },
+    {
+      "robot_id": "robot-001",
+      "action": "wave",
+      "params": {"duration_ms": 3000},
+      "priority": "normal",
+      "timeout_ms": 5000
+    },
+    {
+      "robot_id": "robot-002",
+      "action": "bow",
+      "params": {},
+      "priority": "normal",
+      "timeout_ms": 5000
+    },
+    {
+      "robot_id": "all",
+      "action": "dance_five",
+      "params": {},
+      "priority": "normal",
+      "timeout_ms": 10000
+    },
+    {
+      "robot_id": "all",
+      "action": "stop",
+      "params": {},
+      "priority": "high",
+      "timeout_ms": 3000
+    }
+  ],
+  "options": {
+    "execution_mode": "grouped",
+    "stop_on_error": false,
+    "retry_on_failure": 2,
+    "retry_backoff_factor": 1.5,
+    "delay_between_commands_ms": 500,
+    "max_parallel": 5,
+    "dry_run": false
+  }
+}

@@ -26,10 +26,10 @@ class EndpointProbe:
     def check_http_endpoint(endpoint: Endpoint) -> Tuple[bool, float, Optional[str]]:
         """
         檢查 HTTP/HTTPS 端點
-        
+
         Args:
             endpoint: 端點配置
-            
+
         Returns:
             (是否可用, 響應時間ms, 錯誤訊息)
         """
@@ -73,10 +73,10 @@ class EndpointProbe:
     def check_unix_socket(endpoint: Endpoint) -> Tuple[bool, float, Optional[str]]:
         """
         檢查 Unix socket 端點
-        
+
         Args:
             endpoint: 端點配置
-            
+
         Returns:
             (是否可用, 響應時間ms, 錯誤訊息)
         """
@@ -113,10 +113,10 @@ class EndpointProbe:
     def check_tcp_endpoint(endpoint: Endpoint) -> Tuple[bool, float, Optional[str]]:
         """
         檢查 TCP 端點
-        
+
         Args:
             endpoint: 端點配置
-            
+
         Returns:
             (是否可用, 響應時間ms, 錯誤訊息)
         """
@@ -164,10 +164,10 @@ class EndpointProbe:
     def probe_endpoint(endpoint: Endpoint) -> Tuple[bool, float, Optional[str]]:
         """
         探測端點（自動選擇方法）
-        
+
         Args:
             endpoint: 端點配置
-            
+
         Returns:
             (是否可用, 響應時間ms, 錯誤訊息)
         """
@@ -188,12 +188,12 @@ class EndpointProbe:
     ) -> ProviderHealth:
         """
         檢查提供商的健康狀態（檢查所有端點）
-        
+
         Args:
             provider_id: 提供商 ID
             endpoints: 端點列表
             previous_failures: 之前的連續失敗次數
-            
+
         Returns:
             ProviderHealth 物件
         """

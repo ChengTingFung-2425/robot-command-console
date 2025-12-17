@@ -292,6 +292,118 @@ app.config['JSON_AS_ASCII'] = False
 app.json.ensure_ascii = False
 ```
 
+### 16. 審計日誌記錄模式⭐⭐
+
+**使用頻率**：所有安全敏感操作
+**相關文件**：[security/audit-logging-implementation.md](security/audit-logging-implementation.md)
+
+```python
+# ✅ 使用專用函數記錄審計事件
+from WebUI.app.audit import log_login_attempt, log_audit_event
+
+# 登入成功/失敗
+log_login_attempt(username='user', success=True, user_id=user.id)
+log_login_attempt(username='user', success=False)
+
+# 自訂事件
+log_audit_event(
+    action='custom_action',
+    message='執行操作',
+    user_id=current_user.id,
+    resource_type='robot',
+    resource_id='123',
+    context={'detail': 'info'}
+)
+```
+
+### 17. Flask-SQLAlchemy 資料庫遷移⭐
+
+**使用頻率**：資料庫 schema 變更時
+**相關文件**：[security/audit-logging-implementation.md](security/audit-logging-implementation.md)
+
+```python
+# ✅ 遷移檔案結構
+# WebUI/migrations/versions/<revision_id>_<description>.py
+
+from alembic import op
+import sqlalchemy as sa
+
+revision = 'a1u2d3i4t5l6'
+down_revision = 'previous_revision'
+
+def upgrade():
+    op.create_table('table_name', ...)
+    op.create_index('index_name', 'table_name', ['column'])
+
+def downgrade():
+    op.drop_index('index_name', 'table_name')
+    op.drop_table('table_name')
+```
+
+### 18. RBAC 權限檢查模式⭐⭐
+
+**使用頻率**：所有需要權限控管的路由
+**相關文件**：[security/audit-logging-implementation.md](security/audit-logging-implementation.md)
+
+```python
+# ✅ 在路由中檢查角色權限
+@bp.route('/admin_only')
+@login_required
+def admin_function():
+    if current_user.role not in ['admin', 'auditor']:
+        flash('您沒有權限訪問此頁面。')
+        abort(403)
+    # 執行管理操作
+    return render_template('admin_page.html.j2')
+```
+
+### 19. Flask 模板條件渲染⭐⭐
+
+**使用頻率**：所有需要根據角色顯示不同內容的模板
+**相關文件**：[security/audit-logging-implementation.md](security/audit-logging-implementation.md)
+
+```jinja2
+{# ✅ 在模板中根據角色顯示內容 #}
+{% if current_user.is_authenticated %}
+    {% if current_user.role in ['admin', 'auditor'] %}
+    <li>
+        <a href="{{ url_for('webui.audit_logs') }}">
+            <i class="fa fa-shield"></i> 審計日誌
+        </a>
+    </li>
+    {% endif %}
+{% endif %}
+```
+
+### 20. 審計日誌查詢過濾模式⭐
+
+**使用頻率**：實作列表查詢頁面時
+**相關文件**：[security/audit-logging-implementation.md](security/audit-logging-implementation.md)
+
+```python
+# ✅ 多維度過濾與分頁查詢
+query = AuditLog.query
+
+# 應用過濾條件
+if severity:
+    query = query.filter(AuditLog.severity == severity)
+if category:
+    query = query.filter(AuditLog.category == category)
+if start_date:
+    query = query.filter(AuditLog.timestamp >= start_dt)
+if search:
+    query = query.filter(
+        db.or_(
+            AuditLog.message.ilike(f'%{search}%'),
+            AuditLog.trace_id.ilike(f'%{search}%')
+        )
+    )
+
+# 排序與分頁
+query = query.order_by(AuditLog.timestamp.desc())
+pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+```
+
 ---
 
 ## 📚 詳細經驗索引
@@ -330,6 +442,18 @@ app.json.ensure_ascii = False
   - XSS 防護與輸入驗證
   - 認證授權最佳實踐
 
+- **[security/audit-logging-implementation.md](security/audit-logging-implementation.md)**（新增）
+  - 審計日誌系統實作（2025-12-17）
+  - AuditLog 資料模型設計
+  - 審計記錄機制與工具函數
+  - 查詢介面與權限控管
+  - 測試策略與最佳實踐
+
+- **[security/audit-logging-summary.md](security/audit-logging-summary.md)**（新增）
+  - 審計日誌完成摘要
+  - 統計數據與技術亮點
+  - 未來增強建議
+
 ### 代碼品質經驗
 
 - **[memory/code_quality_lessons.md](memory/code_quality_lessons.md)**
@@ -341,6 +465,13 @@ app.json.ensure_ascii = False
 ---
 
 ## 🔄 最近更新
+
+### 2025-12-17: 安全性強化 - 審計日誌系統實作
+- 實作完整審計日誌系統（資料模型、記錄機制、查詢介面）
+- 新增 AuditLog 模型（符合 EventLog schema）
+- 整合至關鍵路由（登入/登出/註冊/密碼重設）
+- 21 個測試全部通過
+- 詳見：[security/audit-logging-summary.md](security/audit-logging-summary.md)
 
 ### 2025-12-17: CLI 批次操作 + 代碼品質優化
 - 新增 CLI 批次操作模組（36 個測試，100% 通過）

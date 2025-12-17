@@ -143,9 +143,10 @@ class ProviderManifest:
         skills = [Skill(**skill) for skill in data.get("skills", [])]
 
         anti_decryption_data = data.get("security", {}).get("anti_decryption", {})
-        anti_decryption = (AntiDecryptionConfig(**anti_decryption_data)
-                           if anti_decryption_data
-                           else AntiDecryptionConfig())
+        if anti_decryption_data:
+            anti_decryption = AntiDecryptionConfig(**anti_decryption_data)
+        else:
+            anti_decryption = AntiDecryptionConfig()
 
         return cls(
             manifest_version=data["manifest_version"],

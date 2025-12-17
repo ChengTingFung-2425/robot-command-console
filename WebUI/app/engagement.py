@@ -35,33 +35,33 @@ def get_or_create_user_profile(user: User) -> UserProfile:
 def award_points(user_id: int, reason: str, amount: Optional[int] = None) -> UserProfile:
     """
     Award points to a user for a specific action.
-    
+
     Args:
         user_id: The ID of the user to award points to
         reason: The reason for awarding points (e.g., 'registration', 'command_execution')
         amount: Optional custom amount; if not provided, uses POINTS_AWARD[reason]
-    
+
     Returns:
         Updated UserProfile instance
     """
     user = User.query.get(user_id)
     if not user:
         raise ValueError(f"User with ID {user_id} not found")
-    
+
     profile = get_or_create_user_profile(user)
-    
+
     # Determine points to award
     if amount is None:
         if reason not in POINTS_AWARD:
             raise ValueError(f"Unknown reason: {reason}. Valid reasons: {list(POINTS_AWARD.keys())}")
         amount = POINTS_AWARD[reason]
-    
+
     if amount <= 0:
         return profile
-    
+
     profile.add_points(amount)
     db.session.commit()
-    
+
     return profile
 
 
@@ -119,16 +119,16 @@ def update_command_stats(user_id: int, command_count: Optional[int] = None) -> O
     user = User.query.get(user_id)
     if not user:
         return None
-    
+
     profile = get_or_create_user_profile(user)
-    
+
     if command_count is not None:
         profile.total_commands = command_count
     else:
         # Count from database
         from WebUI.app.models import Command
         profile.total_commands = Command.query.filter_by(user_id=user_id).count()
-    
+
     db.session.commit()
     return profile
 
@@ -138,7 +138,7 @@ def update_robot_stats(user_id: int) -> Optional[UserProfile]:
     user = User.query.get(user_id)
     if not user:
         return None
-    
+
     profile = get_or_create_user_profile(user)
     profile.total_robots = user.robots.count()
     db.session.commit()
@@ -151,7 +151,7 @@ def update_advanced_command_stats(user_id: int) -> Optional[UserProfile]:
     user = User.query.get(user_id)
     if not user:
         return None
-    
+
     profile = get_or_create_user_profile(user)
     profile.total_advanced_commands = AdvancedCommand.query.filter_by(author_id=user_id).count()
     db.session.commit()
@@ -161,31 +161,31 @@ def update_advanced_command_stats(user_id: int) -> Optional[UserProfile]:
 def grant_achievement(user_id: int, achievement_id: int) -> Optional[UserAchievement]:
     """
     Grant an achievement to a user.
-    
+
     Returns:
         UserAchievement instance if newly granted, or None if already had it
     """
     user = User.query.get(user_id)
     if not user:
         raise ValueError(f"User with ID {user_id} not found")
-    
+
     achievement = Achievement.query.get(achievement_id)
     if not achievement:
         raise ValueError(f"Achievement with ID {achievement_id} not found")
-    
+
     # Check if user already has this achievement
     existing = UserAchievement.query.filter_by(
         user_id=user_id,
         achievement_id=achievement_id
     ).first()
-    
+
     if existing:
         return None  # Already has this achievement
-    
+
     user_achievement = UserAchievement(user_id=user_id, achievement_id=achievement_id)
     db.session.add(user_achievement)
     db.session.commit()
-    
+
     return user_achievement
 
 
@@ -194,7 +194,7 @@ def grant_achievement_by_name(user_id: int, achievement_name: str) -> UserAchiev
     achievement = Achievement.query.filter_by(name=achievement_name).first()
     if not achievement:
         raise ValueError(f"Achievement '{achievement_name}' not found")
-    
+
     return grant_achievement(user_id, achievement.id)
 
 
@@ -214,11 +214,11 @@ def get_available_achievements_for_user(user_id: int) -> list:
         UserAchievement.user_id == user_id
     ).all()
     earned_ids = [aid[0] for aid in earned_ids]
-    
+
     available = Achievement.query.filter(
         ~Achievement.id.in_(earned_ids)
     ).all()
-    
+
     return available
 
 
@@ -334,29 +334,29 @@ def initialize_achievements():
             is_title=False
         ),
     ]
-    
+
     for achievement_data in default_achievements:
         # Check if achievement already exists
         existing = Achievement.query.filter_by(name=achievement_data.name).first()
         if not existing:
             db.session.add(achievement_data)
-    
+
     db.session.commit()
 
 
 def get_leaderboard(limit: int = 10, sort_by: str = 'points') -> List[tuple]:
     """
     Get leaderboard of top users.
-    
+
     Args:
         limit: Number of top users to return
         sort_by: Sort criteria ('points', 'level', 'reputation', 'commands')
-    
+
     Returns:
         List of (User, UserProfile) tuples
     """
     query = db.session.query(User, UserProfile).filter(User.id == UserProfile.user_id)
-    
+
     if sort_by == 'points':
         query = query.order_by(UserProfile.points.desc())  # type: ignore
     elif sort_by == 'level':
@@ -367,6 +367,6 @@ def get_leaderboard(limit: int = 10, sort_by: str = 'points') -> List[tuple]:
         query = query.order_by(UserProfile.total_commands.desc())  # type: ignore
     else:
         query = query.order_by(UserProfile.points.desc())  # type: ignore
-    
+
     return query.limit(limit).all()
 

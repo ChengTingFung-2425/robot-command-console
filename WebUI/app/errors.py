@@ -6,7 +6,7 @@ from . import db
 
 def register_error_handlers(app):
     """Register error handlers with Flask app"""
-    
+
     @app.errorhandler(404)
     def not_found_error(error):
         """404 Not Found 錯誤處理"""

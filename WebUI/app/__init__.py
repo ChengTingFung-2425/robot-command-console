@@ -28,12 +28,12 @@ app = None
 def create_app(config_name='default'):
     """Create and configure Flask application instance."""
     global app
-    
+
     flask_app = Flask(__name__)
-    
+
     # Ensure proper UTF-8 encoding for JSON responses
     flask_app.config['JSON_AS_ASCII'] = False
-    
+
     # Apply configuration
     if config_name == 'testing':
         flask_app.config['TESTING'] = True
@@ -44,7 +44,7 @@ def create_app(config_name='default'):
         flask_app.config['LANGUAGES'] = ['en', 'es', 'zh']
     else:
         flask_app.config.from_object(Config)
-    
+
     # Initialize extensions
     db.init_app(flask_app)
     migrate.init_app(flask_app, db)
@@ -54,7 +54,7 @@ def create_app(config_name='default'):
     bootstrap.init_app(flask_app)
     moment.init_app(flask_app)
     babel.init_app(flask_app)
-    
+
     # Configure logging (only for non-testing)
     if not flask_app.testing and not flask_app.debug:
         root = logging.getLogger()
@@ -99,7 +99,7 @@ def create_app(config_name='default'):
     # Create app context and update global app
     if app is None:
         app = flask_app
-    
+
     return flask_app
 
 

@@ -6,6 +6,8 @@
 - 審計日誌查詢
 - 權限控管
 - CSV 匯出
+
+注意：此測試需要 WebUI 依賴（Flask 等）。如果依賴不可用，測試將被跳過。
 """
 
 import unittest
@@ -15,16 +17,22 @@ import os
 # 添加專案根目錄到路徑
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-# noqa: E402 - imports after sys.path modification
-from WebUI.app import create_app, db  # noqa: E402
-from WebUI.app.models import User, AuditLog  # noqa: E402
-from WebUI.app.audit import (  # noqa: E402
-    log_audit_event, log_login_attempt, log_logout,
-    log_registration, log_password_reset_request,
-    AuditAction, AuditSeverity, AuditCategory, AuditStatus
-)
+# 嘗試導入 WebUI 依賴，如果失敗則跳過所有測試
+try:
+    from WebUI.app import create_app, db  # noqa: E402
+    from WebUI.app.models import User, AuditLog  # noqa: E402
+    from WebUI.app.audit import (  # noqa: E402
+        log_audit_event, log_login_attempt, log_logout,
+        log_registration, log_password_reset_request,
+        AuditAction, AuditSeverity, AuditCategory, AuditStatus
+    )
+    WEBUI_AVAILABLE = True
+except ImportError as e:
+    WEBUI_AVAILABLE = False
+    SKIP_REASON = f"WebUI dependencies not available: {e}"
 
 
+@unittest.skipUnless(WEBUI_AVAILABLE, "WebUI dependencies (Flask, etc.) not installed")
 class TestAuditLogging(unittest.TestCase):
     """測試審計日誌記錄功能"""
 
@@ -161,6 +169,7 @@ class TestAuditLogging(unittest.TestCase):
             self.assertEqual(log_dict['context'], {'key': 'value'})
 
 
+@unittest.skipUnless(WEBUI_AVAILABLE, "WebUI dependencies (Flask, etc.) not installed")
 class TestAuditLogQueryInterface(unittest.TestCase):
     """測試審計日誌查詢介面"""
 
@@ -308,6 +317,7 @@ class TestAuditLogQueryInterface(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
 
 
+@unittest.skipUnless(WEBUI_AVAILABLE, "WebUI dependencies (Flask, etc.) not installed")
 class TestAuditLogIntegration(unittest.TestCase):
     """測試審計日誌整合功能"""
 

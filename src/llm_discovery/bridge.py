@@ -6,12 +6,10 @@ LLM IPC Bridge - 連接 LLM 和專案的橋樑
 
 import asyncio
 import aiohttp
-import json
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
-from .models import Skill, ProviderManifest
 from .discovery_service import DiscoveryService
 
 logger = logging.getLogger(__name__)

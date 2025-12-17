@@ -5,7 +5,6 @@ MCP 協定適配器
 支援 JSON-RPC 2.0 格式
 """
 
-import json
 import logging
 from typing import Dict, Any, Optional
 from datetime import datetime

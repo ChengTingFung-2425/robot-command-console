@@ -274,8 +274,8 @@ class BackendServiceManager:
                         return True
                 except Exception as e:
                     if self.debug_mode:
-                        logger.debug(f"健康檢查嘗試 {i+1}/{max_retries}: {e}")
-                
+                        logger.debug(f"健康檢查嘗試 {i + 1}/{max_retries}: {e}")
+
                 if i < max_retries - 1:
                     await asyncio.sleep(1)
             return False
@@ -289,8 +289,8 @@ class BackendServiceManager:
                             return True
             except Exception as e:
                 if self.debug_mode:
-                    logger.debug(f"健康檢查嘗試 {i+1}/{max_retries}: {e}")
-            
+                    logger.debug(f"健康檢查嘗試 {i + 1}/{max_retries}: {e}")
+
             if i < max_retries - 1:
                 await asyncio.sleep(1)
         
@@ -461,15 +461,15 @@ if __name__ == '__main__':
         manager = BackendServiceManager(debug_mode=args.debug)
         
         try:
-            print("\n" + "="*60)
+            print("\n" + "=" * 60)
             print("啟動後端服務...")
-            print("="*60 + "\n")
-            
+            print("=" * 60 + "\n")
+
             success, total = await manager.start_all()
-            
-            print("\n" + "="*60)
+
+            print("\n" + "=" * 60)
             print(f"啟動完成: {success}/{total} 個服務成功")
-            print("="*60)
+            print("=" * 60)
             print(f"\nFlask API: {manager.get_service_url('flask')}")
             print(f"MCP Service: {manager.get_service_url('mcp')}")
             print("API Token is generated and available for use.")

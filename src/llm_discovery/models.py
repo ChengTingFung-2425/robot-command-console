@@ -4,7 +4,7 @@
 定義 LLM Copilot discovery 所需的資料結構
 """
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import List, Optional, Dict, Any, Literal
 from dataclasses import dataclass, field, asdict
 import json
@@ -143,7 +143,9 @@ class ProviderManifest:
         skills = [Skill(**skill) for skill in data.get("skills", [])]
 
         anti_decryption_data = data.get("security", {}).get("anti_decryption", {})
-        anti_decryption = AntiDecryptionConfig(**anti_decryption_data) if anti_decryption_data else AntiDecryptionConfig()
+        anti_decryption = (AntiDecryptionConfig(**anti_decryption_data)
+                           if anti_decryption_data
+                           else AntiDecryptionConfig())
 
         return cls(
             manifest_version=data["manifest_version"],

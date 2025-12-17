@@ -103,6 +103,8 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install pytest pytest-asyncio aiohttp pydantic httpx requests
+          # 安裝 WebUI 測試依賴（用於審計日誌測試）
+          pip install Flask Flask-Login Flask-SQLAlchemy Flask-WTF email-validator
 
       - name: 執行所有測試
         run: |
@@ -247,6 +249,8 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install pytest pytest-asyncio aiohttp pydantic httpx requests
+          # 安裝 WebUI 測試依賴（用於審計日誌測試）
+          pip install Flask Flask-Login Flask-SQLAlchemy Flask-WTF email-validator
 
       - name: 執行安全測試
         run: |

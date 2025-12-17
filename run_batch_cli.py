@@ -14,15 +14,15 @@ from pathlib import Path
 # 添加 src 到路徑
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
-from robot_service.batch import (
+from robot_service.batch import (  # noqa: E402
     BatchParser,
     BatchExecutor,
     ProgressTracker,
     ResultExporter
 )
-from robot_service.service_coordinator import ServiceCoordinator, QueueService
-from robot_service.command_history_manager import CommandHistoryManager
-from common.service_types import ServiceConfig
+from robot_service.service_coordinator import ServiceCoordinator, QueueService  # noqa: E402
+from robot_service.command_history_manager import CommandHistoryManager  # noqa: E402
+from common.service_types import ServiceConfig  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

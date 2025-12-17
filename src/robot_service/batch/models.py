@@ -9,8 +9,6 @@ from datetime import datetime
 from enum import Enum
 from typing import List, Dict, Any, Optional
 
-from common.datetime_utils import utc_now
-
 
 class ExecutionMode(str, Enum):
     """執行模式"""
@@ -49,11 +47,11 @@ class BatchCommand:
     timeout_ms: int = 10000  # 超時時間（毫秒）
     command_id: Optional[str] = None  # 指令 ID（自動生成）
     trace_id: Optional[str] = None  # 追蹤 ID（自動生成）
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """轉換為字典"""
         return asdict(self)
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'BatchCommand':
         """從字典創建實例"""
@@ -78,7 +76,7 @@ class BatchOptions:
     delay_between_commands_ms: int = 0  # 指令間延遲（毫秒）
     max_parallel: int = 10  # 最大並行數
     dry_run: bool = False  # 乾跑模式（不實際執行）
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """轉換為字典"""
         return {
@@ -90,14 +88,14 @@ class BatchOptions:
             "max_parallel": self.max_parallel,
             "dry_run": self.dry_run,
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'BatchOptions':
         """從字典創建實例"""
         execution_mode = data.get("execution_mode", "grouped")
         if isinstance(execution_mode, str):
             execution_mode = ExecutionMode(execution_mode)
-        
+
         return cls(
             execution_mode=execution_mode,
             stop_on_error=data.get("stop_on_error", False),
@@ -118,7 +116,7 @@ class BatchSpec:
     commands: List[BatchCommand] = field(default_factory=list)  # 指令列表
     options: BatchOptions = field(default_factory=BatchOptions)  # 執行選項
     metadata: Dict[str, Any] = field(default_factory=dict)  # 額外元數據
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """轉換為字典"""
         return {
@@ -129,16 +127,16 @@ class BatchSpec:
             "options": self.options.to_dict(),
             "metadata": self.metadata,
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'BatchSpec':
         """從字典創建實例"""
         options_data = data.get("options", {})
         options = BatchOptions.from_dict(options_data) if options_data else BatchOptions()
-        
+
         commands_data = data.get("commands", [])
         commands = [BatchCommand.from_dict(cmd) for cmd in commands_data]
-        
+
         return cls(
             batch_id=data.get("batch_id", ""),
             description=data.get("description", ""),
@@ -163,7 +161,7 @@ class CommandResult:
     error: Optional[str] = None  # 錯誤訊息
     retry_count: int = 0  # 重試次數
     result_data: Dict[str, Any] = field(default_factory=dict)  # 結果資料
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """轉換為字典"""
         return {
@@ -196,7 +194,7 @@ class BatchResult:
     cancelled: int = 0  # 取消數
     commands: List[CommandResult] = field(default_factory=list)  # 指令結果列表
     metadata: Dict[str, Any] = field(default_factory=dict)  # 額外元數據
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """轉換為字典"""
         return {
@@ -213,7 +211,7 @@ class BatchResult:
             "commands": [cmd.to_dict() for cmd in self.commands],
             "metadata": self.metadata,
         }
-    
+
     def update_statistics(self):
         """更新統計資訊"""
         self.total_commands = len(self.commands)
@@ -221,7 +219,7 @@ class BatchResult:
         self.failed = sum(1 for cmd in self.commands if cmd.status == CommandStatus.FAILED)
         self.timeout = sum(1 for cmd in self.commands if cmd.status == CommandStatus.TIMEOUT)
         self.cancelled = sum(1 for cmd in self.commands if cmd.status == CommandStatus.CANCELLED)
-        
+
         # 更新批次狀態
         if self.cancelled > 0:
             self.status = BatchStatus.CANCELLED
@@ -232,7 +230,7 @@ class BatchResult:
                 self.status = BatchStatus.FAILED
         elif self.successful == self.total_commands:
             self.status = BatchStatus.COMPLETED
-        
+
         # 計算總時長
         if self.end_time and self.start_time:
             self.duration_ms = int((self.end_time - self.start_time).total_seconds() * 1000)

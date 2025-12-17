@@ -1715,7 +1715,6 @@ def simulate_firmware_progress(update_id):
         }), 500
 
 
-
 # 審計日誌介面（僅限 admin/auditor）
 
 
@@ -1753,21 +1752,21 @@ def audit_logs():
         try:
             query = query.filter(AuditLog.user_id == int(user_id_str))
         except ValueError:
-            pass
+            pass  # 無效的使用者 ID，忽略此過濾條件
     if start_date:
         try:
             from datetime import datetime
             start_dt = datetime.fromisoformat(start_date)
             query = query.filter(AuditLog.timestamp >= start_dt)
         except ValueError:
-            pass
+            pass  # 無效的日期格式，忽略此過濾條件
     if end_date:
         try:
             from datetime import datetime
             end_dt = datetime.fromisoformat(end_date)
             query = query.filter(AuditLog.timestamp <= end_dt)
         except ValueError:
-            pass
+            pass  # 無效的日期格式，忽略此過濾條件
     if search:
         query = query.filter(
             db.or_(
@@ -1855,19 +1854,19 @@ def export_audit_logs():
         try:
             query = query.filter(AuditLog.user_id == int(user_id_str))
         except ValueError:
-            pass
+            pass  # 無效的使用者 ID，忽略此過濾條件
     if start_date:
         try:
             start_dt = datetime.fromisoformat(start_date)
             query = query.filter(AuditLog.timestamp >= start_dt)
         except ValueError:
-            pass
+            pass  # 無效的日期格式，忽略此過濾條件
     if end_date:
         try:
             end_dt = datetime.fromisoformat(end_date)
             query = query.filter(AuditLog.timestamp <= end_dt)
         except ValueError:
-            pass
+            pass  # 無效的日期格式，忽略此過濾條件
 
     # 排序
     query = query.order_by(AuditLog.timestamp.desc())

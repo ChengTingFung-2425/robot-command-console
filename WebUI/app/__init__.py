@@ -34,6 +34,11 @@ def create_app(config_name='default'):
     # Ensure proper UTF-8 encoding for JSON responses
     flask_app.config['JSON_AS_ASCII'] = False
 
+    # Enable autoescaping for all templates including .html.j2
+    flask_app.jinja_env.autoescape = True
+    # Add .j2 extension to autoescape list
+    flask_app.jinja_env.autoescape_extensions = ('html', 'htm', 'xml', 'j2', 'html.j2')
+
     # Apply configuration
     if config_name == 'testing':
         flask_app.config['TESTING'] = True

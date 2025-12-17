@@ -7,7 +7,6 @@ Create Date: 2025-12-17 02:30:00.000000
 """
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = 'a1u2d3i4t5l6'
@@ -18,7 +17,8 @@ depends_on = None
 
 def upgrade():
     # Create audit_log table
-    op.create_table('audit_log',
+    op.create_table(
+        'audit_log',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('trace_id', sa.String(length=64), nullable=False),
         sa.Column('timestamp', sa.DateTime(), nullable=False),
@@ -36,7 +36,7 @@ def upgrade():
         sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
         sa.PrimaryKeyConstraint('id')
     )
-    
+
     # Create indexes
     op.create_index('idx_audit_timestamp_severity', 'audit_log', ['timestamp', 'severity'], unique=False)
     op.create_index('idx_audit_user_action', 'audit_log', ['user_id', 'action'], unique=False)
@@ -60,6 +60,6 @@ def downgrade():
     op.drop_index('idx_audit_category_timestamp', table_name='audit_log')
     op.drop_index('idx_audit_user_action', table_name='audit_log')
     op.drop_index('idx_audit_timestamp_severity', table_name='audit_log')
-    
+
     # Drop table
     op.drop_table('audit_log')

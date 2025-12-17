@@ -27,6 +27,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 
 from src.common.service_types import ServiceConfig  # noqa: E402
 from src.robot_service.service_coordinator import ServiceBase, ServiceCoordinator, QueueService  # noqa: E402
+from src.robot_service.token_integration import TokenIntegration  # noqa: E402
 
 
 logger = logging.getLogger(__name__)
@@ -144,12 +145,24 @@ class ProcessService(ServiceBase):
             })
 
             # 啟動進程（使用 DEVNULL 避免管道緩衝區阻塞）
+            # Redirect child stdout/stderr to temporary files for post-mortem diagnostics
+            out_path = f"/tmp/{self.name}.stdout.log"
+            err_path = f"/tmp/{self.name}.stderr.log"
+            try:
+                self._stdout_file = open(out_path, 'w+', encoding='utf-8')
+                self._stderr_file = open(err_path, 'w+', encoding='utf-8')
+            except Exception:
+                # fallback to DEVNULL if file open fails
+                self._stdout_file = subprocess.DEVNULL
+                self._stderr_file = subprocess.DEVNULL
+
             self._process = subprocess.Popen(
                 self._config.command,
                 env=env,
                 cwd=cwd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stdout=self._stdout_file,
+                stderr=self._stderr_file,
+                text=True,
             )
 
             # 等待服務就緒（透過健康檢查）
@@ -190,10 +203,45 @@ class ProcessService(ServiceBase):
             if process is None or process.poll() is not None:
                 # 進程已退出或不存在
                 if process is not None:
+                    # Attempt to read redirected log files for diagnostics
+                    stderr_out = None
+                    stdout_out = None
+                    try:
+                        if hasattr(self, '_stderr_file') and self._stderr_file is not subprocess.DEVNULL:
+                            try:
+                                self._stderr_file.flush()
+                            except Exception:
+                                pass
+                            try:
+                                with open(f"/tmp/{self.name}.stderr.log", 'r', encoding='utf-8', errors='replace') as f:
+                                    stderr_out = f.read()
+                            except Exception:
+                                stderr_out = '<failed to read stderr file>'
+                    except Exception:
+                        stderr_out = '<stderr read error>'
+                    try:
+                        if hasattr(self, '_stdout_file') and self._stdout_file is not subprocess.DEVNULL:
+                            try:
+                                self._stdout_file.flush()
+                            except Exception:
+                                pass
+                            try:
+                                with open(f"/tmp/{self.name}.stdout.log", 'r', encoding='utf-8', errors='replace') as f:
+                                    stdout_out = f.read()
+                            except Exception:
+                                stdout_out = '<failed to read stdout file>'
+                    except Exception:
+                        stdout_out = '<stdout read error>'
+
                     logger.error("Process exited during startup", extra={
                         "service": self.name,
                         "exit_code": process.returncode,
+                        "stderr_file": f"/tmp/{self.name}.stderr.log",
+                        "stdout_file": f"/tmp/{self.name}.stdout.log",
+                        "stderr": stderr_out,
+                        "stdout": stdout_out,
                     })
+
                 return False
 
             # 嘗試健康檢查（使用共用會話以提高效能）
@@ -385,7 +433,7 @@ class UnifiedLauncher:
             ProcessServiceConfig(
                 name="flask_api",
                 service_type=ServiceType.FLASK_API,
-                command=["python3", "flask_service.py"],
+                command=[sys.executable, "flask_service.py"],
                 port=5000,
                 health_url="http://127.0.0.1:5000/health",
                 working_dir=self._base_dir,
@@ -399,7 +447,7 @@ class UnifiedLauncher:
             ProcessServiceConfig(
                 name="mcp_service",
                 service_type=ServiceType.MCP_SERVICE,
-                command=["python3", "-m", "MCP.start"],
+                command=[sys.executable, "-m", "MCP.start"],
                 port=8000,
                 health_url="http://127.0.0.1:8000/health",
                 working_dir=self._base_dir,
@@ -649,8 +697,21 @@ async def main_async(args) -> int:
         # 啟動所有服務
         await launcher.start_all()
 
+        # 啟動 TokenIntegration (Edge token cache + sync worker)
+        token_integration = TokenIntegration()
+        try:
+            token_integration.start()
+        except Exception:
+            logger.exception('Failed to start TokenIntegration')
+
         # 等待關閉信號
         await shutdown_event.wait()
+
+        # 停止 TokenIntegration cleanly
+        try:
+            token_integration.stop()
+        except Exception:
+            logger.exception('Error stopping TokenIntegration')
 
         # 停止所有服務
         await launcher.stop_all(timeout=30.0)

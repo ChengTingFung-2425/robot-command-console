@@ -4,6 +4,13 @@
 
 包含：Textual 框架、LLM 整合、自然語言處理等經驗。
 
+## 📚 相關文件
+
+- **[← 返回主記憶](../PROJECT_MEMORY.md)** - Top 15 關鍵經驗
+- **[Phase 3 經驗](phase3_lessons.md)** - 服務整合
+- **[安全性](security_lessons.md)** - 提示注入防護、輸入驗證
+- **[代碼品質](code_quality_lessons.md)** - 測試策略
+
 ---
 
 ## 🎨 TUI + LLM 自然語言控制整合（2025-12-11）

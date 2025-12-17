@@ -4,6 +4,14 @@
 
 包含：Phase 3.1, 3.2, 3.3 的服務協調、Edge UI、固件更新、本地指令歷史、統一整合、安全修復等經驗。
 
+## 📚 相關文件
+
+- **[← 返回主記憶](../PROJECT_MEMORY.md)** - Top 15 關鍵經驗
+- **[CLI 批次操作](cli_batch_lessons.md)** - 批次執行經驗
+- **[TUI + LLM](tui_llm_lessons.md)** - 互動介面經驗
+- **[安全性](security_lessons.md)** - Token 輪替、認證
+- **[代碼品質](code_quality_lessons.md)** - Code Review 經驗
+
 ---
 
 ## 🚀 Phase 3.2: Tiny 版本開發經驗（2025-12-10）

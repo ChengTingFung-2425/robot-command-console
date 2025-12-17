@@ -2,6 +2,13 @@
 
 此文件包含專案記憶中關於安全性的詳細經驗教訓。
 
+## 📚 相關文件
+
+- **[← 返回主記憶](../PROJECT_MEMORY.md)** - Top 15 關鍵經驗
+- **[Phase 3 經驗](phase3_lessons.md)** - Token 管理、認證授權
+- **[代碼品質](code_quality_lessons.md)** - CodeQL 修復
+- **[CLI 批次操作](cli_batch_lessons.md)** - 錯誤處理、驗證
+
 ---
 
 ## 安全性相關經驗

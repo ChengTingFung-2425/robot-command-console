@@ -7,7 +7,7 @@
 > - 開發者可參考此文件了解過去遇到的問題和解決方案
 > - 此文件不應包含架構設計、規劃或功能說明（這些請放在其他專門文件中）
 > 
-> 📖 **其他文件**：[architecture.md](architecture.md)、[plans/](plans/)、[development/](development/)
+> 📖 **其他文件**：[architecture.md](architecture.md)、[plans/](plans/)、[development/](development/), [memory/](memory/)
 
 ---
 

@@ -663,6 +663,13 @@ def get_robot_status():
   - 實作階段規劃（5 個 Phase）
   - 安全考量與優缺點分析
 
+- **[security/approach-b-implementation.md](security/approach-b-implementation.md)**（新增 2025-12-17）
+  - 方案 B Phase 1 實作文件
+  - Server 端 JWT Token 認證 API
+  - 5 個 API 端點（login, refresh, verify, revoke, me）
+  - 14 個測試案例
+  - 程式碼範例與使用指引
+
 ### 代碼品質經驗
 
 - **[memory/code_quality_lessons.md](memory/code_quality_lessons.md)**
@@ -674,6 +681,15 @@ def get_robot_status():
 ---
 
 ## 🔄 最近更新
+
+### 2025-12-17: 方案 B Phase 1 - Server 端 JWT Token 認證 API 實作
+- 實作 Server 端認證 API 模組（WebUI/app/auth_api.py）
+- 5 個 API 端點：/api/auth/login, refresh, verify, revoke, me
+- JWT Token 策略：Access 15分鐘 + Refresh 7天 + Device ID 綁定
+- 14 個測試案例全部通過
+- 審計日誌完整整合（api_login_success/failure, token_refresh 等）
+- 符合零信任前端原則（所有驗證在 Server 端）
+- 詳見：[security/approach-b-implementation.md](security/approach-b-implementation.md)
 
 ### 2025-12-17: Edge-Cloud 認證架構分析
 - 完成 Edge-Cloud 認證同步架構分析文件

@@ -23,10 +23,10 @@ from typing import Any, Dict, List, Optional
 import aiohttp
 
 # 添加專案路徑
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-from common.service_types import ServiceConfig  # noqa: E402
-from .service_coordinator import ServiceBase, ServiceCoordinator, QueueService  # noqa: E402
+from src.common.service_types import ServiceConfig  # noqa: E402
+from src.robot_service.service_coordinator import ServiceBase, ServiceCoordinator, QueueService  # noqa: E402
 
 
 logger = logging.getLogger(__name__)

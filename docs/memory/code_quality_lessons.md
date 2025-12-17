@@ -4,6 +4,13 @@
 
 包含：Linting 自動化、測試策略、重構經驗等。
 
+## 📚 相關文件
+
+- **[← 返回主記憶](../PROJECT_MEMORY.md)** - Top 15 關鍵經驗
+- **[CLI 批次操作](cli_batch_lessons.md)** - 測試驗證、批次執行
+- **[Phase 3 經驗](phase3_lessons.md)** - Code Review、CodeQL 修復
+- **[安全性](security_lessons.md)** - 安全掃描、最佳實踐
+
 ---
 
 ## 🔧 倉庫代碼品質優化（2025-12-17）

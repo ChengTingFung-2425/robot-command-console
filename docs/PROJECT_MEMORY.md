@@ -77,7 +77,25 @@ python3 -m flake8 src/ MCP/ --select=E,F,W --exclude=.venv,node_modules,__pycach
 
 ## 🎯 關鍵經驗精華（Top 15）
 
-### 1. Python 時間處理（必記）⭐⭐⭐
+> 根據使用頻率排序，⭐⭐⭐ 為最高頻率
+
+### 1. Linting 自動修正（最常用）⭐⭐⭐
+
+**使用頻率**：幾乎每次提交
+**相關文件**：[code_quality_lessons.md](memory/code_quality_lessons.md)
+
+```bash
+# 移除所有尾隨空格（W293）
+find src/ MCP/ -name "*.py" -exec sed -i 's/[[:space:]]*$//' {} \;
+
+# 檢查代碼品質
+python3 -m flake8 src/ MCP/ --select=E,F,W --max-line-length=120
+```
+
+### 2. Python 時間處理（必記）⭐⭐⭐
+
+**使用頻率**：高頻使用
+**相關文件**：[phase3_lessons.md](memory/phase3_lessons.md#經驗-11-python-時間處理)
 
 ```python
 # ❌ 不要使用（Python 3.12+ 已棄用）
@@ -89,17 +107,19 @@ timestamp = utc_now()
 iso_string = utc_now_iso()
 ```
 
-### 2. Linting 自動修正（每次都要用）⭐⭐⭐
+### 3. 測試驅動開發流程⭐⭐⭐
 
-```bash
-# 移除所有尾隨空格（W293）
-find src/ MCP/ -name "*.py" -exec sed -i 's/[[:space:]]*$//' {} \;
+**使用頻率**：每個新功能
+**相關文件**：[cli_batch_lessons.md](memory/cli_batch_lessons.md)
 
-# 檢查代碼品質
-python3 -m flake8 src/ MCP/ --select=E,F,W --max-line-length=120
+```
+撰寫測試 → 執行（失敗）→ 實作 → 執行（通過）→ 重構
 ```
 
-### 3. 安全的 Token 生成⭐⭐⭐
+### 4. 安全的 Token 生成⭐⭐⭐
+
+**使用頻率**：所有認證相關功能
+**相關文件**：[security_lessons.md](memory/security_lessons.md)
 
 ```python
 # ❌ 硬編碼預設 token
@@ -110,7 +130,10 @@ import secrets
 token = os.environ.get("APP_TOKEN") or secrets.token_hex(32)
 ```
 
-### 4. 型別提示正確使用⭐⭐
+### 5. 型別提示正確使用⭐⭐
+
+**使用頻率**：高頻使用
+**相關文件**：[code_quality_lessons.md](memory/code_quality_lessons.md)
 
 ```python
 # ❌ 降低型別安全性
@@ -122,100 +145,10 @@ def process(options: BatchOptions) -> None:
     pass
 ```
 
-### 5. dataclass 與 datetime⭐⭐
+### 6. 批次操作錯誤處理⭐⭐
 
-```python
-# ❌ 所有實例共享同一時間戳
-@dataclass
-class Status:
-    updated_at: datetime = utc_now()  # 錯誤！
-
-# ✅ 使用 field(default_factory=...)
-@dataclass
-class Status:
-    updated_at: datetime = field(default_factory=utc_now)
-```
-
-### 6. 非重入鎖問題⭐⭐
-
-```python
-# ❌ 會造成死鎖
-def method_a(self):
-    with self._lock:
-        self.method_b()  # method_b 也需要 _lock
-
-# ✅ 使用可重入鎖或提取邏輯
-self._lock = threading.RLock()  # 可重入鎖
-```
-
-### 7. HTTP 會話重用⭐
-
-```python
-# ❌ 每次建立新會話
-async with aiohttp.ClientSession() as session:
-    ...
-
-# ✅ 重用會話
-if self._session is None or self._session.closed:
-    self._session = aiohttp.ClientSession()
-```
-
-### 8. 競態條件防護⭐
-
-```python
-# ❌ 直接存取可能為 None 的屬性
-if self._process.poll() is not None:
-    ...
-
-# ✅ 先儲存引用
-process = self._process
-if process is None or process.poll() is not None:
-    ...
-```
-
-### 9. 狀態更新與事件通知一致性⭐⭐
-
-```python
-# ✅ 在同一處理中完成
-async def update_status(self, robot_id, status):
-    await self._state_store.set(key, status)
-    await self._event_bus.publish(EventTopics.STATUS_UPDATED, {...})
-```
-
-### 10. Async Fixtures 問題（pytest-asyncio）⭐⭐
-
-```python
-# ❌ pytest-asyncio 新版不支援
-@pytest.fixture
-async def setup():
-    return await create_resource()
-
-# ✅ 直接在測試函數中建立
-async def test_something():
-    resource = await create_resource()
-    # 或使用乾跑模式簡化
-```
-
-### 11. Flask 2.3+ JSON 配置⭐
-
-```python
-# ⚠️ 舊版本（已棄用）
-app.config['JSON_AS_ASCII'] = False
-
-# ✅ 新版本
-app.json.ensure_ascii = False
-```
-
-### 12. 動作驗證（安全性）⭐⭐
-
-```python
-# ✅ 驗證動作在有效清單中
-if action_name not in VALID_ACTIONS:
-    logger.warning(f"Invalid action: {action_name}")
-    return error_response()
-```
-
-### 13. 批次操作錯誤處理⭐⭐
+**使用頻率**：所有批次/非同步操作
+**相關文件**：[cli_batch_lessons.md](memory/cli_batch_lessons.md)
 
 ```python
 # ✅ 指數退避重試 + 超時控制
@@ -230,7 +163,83 @@ for attempt in range(max_retries):
             return timeout_result
 ```
 
-### 14. 重複計數防護⭐
+### 7. dataclass 與 datetime⭐⭐
+
+**使用頻率**：資料模型定義時
+**相關文件**：[phase3_lessons.md](memory/phase3_lessons.md)
+
+```python
+# ❌ 所有實例共享同一時間戳
+@dataclass
+class Status:
+    updated_at: datetime = utc_now()  # 錯誤！
+
+# ✅ 使用 field(default_factory=...)
+@dataclass
+class Status:
+    updated_at: datetime = field(default_factory=utc_now)
+```
+
+### 8. 動作驗證（安全性）⭐⭐
+
+**使用頻率**：所有用戶輸入處理
+**相關文件**：[security_lessons.md](memory/security_lessons.md)
+
+```python
+# ✅ 驗證動作在有效清單中
+if action_name not in VALID_ACTIONS:
+    logger.warning(f"Invalid action: {action_name}")
+    return error_response()
+```
+
+### 9. Async Fixtures 問題（pytest-asyncio）⭐⭐
+
+**使用頻率**：測試撰寫時
+**相關文件**：[cli_batch_lessons.md](memory/cli_batch_lessons.md#131-async-fixtures-問題)
+
+```python
+# ❌ pytest-asyncio 新版不支援
+@pytest.fixture
+async def setup():
+    return await create_resource()
+
+# ✅ 直接在測試函數中建立
+async def test_something():
+    resource = await create_resource()
+    # 或使用乾跑模式簡化
+```
+
+### 10. 非重入鎖問題⭐⭐
+
+**使用頻率**：多執行緒同步時
+**相關文件**：[phase3_lessons.md](memory/phase3_lessons.md)
+
+```python
+# ❌ 會造成死鎖
+def method_a(self):
+    with self._lock:
+        self.method_b()  # method_b 也需要 _lock
+
+# ✅ 使用可重入鎖或提取邏輯
+self._lock = threading.RLock()  # 可重入鎖
+```
+
+### 11. 狀態更新與事件通知一致性⭐⭐
+
+**使用頻率**：狀態管理功能
+**相關文件**：[phase3_lessons.md](memory/phase3_lessons.md)
+
+```python
+# ✅ 在同一處理中完成
+async def update_status(self, robot_id, status):
+    await self._state_store.set(key, status)
+    await self._event_bus.publish(EventTopics.STATUS_UPDATED, {...})
+```
+
+### 12. 重複計數防護⭐
+
+**使用頻率**：狀態追蹤功能
+**相關文件**：[cli_batch_lessons.md](memory/cli_batch_lessons.md)
 
 ```python
 # ✅ 檢查舊狀態避免重複計數
@@ -239,10 +248,48 @@ if status in terminal_states and (old_status is None or old_status not in termin
     self.completed += 1
 ```
 
-### 15. 測試驅動開發流程⭐⭐⭐
+### 13. 競態條件防護⭐
 
+**使用頻率**：多執行緒/非同步操作
+**相關文件**：[phase3_lessons.md](memory/phase3_lessons.md)
+
+```python
+# ❌ 直接存取可能為 None 的屬性
+if self._process.poll() is not None:
+    ...
+
+# ✅ 先儲存引用
+process = self._process
+if process is None or process.poll() is not None:
+    ...
 ```
-撰寫測試 → 執行（失敗）→ 實作 → 執行（通過）→ 重構
+
+### 14. HTTP 會話重用⭐
+
+**使用頻率**：HTTP 客戶端實作
+**相關文件**：[tui_llm_lessons.md](memory/tui_llm_lessons.md)
+
+```python
+# ❌ 每次建立新會話
+async with aiohttp.ClientSession() as session:
+    ...
+
+# ✅ 重用會話
+if self._session is None or self._session.closed:
+    self._session = aiohttp.ClientSession()
+```
+
+### 15. Flask 2.3+ JSON 配置⭐
+
+**使用頻率**：Flask 應用配置
+**相關文件**：[phase3_lessons.md](memory/phase3_lessons.md)
+
+```python
+# ⚠️ 舊版本（已棄用）
+app.config['JSON_AS_ASCII'] = False
+
+# ✅ 新版本
+app.json.ensure_ascii = False
 ```
 
 ---

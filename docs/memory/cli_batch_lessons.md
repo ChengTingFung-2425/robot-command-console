@@ -4,6 +4,13 @@
 
 包含：Phase 6 測試驗證、批次執行架構、多工調度等經驗。
 
+## 📚 相關文件
+
+- **[← 返回主記憶](../PROJECT_MEMORY.md)** - Top 15 關鍵經驗
+- **[代碼品質](code_quality_lessons.md)** - Linting、測試策略
+- **[Phase 3 經驗](phase3_lessons.md)** - 服務協調器、狀態管理
+- **[安全性](security_lessons.md)** - Token 管理、輸入驗證
+
 ---
 
 ## 🧪 Phase 6: CLI 批次操作測試與驗證（2025-12-17）

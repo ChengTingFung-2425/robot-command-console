@@ -6,7 +6,7 @@ Progress Tracker
 
 import logging
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 
 from .models import CommandStatus
 from common.datetime_utils import utc_now
@@ -61,9 +61,17 @@ class ProgressTracker:
             command_id: 指令 ID
             status: 指令狀態
         """
+        terminal_states = {
+            CommandStatus.SUCCESS,
+            CommandStatus.FAILED,
+            CommandStatus.TIMEOUT,
+            CommandStatus.CANCELLED
+        }
+
         # 檢查是否已經記錄過此指令
-        if command_id in self.command_status:
-            old_status = self.command_status[command_id]
+        old_status = self.command_status.get(command_id)
+
+        if old_status is not None:
             # 如果狀態沒變，不需要更新
             if old_status == status:
                 return
@@ -74,13 +82,8 @@ class ProgressTracker:
         self.command_status[command_id] = status
         self._increase_count(status)
 
-        # 更新完成數
-        if status in [
-            CommandStatus.SUCCESS,
-            CommandStatus.FAILED,
-            CommandStatus.TIMEOUT,
-            CommandStatus.CANCELLED
-        ]:
+        # 更新完成數：只有在從非終止狀態轉換到終止狀態時才增加
+        if status in terminal_states and (old_status is None or old_status not in terminal_states):
             self.completed += 1
 
     def _increase_count(self, status: CommandStatus):
@@ -105,7 +108,7 @@ class ProgressTracker:
         elif status == CommandStatus.CANCELLED:
             self.cancelled = max(0, self.cancelled - 1)
 
-    def get_summary(self) -> Dict[str, any]:
+    def get_summary(self) -> Dict[str, Any]:
         """
         取得進度摘要
 

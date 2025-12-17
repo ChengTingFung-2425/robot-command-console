@@ -30,7 +30,7 @@ class TraceEventType(Enum):
 
 class TraceEvent:
     """追蹤事件"""
-    
+
     def __init__(
         self,
         trace_id: str,
@@ -42,7 +42,7 @@ class TraceEvent:
         self.event_type = event_type
         self.data = data
         self.timestamp = timestamp or datetime.now()
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """轉換為字典"""
         return {
@@ -51,7 +51,7 @@ class TraceEvent:
             "data": self.data,
             "timestamp": self.timestamp.isoformat()
         }
-    
+
     def to_json(self) -> str:
         """轉換為 JSON"""
         return json.dumps(self.to_dict(), ensure_ascii=False, indent=2)
@@ -60,18 +60,18 @@ class TraceEvent:
 class LLMTraceManager:
     """
     LLM 追蹤管理器
-    
+
     功能：
     - 追蹤 LLM 處理的完整流程
     - 記錄每個步驟的輸入和輸出
     - 提供即時追蹤和歷史查詢
     - 支援追蹤事件訂閱
     """
-    
+
     def __init__(self, max_traces: int = 1000):
         """
         初始化追蹤管理器
-        
+
         Args:
             max_traces: 最大保存的追蹤記錄數
         """
@@ -80,12 +80,12 @@ class LLMTraceManager:
         self._active_traces: Dict[str, Dict[str, Any]] = {}  # trace_id -> metadata
         self._subscribers: List[Callable] = []
         self._lock = asyncio.Lock()
-    
+
     def generate_trace_id(self) -> str:
         """生成追蹤 ID"""
         import uuid
         return f"trace-{uuid.uuid4().hex[:16]}"
-    
+
     async def start_trace(
         self,
         trace_id: Optional[str] = None,
@@ -95,19 +95,19 @@ class LLMTraceManager:
     ) -> str:
         """
         開始新的追蹤
-        
+
         Args:
             trace_id: 追蹤 ID（若未指定則自動生成）
             input_type: 輸入類型（text, speech）
             input_data: 輸入資料
             metadata: 額外的元資料
-        
+
         Returns:
             追蹤 ID
         """
         if not trace_id:
             trace_id = self.generate_trace_id()
-        
+
         async with self._lock:
             # 初始化追蹤
             self._traces[trace_id] = []
@@ -116,7 +116,7 @@ class LLMTraceManager:
                 "started_at": datetime.now(),
                 "metadata": metadata or {}
             }
-            
+
             # 記錄輸入事件
             await self._add_event(
                 trace_id,
@@ -127,10 +127,10 @@ class LLMTraceManager:
                     "metadata": metadata
                 }
             )
-        
+
         logger.info(f"開始追蹤: {trace_id}, type={input_type}")
         return trace_id
-    
+
     async def trace_llm_request(
         self,
         trace_id: str,
@@ -140,7 +140,7 @@ class LLMTraceManager:
     ):
         """
         追蹤 LLM 請求
-        
+
         Args:
             trace_id: 追蹤 ID
             messages: 發送給 LLM 的訊息
@@ -158,7 +158,7 @@ class LLMTraceManager:
             }
         )
         logger.debug(f"追蹤 LLM 請求: {trace_id}, provider={provider}")
-    
+
     async def trace_llm_response(
         self,
         trace_id: str,
@@ -167,7 +167,7 @@ class LLMTraceManager:
     ):
         """
         追蹤 LLM 回應
-        
+
         Args:
             trace_id: 追蹤 ID
             response: LLM 回應
@@ -183,7 +183,7 @@ class LLMTraceManager:
             }
         )
         logger.debug(f"追蹤 LLM 回應: {trace_id}, time={processing_time_ms}ms")
-    
+
     async def trace_function_call(
         self,
         trace_id: str,
@@ -192,7 +192,7 @@ class LLMTraceManager:
     ):
         """
         追蹤 Function Call
-        
+
         Args:
             trace_id: 追蹤 ID
             function_name: Function 名稱
@@ -207,7 +207,7 @@ class LLMTraceManager:
             }
         )
         logger.debug(f"追蹤 Function Call: {trace_id}, func={function_name}")
-    
+
     async def trace_function_executed(
         self,
         trace_id: str,
@@ -217,7 +217,7 @@ class LLMTraceManager:
     ):
         """
         追蹤 Function 執行結果
-        
+
         Args:
             trace_id: 追蹤 ID
             function_name: Function 名稱
@@ -235,7 +235,7 @@ class LLMTraceManager:
             }
         )
         logger.debug(f"追蹤 Function 執行: {trace_id}, func={function_name}, time={execution_time_ms}ms")
-    
+
     async def trace_bridge_call(
         self,
         trace_id: str,
@@ -245,7 +245,7 @@ class LLMTraceManager:
     ):
         """
         追蹤 Bridge 呼叫
-        
+
         Args:
             trace_id: 追蹤 ID
             endpoint: 端點 URL
@@ -262,7 +262,7 @@ class LLMTraceManager:
             }
         )
         logger.debug(f"追蹤 Bridge 呼叫: {trace_id}, endpoint={endpoint}")
-    
+
     async def trace_queue_enqueued(
         self,
         trace_id: str,
@@ -271,7 +271,7 @@ class LLMTraceManager:
     ):
         """
         追蹤加入佇列
-        
+
         Args:
             trace_id: 追蹤 ID
             queue_name: 佇列名稱
@@ -286,7 +286,7 @@ class LLMTraceManager:
             }
         )
         logger.debug(f"追蹤加入佇列: {trace_id}, queue={queue_name}")
-    
+
     async def trace_robot_executed(
         self,
         trace_id: str,
@@ -296,7 +296,7 @@ class LLMTraceManager:
     ):
         """
         追蹤機器人執行
-        
+
         Args:
             trace_id: 追蹤 ID
             robot_id: 機器人 ID
@@ -313,7 +313,7 @@ class LLMTraceManager:
             }
         )
         logger.debug(f"追蹤機器人執行: {trace_id}, robot={robot_id}, action={action}")
-    
+
     async def trace_error(
         self,
         trace_id: str,
@@ -322,7 +322,7 @@ class LLMTraceManager:
     ):
         """
         追蹤錯誤
-        
+
         Args:
             trace_id: 追蹤 ID
             error: 錯誤訊息
@@ -337,7 +337,7 @@ class LLMTraceManager:
             }
         )
         logger.error(f"追蹤錯誤: {trace_id}, error={error}")
-    
+
     async def complete_trace(
         self,
         trace_id: str,
@@ -346,7 +346,7 @@ class LLMTraceManager:
     ):
         """
         完成追蹤
-        
+
         Args:
             trace_id: 追蹤 ID
             success: 是否成功
@@ -356,7 +356,7 @@ class LLMTraceManager:
             if trace_id in self._active_traces:
                 started_at = self._active_traces[trace_id]["started_at"]
                 duration_ms = (datetime.now() - started_at).total_seconds() * 1000
-                
+
                 await self._add_event(
                     trace_id,
                     TraceEventType.COMPLETED,
@@ -366,12 +366,12 @@ class LLMTraceManager:
                         "duration_ms": duration_ms
                     }
                 )
-                
+
                 # 移除活動追蹤
                 del self._active_traces[trace_id]
-                
+
                 logger.info(f"完成追蹤: {trace_id}, success={success}, duration={duration_ms}ms")
-    
+
     async def _add_event(
         self,
         trace_id: str,
@@ -380,32 +380,32 @@ class LLMTraceManager:
     ):
         """
         新增追蹤事件
-        
+
         Args:
             trace_id: 追蹤 ID
             event_type: 事件類型
             data: 事件資料
         """
         event = TraceEvent(trace_id, event_type, data)
-        
+
         async with self._lock:
             if trace_id not in self._traces:
                 self._traces[trace_id] = []
-            
+
             self._traces[trace_id].append(event)
-            
+
             # 限制追蹤記錄數量
             if len(self._traces) > self.max_traces:
                 oldest_trace = min(self._traces.keys())
                 del self._traces[oldest_trace]
-        
+
         # 通知訂閱者
         await self._notify_subscribers(event)
-    
+
     async def _notify_subscribers(self, event: TraceEvent):
         """
         通知訂閱者
-        
+
         Args:
             event: 追蹤事件
         """
@@ -417,75 +417,75 @@ class LLMTraceManager:
                     subscriber(event)
             except Exception as e:
                 logger.exception(f"通知訂閱者時發生錯誤: {e}")
-    
+
     def subscribe(self, callback: Callable[[TraceEvent], None]):
         """
         訂閱追蹤事件
-        
+
         Args:
             callback: 回調函數
         """
         self._subscribers.append(callback)
         logger.debug(f"新增追蹤訂閱者: {callback}")
-    
+
     def unsubscribe(self, callback: Callable[[TraceEvent], None]):
         """
         取消訂閱
-        
+
         Args:
             callback: 回調函數
         """
         if callback in self._subscribers:
             self._subscribers.remove(callback)
             logger.debug(f"移除追蹤訂閱者: {callback}")
-    
+
     async def get_trace(self, trace_id: str) -> Optional[List[TraceEvent]]:
         """
         取得追蹤記錄
-        
+
         Args:
             trace_id: 追蹤 ID
-        
+
         Returns:
             追蹤事件列表
         """
         async with self._lock:
             return self._traces.get(trace_id)
-    
+
     async def get_all_traces(self) -> Dict[str, List[TraceEvent]]:
         """
         取得所有追蹤記錄
-        
+
         Returns:
             所有追蹤記錄
         """
         async with self._lock:
             return self._traces.copy()
-    
+
     async def get_active_traces(self) -> List[str]:
         """
         取得活動追蹤 ID 列表
-        
+
         Returns:
             活動追蹤 ID 列表
         """
         async with self._lock:
             return list(self._active_traces.keys())
-    
+
     async def get_trace_summary(self, trace_id: str) -> Optional[Dict[str, Any]]:
         """
         取得追蹤摘要
-        
+
         Args:
             trace_id: 追蹤 ID
-        
+
         Returns:
             追蹤摘要
         """
         events = await self.get_trace(trace_id)
         if not events:
             return None
-        
+
         # 提取關鍵資訊
         summary = {
             "trace_id": trace_id,
@@ -493,7 +493,7 @@ class LLMTraceManager:
             "started_at": events[0].timestamp.isoformat(),
             "events": []
         }
-        
+
         # 分類事件
         for event in events:
             summary["events"].append({
@@ -501,27 +501,27 @@ class LLMTraceManager:
                 "timestamp": event.timestamp.isoformat(),
                 "summary": self._summarize_event(event)
             })
-        
+
         # 計算總時長
         if len(events) > 1:
             duration = (events[-1].timestamp - events[0].timestamp).total_seconds() * 1000
             summary["duration_ms"] = duration
-        
+
         return summary
-    
+
     def _summarize_event(self, event: TraceEvent) -> str:
         """
         總結事件內容
-        
+
         Args:
             event: 追蹤事件
-        
+
         Returns:
             事件摘要
         """
         event_type = event.event_type
         data = event.data
-        
+
         if event_type == TraceEventType.INPUT_RECEIVED:
             return f"Received {data.get('input_type')} input"
         elif event_type == TraceEventType.LLM_REQUEST:
@@ -542,24 +542,24 @@ class LLMTraceManager:
             return f"Error: {data.get('error')}"
         elif event_type == TraceEventType.COMPLETED:
             return f"Completed in {data.get('duration_ms')}ms"
-        
+
         return str(data)
-    
+
     async def export_trace(self, trace_id: str, format: str = "json") -> str:
         """
         匯出追蹤記錄
-        
+
         Args:
             trace_id: 追蹤 ID
             format: 匯出格式（json, text）
-        
+
         Returns:
             匯出的追蹤資料
         """
         events = await self.get_trace(trace_id)
         if not events:
             return ""
-        
+
         if format == "json":
             return json.dumps(
                 [event.to_dict() for event in events],
@@ -572,5 +572,5 @@ class LLMTraceManager:
                 time_str = event.timestamp.strftime("%H:%M:%S.%f")[:-3]
                 lines.append(f"[{time_str}] {event.event_type.value}: {self._summarize_event(event)}")
             return "\n".join(lines)
-        
+
         return ""

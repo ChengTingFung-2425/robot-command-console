@@ -5,7 +5,6 @@ Integration Tests for Batch Operations
 """
 
 import pytest
-import asyncio
 import tempfile
 import json
 from pathlib import Path
@@ -16,12 +15,8 @@ from robot_service.batch import (
     BatchSpec,
     BatchCommand,
     ExecutionMode,
-    CommandStatus,
     BatchStatus,
 )
-from robot_service.service_coordinator import ServiceCoordinator, QueueService
-from robot_service.command_history_manager import CommandHistoryManager
-from common.service_types import ServiceConfig
 
 
 class TestBatchExecutorIntegration:

@@ -54,25 +54,25 @@ class Skill:
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
-    
+
     def to_openai_function(self) -> Dict[str, Any]:
         """轉換為 OpenAI function calling 格式（LLM 用於操作軟體）"""
         if self.function_definition:
             return self.function_definition
-        
+
         # 自動生成 function definition
         return {
             "name": self.skill_id,
             "description": self.description,
             "parameters": self.input_schema
         }
-    
+
     def get_info_providers(self) -> List[str]:
         """獲取此 skill 可提供的資訊類型（軟體→LLM）"""
         if not self.info_schema:
             return []
         return self.info_schema.get("provides", [])
-    
+
     def get_query_methods(self) -> Dict[str, Any]:
         """獲取資訊查詢方法（LLM 用於獲取資訊）"""
         if not self.info_schema:
@@ -123,7 +123,7 @@ class ProviderManifest:
         if self.llm_compatibility:
             data["llm_compatibility"] = self.llm_compatibility
         return data
-    
+
     def get_openai_functions(self) -> List[Dict[str, Any]]:
         """獲取所有可透過 LLM API 存取的 skills 作為 OpenAI functions"""
         return [

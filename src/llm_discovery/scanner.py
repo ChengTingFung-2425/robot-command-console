@@ -24,7 +24,7 @@ class FilesystemScanner:
     def get_registry_path() -> Path:
         """
         獲取當前平台的標準 registry 路徑
-        
+
         Returns:
             Registry 路徑
         """
@@ -51,7 +51,7 @@ class FilesystemScanner:
     def scan_manifests() -> List[ProviderManifest]:
         """
         掃描所有註冊的 manifest 檔案
-        
+
         Returns:
             ProviderManifest 列表
         """
@@ -81,10 +81,10 @@ class FilesystemScanner:
     def load_manifest(file_path: Path) -> Optional[ProviderManifest]:
         """
         從檔案載入 manifest
-        
+
         Args:
             file_path: manifest 檔案路徑
-            
+
         Returns:
             ProviderManifest 或 None
         """
@@ -122,10 +122,10 @@ class FilesystemScanner:
     def save_manifest(manifest: ProviderManifest) -> bool:
         """
         儲存 manifest 到檔案系統
-        
+
         Args:
             manifest: 要儲存的 manifest
-            
+
         Returns:
             成功返回 True，失敗返回 False
         """
@@ -166,10 +166,10 @@ class FilesystemScanner:
     def delete_manifest(provider_id: str) -> bool:
         """
         刪除指定的 manifest
-        
+
         Args:
             provider_id: 提供商 ID
-            
+
         Returns:
             成功返回 True，失敗返回 False
         """
@@ -193,10 +193,10 @@ class FilesystemScanner:
     def validate_manifest_permissions(file_path: Path) -> bool:
         """
         驗證 manifest 檔案權限（應為 0600）
-        
+
         Args:
             file_path: manifest 檔案路徑
-            
+
         Returns:
             權限正確返回 True，否則 False
         """

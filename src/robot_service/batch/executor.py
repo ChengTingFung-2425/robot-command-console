@@ -16,7 +16,8 @@ from .models import (
     CommandResult,
     CommandStatus,
     BatchStatus,
-    ExecutionMode
+    ExecutionMode,
+    BatchOptions
 )
 from ..service_manager import ServiceManager
 from ..command_history_manager import CommandHistoryManager
@@ -165,7 +166,7 @@ class BatchExecutor:
     async def _execute_parallel(
         self,
         commands: List[BatchCommand],
-        options: Any
+        options: BatchOptions
     ) -> List[CommandResult]:
         """
         並行執行所有指令
@@ -209,7 +210,7 @@ class BatchExecutor:
     async def _execute_sequential(
         self,
         commands: List[BatchCommand],
-        options: Any
+        options: BatchOptions
     ) -> List[CommandResult]:
         """
         順序執行所有指令
@@ -259,7 +260,7 @@ class BatchExecutor:
     async def _execute_grouped(
         self,
         commands: List[BatchCommand],
-        options: Any
+        options: BatchOptions
     ) -> List[CommandResult]:
         """
         分組並行執行（組內順序執行，組間並行）
@@ -310,7 +311,7 @@ class BatchExecutor:
     async def _execute_single_command_with_limit(
         self,
         command: BatchCommand,
-        options: Any
+        options: BatchOptions
     ) -> CommandResult:
         """
         使用信號量限制並行數執行單個指令
@@ -328,7 +329,7 @@ class BatchExecutor:
     async def _execute_single_command(
         self,
         command: BatchCommand,
-        options: Any
+        options: BatchOptions
     ) -> CommandResult:
         """
         執行單個指令（帶重試機制）

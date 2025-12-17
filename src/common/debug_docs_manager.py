@@ -12,7 +12,7 @@ class DebugDocsManager:
         self.project_root = project_root or self._detect_project_root()
         self.docs_dir = self.project_root / "docs" / "developer"
         self.debug_guide_path = self.docs_dir / "DEBUG_MODE.md"
-    
+
     def _detect_project_root(self):
         current = Path(__file__).parent
         for _ in range(5):
@@ -20,14 +20,14 @@ class DebugDocsManager:
                 return current
             current = current.parent
         return Path(__file__).parent.parent.parent
-    
+
     def is_debug_mode_active(self):
         """檢查秘密除錯模式是否啟用（必須三個條件同時滿足）"""
         has_env_var = os.environ.get('__ROBOT_INTERNAL_DEBUG__') == '1'
         has_debug_file = (self.project_root / '.robot_debug').exists()
         has_debug_port = os.environ.get('DEBUG_PORT') == '54321'
         return has_env_var and has_debug_file and has_debug_port
-    
+
     def generate_debug_docs(self):
         if not self.is_debug_mode_active():
             return False

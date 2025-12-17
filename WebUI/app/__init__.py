@@ -97,6 +97,10 @@ def create_app(config_name='default'):
     from WebUI.app.routes import bp as webui_bp
     flask_app.register_blueprint(webui_bp)
 
+    # Register blueprint for Auth API routes
+    from WebUI.app.auth_api import auth_api_bp
+    flask_app.register_blueprint(auth_api_bp)
+
     # Register error handlers
     from WebUI.app.errors import register_error_handlers
     register_error_handlers(flask_app)

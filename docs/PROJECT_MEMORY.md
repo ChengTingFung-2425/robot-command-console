@@ -731,6 +731,21 @@ def get_robot_status():
 - Edge UI 移植完成
 - 詳見：[memory/phase3_lessons.md](memory/phase3_lessons.md)
 
+### 2025-12-17: Edge Token 快取、離線同步、Unified Launcher 整合（實作與驗證）
+- 新增邊緣 Token 快取模組：`src/robot_service/edge_token_cache.py`（加密本地儲存、TTL、記憶體快取）。
+- 新增離線同步工作者：`src/robot_service/edge_token_sync.py`（加密佇列、重試/指數退避、持久化）。
+- 新增整合器：`src/robot_service/token_integration.py`，將 `TokenManager` 的輪替事件綁定到快取與同步隊列。
+- 在 `src/robot_service/unified_launcher.py` 中注入 `TokenIntegration.start()/stop()`，並改進子進程啟動診斷：子程序 stdout/stderr 會重導至 `/tmp/<service>.stdout.log` 與 `/tmp/<service>.stderr.log`，啟動失敗時會將內容記錄於啟動器日誌以便排查。
+- 新增使用說明文件：`docs/development/UNIFIED_LAUNCHER.md`（包含快速啟動、環境變數、日誌與故障排除步驟）。
+- 已 commit 並推送所有變更到分支 `copilot/enhance-security-audit-logs`（commit: "docs: add Unified Launcher usage guide"）。
+- 在工作區虛擬環境中手動觸發一次 token rotation（`TokenManager.rotate_token(reason='manual_test')`），驗證 `TokenIntegration` 能正確寫入加密檔案：
+    - 產生 `/home/<user>/.robot-console/edge_tokens.enc`
+    - 產生 `/home/<user>/.robot-console/edge_sync.enc`
+
+**注意/後續**：
+- `token_integration` 的 cloud sync callback 目前為 placeholder（回傳 False 以觸發重試機制），生產環境需實作雲端通知/刷新 API 並安全授權。
+- 建議將 `EDGE_TOKEN_KEY` 作為部署時的安全參數（不要硬編碼），並在文件/部署腳本中說明如何產生與管理該金鑰。
+
 ---
 
 ## 💡 開發流程提醒

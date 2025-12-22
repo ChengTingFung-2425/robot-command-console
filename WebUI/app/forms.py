@@ -66,19 +66,19 @@ class AdvancedCommandForm(FlaskForm):
         import json
         try:
             commands = json.loads(field.data)
-            
+
             # 確認是陣列
             if not isinstance(commands, list):
                 raise ValidationError('指令序列必須是 JSON 陣列格式')
-            
+
             # Note: allow empty list (tests and some UIs may create skeleton commands)
             # if len(commands) == 0:
             #     raise ValidationError('至少需要一個指令')
-            
+
             # 驗證每個指令都有 command 欄位
             valid_commands = {
-                "go_forward", "back_fast", "turn_left", "turn_right", 
-                "left_move_fast", "right_move_fast", "stand", "bow", 
+                "go_forward", "back_fast", "turn_left", "turn_right",
+                "left_move_fast", "right_move_fast", "stand", "bow",
                 "squat", "stand_up_front", "stand_up_back", "wave",
                 "left_kick", "right_kick", "kung_fu", "wing_chun",
                 "left_uppercut", "right_uppercut", "left_shot_fast", "right_shot_fast",
@@ -87,21 +87,21 @@ class AdvancedCommandForm(FlaskForm):
                 "push_ups", "sit_ups", "chest", "weightlifting",
                 "squat_up", "twist", "stepping", "stop", "wait", "advanced_command"
             }
-            
+
             for idx, cmd in enumerate(commands):
                 if not isinstance(cmd, dict):
                     raise ValidationError(f'第 {idx + 1} 個指令格式錯誤：必須是物件')
-                
+
                 if 'command' not in cmd:
                     raise ValidationError(f'第 {idx + 1} 個指令缺少 "command" 欄位')
-                
+
                 if cmd['command'] not in valid_commands:
                     raise ValidationError(f'第 {idx + 1} 個指令 "{cmd["command"]}" 不是有效的動作')
-                
+
                 # 驗證 wait 指令需要 duration_ms 參數
                 if cmd['command'] == 'wait' and 'duration_ms' not in cmd:
                     raise ValidationError(f'第 {idx + 1} 個 "wait" 指令缺少 "duration_ms" 參數')
-            
+
         except json.JSONDecodeError as e:
             raise ValidationError(f'JSON 格式錯誤：{str(e)}')
 

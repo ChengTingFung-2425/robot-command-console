@@ -6,13 +6,17 @@ from urllib.parse import quote as url_quote
 from flask import Blueprint, jsonify, request, render_template, redirect, url_for, flash, session, abort
 from flask_login import current_user, login_user, logout_user, login_required
 from WebUI.app import db
-from WebUI.app.models import Robot, Command, User, AdvancedCommand, UserProfile
+from WebUI.app.models import Robot, Command, User, AdvancedCommand, UserProfile, AuditLog
 from WebUI.app.forms import (
     LoginForm, RegisterForm, RegisterRobotForm,
     ResetPasswordRequestForm, ResetPasswordForm, AdvancedCommandForm
 )
 from WebUI.app.email import send_email
 from WebUI.app.engagement import award_on_registration, get_or_create_user_profile
+from WebUI.app.audit import (
+    log_login_attempt, log_logout, log_registration,
+    log_password_reset_request, log_password_reset_complete
+)
 import json
 import requests
 import logging
@@ -56,15 +60,22 @@ def register():
         user.set_password(form.password.data)
         db.session.add(user)
         db.session.flush()  # Ensure user.id is generated
-        
+
         # Create user profile with engagement metrics
         profile = UserProfile(user_id=user.id)
         db.session.add(profile)
         db.session.commit()
-        
+
         # Award registration points
         award_on_registration(user.id)
-        
+
+        # Log registration event
+        log_registration(
+            username=user.username,
+            email=user.email,
+            user_id=user.id
+        )
+
         flash('註冊成功，請登入。')
         return redirect(url_for('webui.login'))
     return render_template('register.html.j2', form=form)
@@ -80,8 +91,14 @@ def login():
     if form.validate_on_submit():
         user = User.query.filter_by(username=form.username.data).first()
         if user is None or not user.check_password(form.password.data):
+            # Log failed login attempt
+            log_login_attempt(username=form.username.data, success=False)
             flash('用戶名稱或密碼錯誤')
             return redirect(url_for('webui.login'))
+
+        # Log successful login
+        log_login_attempt(username=user.username, success=True, user_id=user.id)
+
         login_user(user, remember=form.remember_me.data)
         return redirect(url_for('webui.home'))
     return render_template('login.html.j2', form=form)
@@ -91,6 +108,10 @@ def login():
 
 @bp.route('/logout')
 def logout():
+    # Log logout event before logging out
+    if current_user.is_authenticated:
+        log_logout(user_id=current_user.id, username=current_user.username)
+
     logout_user()
     return redirect(url_for('webui.home'))
 
@@ -102,7 +123,7 @@ def user_profile(username):
     """Display user profile with engagement metrics and achievements."""
     user = User.query.filter_by(username=username).first_or_404()
     profile = get_or_create_user_profile(user)
-    
+
     # Get user's earned achievements
     from WebUI.app.models import UserAchievement, Achievement
     user_achievements = db.session.query(Achievement).join(
@@ -110,7 +131,7 @@ def user_profile(username):
     ).filter(
         UserAchievement.user_id == user.id
     ).all()
-    
+
     return render_template(
         'user.html.j2',
         user=user,
@@ -131,7 +152,7 @@ def edit_profile():
         db.session.commit()
         flash('檔案已更新。')
         return redirect(url_for('webui.user_profile', username=current_user.username))
-    
+
     return render_template('edit_profile.html.j2')
 
 # 排行榜
@@ -141,18 +162,18 @@ def edit_profile():
 def leaderboard():
     """Display leaderboard of top users."""
     from WebUI.app.engagement import get_leaderboard
-    
+
     sort_by = request.args.get('sort', 'points')
     limit = request.args.get('limit', 50, type=int)
-    
+
     if sort_by not in ['points', 'level', 'reputation', 'commands']:
         sort_by = 'points'
-    
+
     if limit > 100:
         limit = 100
-    
+
     leaderboard_data = get_leaderboard(limit=limit, sort_by=sort_by)
-    
+
     return render_template(
         'leaderboard.html.j2',
         leaderboard=leaderboard_data,
@@ -171,10 +192,10 @@ def register_robot():
         robot = Robot(name=form.name.data, type=form.type.data, owner=current_user)
         db.session.add(robot)
         db.session.commit()
-        
+
         # Award points for robot registration
         award_on_robot_registration(current_user.id)
-        
+
         flash('機器人註冊成功！')
         return redirect(url_for('webui.robot_dashboard'))
     return render_template('register_robot.html.j2', form=form)
@@ -221,7 +242,7 @@ def media_stream(robot_id=None):
     elif robots:
         # 預設選擇第一個機器人
         robot = robots[0]
-    
+
     return render_template('media_stream.html.j2', robots=robots, robot=robot)
 
 
@@ -254,13 +275,13 @@ def get_command_status(cmd_id):
 
 def expand_advanced_command(advanced_cmd):
     """展開進階指令為基礎動作列表
-    
+
     Args:
         advanced_cmd: AdvancedCommand 模型實例
-        
+
     Returns:
         list: 基礎動作名稱列表，例如 ['go_forward', 'turn_left', 'stand']
-        
+
     Raises:
         ValueError: 如果指令格式無效或包含無效的動作
     """
@@ -274,40 +295,40 @@ def expand_advanced_command(advanced_cmd):
         "stand_up_front", "stepping", "stop", "turn_left", "turn_right", "twist",
         "wave", "weightlifting", "wing_chun"
     }
-    
+
     try:
         # 從資料庫載入進階指令的 base_commands
         base_commands_str = advanced_cmd.current_base_commands()
         commands = json.loads(base_commands_str)
-        
+
         # 確認是陣列
         if not isinstance(commands, list):
             raise ValueError('指令序列必須是陣列格式')
-        
+
         # 提取動作名稱並驗證
         actions = []
         for idx, cmd in enumerate(commands):
             if not isinstance(cmd, dict):
                 raise ValueError(f'第 {idx + 1} 個指令格式錯誤：必須是物件')
-            
+
             if 'command' not in cmd:
                 raise ValueError(f'第 {idx + 1} 個指令缺少 "command" 欄位')
-            
+
             action_name = cmd['command']
-            
+
             # 跳過特殊指令如 'wait' 和 'advanced_command'
             if action_name in ['wait', 'advanced_command']:
                 logging.warning(f'跳過特殊指令: {action_name}')
                 continue
-            
+
             # 驗證是否為有效的基礎動作
             if action_name not in VALID_ACTIONS:
                 raise ValueError(f'第 {idx + 1} 個指令 "{action_name}" 不是有效的基礎動作')
-            
+
             actions.append(action_name)
-        
+
         return actions
-        
+
     except json.JSONDecodeError as e:
         raise ValueError(f'JSON 格式錯誤：{str(e)}')
     except Exception as e:
@@ -316,11 +337,11 @@ def expand_advanced_command(advanced_cmd):
 
 def send_actions_to_robot(robot, actions):
     """發送動作列表到機器人的 Robot-Console 執行佇列
-    
+
     Args:
         robot: Robot 模型實例
         actions: 基礎動作名稱列表
-        
+
     Returns:
         dict: 包含結果的字典 {'success': bool, 'message': str, 'details': dict}
     """
@@ -329,19 +350,19 @@ def send_actions_to_robot(robot, actions):
         payload = {
             "actions": actions
         }
-        
+
         # 記錄發送資訊
         logging.info(
             f"發送動作列表到機器人 {robot.name}: {actions}"
         )
-        
+
         # 使用 MQTT 發送到機器人（選項 1：直接 MQTT 發布）
         try:
             from WebUI.app.mqtt_client import publish_to_robot
-            
+
             # 嘗試透過 MQTT 發送
             mqtt_success = publish_to_robot(robot.name, payload)
-            
+
             if mqtt_success:
                 return {
                     'success': True,
@@ -357,18 +378,18 @@ def send_actions_to_robot(robot, actions):
             else:
                 # MQTT 發送失敗，記錄警告
                 logging.warning("MQTT 發送失敗，可能是 MQTT 未啟用或連接失敗")
-                
+
         except ImportError as e:
             logging.warning(f"無法導入 MQTT 客戶端模組: {str(e)}")
         except Exception as e:
             logging.warning(f"MQTT 發送時發生錯誤: {str(e)}")
-        
+
         # 備用方案：如果 MQTT 不可用或失敗，只記錄到日誌
         # 這允許在沒有 MQTT 配置的環境中仍然可以測試其他功能
         logging.info(
             "備用方案：動作列表已記錄（MQTT 不可用），等待其他傳輸機制"
         )
-        
+
         return {
             'success': True,
             'message': f'已接受 {len(actions)} 個動作到機器人 {robot.name}（等待傳輸）',
@@ -380,7 +401,7 @@ def send_actions_to_robot(robot, actions):
                 'transport': 'pending'
             }
         }
-        
+
     except Exception as e:
         logging.error(f'發送動作到機器人時發生錯誤: {str(e)}', exc_info=True)
         return {
@@ -395,12 +416,12 @@ def send_actions_to_robot(robot, actions):
 @login_required
 def execute_advanced_command(cmd_id):
     """執行進階指令：展開並發送到指定機器人的 Robot-Console 執行佇列
-    
+
     Request Body (JSON):
         {
             "robot_id": 1  // 目標機器人 ID
         }
-        
+
     Response:
         {
             "success": true,
@@ -412,37 +433,37 @@ def execute_advanced_command(cmd_id):
     try:
         # 取得進階指令
         advanced_cmd = AdvancedCommand.query.get_or_404(cmd_id)
-        
+
         # 權限檢查：只有 approved 的指令可以執行
         if advanced_cmd.status != 'approved':
             return jsonify({
                 'success': False,
                 'message': f'只能執行已批准的進階指令（當前狀態：{advanced_cmd.status}）'
             }), 403
-        
+
         # 取得請求資料
         if request.is_json:
             data = request.get_json()
         else:
             data = request.form
-        
+
         robot_id = data.get('robot_id')
         if not robot_id:
             return jsonify({
                 'success': False,
                 'message': '缺少必要參數：robot_id'
             }), 400
-        
+
         # 取得機器人
         robot = Robot.query.get_or_404(robot_id)
-        
+
         # 權限檢查：確認用戶擁有該機器人
         if robot.owner != current_user and not current_user.is_admin():
             return jsonify({
                 'success': False,
                 'message': '您沒有權限控制此機器人'
             }), 403
-        
+
         # 展開進階指令為基礎動作列表
         try:
             actions = expand_advanced_command(advanced_cmd)
@@ -453,10 +474,10 @@ def execute_advanced_command(cmd_id):
                 'success': False,
                 'message': '展開進階指令失敗，請檢查指令格式是否正確'
             }), 400
-        
+
         # 發送動作到機器人
         result = send_actions_to_robot(robot, actions)
-        
+
         # 記錄到資料庫（建立 Command 記錄）
         cmd_record = Command(
             robot_id=robot.id,
@@ -466,7 +487,7 @@ def execute_advanced_command(cmd_id):
         )
         db.session.add(cmd_record)
         db.session.commit()
-        
+
         # 返回結果
         if result['success']:
             response = {
@@ -485,7 +506,7 @@ def execute_advanced_command(cmd_id):
                 'command_id': cmd_record.id
             }
             return jsonify(response), 500
-        
+
     except Exception as e:
         # 記錄詳細錯誤到日誌（包含堆疊追蹤），但只返回通用訊息給用戶
         logging.error(f'執行進階指令時發生錯誤: {str(e)}', exc_info=True)
@@ -506,6 +527,8 @@ def reset_password_request():
         if user:
             token = user.get_reset_password_token()
             send_password_reset_email(user, token)
+            # Log password reset request
+            log_password_reset_request(email=form.email.data)
             flash('密碼重設郵件已發送至您的信箱，請查收。')
         else:
             flash('該電子郵件尚未註冊。')
@@ -527,6 +550,8 @@ def reset_password(token):
     if form.validate_on_submit():
         user.set_password(form.password.data)
         db.session.commit()
+        # Log password reset completion
+        log_password_reset_complete(user_id=user.id, username=user.username)
         flash('您的密碼已重設成功，請登入。')
         return redirect(url_for('webui.login'))
     return render_template('reset_password.html.j2', form=form)
@@ -1263,12 +1288,12 @@ def firmware_update_page():
 @login_required
 def get_firmware_versions():
     """取得可用的固件版本列表
-    
+
     Query Parameters:
         robot_type: 篩選特定機器人類型的固件（可選）
         stable_only: 是否只顯示穩定版本，預設為 'true'。
                      設為 'false' 以顯示所有版本（包含測試版）
-    
+
     Returns:
         JSON 物件包含：
         - success: 操作是否成功
@@ -1276,22 +1301,22 @@ def get_firmware_versions():
         - count: 版本數量
     """
     from WebUI.app.models import FirmwareVersion
-    
+
     try:
         robot_type = request.args.get('robot_type')
         stable_only = request.args.get('stable_only', 'true').lower() == 'true'
-        
+
         query = FirmwareVersion.query
-        
+
         if robot_type:
             query = query.filter_by(robot_type=robot_type)
-        
+
         if stable_only:
             query = query.filter_by(is_stable=True)
-        
+
         # Order by version descending (newest first)
         versions = query.order_by(FirmwareVersion.created_at.desc()).all()
-        
+
         return jsonify({
             'success': True,
             'versions': [v.to_dict() for v in versions],
@@ -1310,29 +1335,29 @@ def get_firmware_versions():
 @login_required
 def check_firmware_status(robot_id):
     """檢查機器人的固件狀態
-    
+
     回傳機器人當前固件版本以及是否有可用的更新
     """
     from WebUI.app.models import FirmwareVersion, DEFAULT_FIRMWARE_VERSION
-    
+
     try:
         robot = Robot.query.get_or_404(robot_id)
-        
+
         # 權限檢查：確認用戶擁有該機器人
         if robot.owner != current_user and not current_user.is_admin():
             return jsonify({
                 'success': False,
                 'error': '您沒有權限查看此機器人'
             }), 403
-        
+
         current_version = robot.firmware_version or DEFAULT_FIRMWARE_VERSION
-        
+
         # 查找該機器人類型的最新穩定版本
         latest_version = FirmwareVersion.query.filter_by(
             robot_type=robot.type,
             is_stable=True
         ).order_by(FirmwareVersion.created_at.desc()).first()
-        
+
         # 判斷是否有更新可用
         update_available = False
         latest_version_str = None
@@ -1343,7 +1368,7 @@ def check_firmware_status(robot_id):
                 current_version,
                 latest_version.version
             ) < 0
-        
+
         return jsonify({
             'success': True,
             'robot_id': robot.id,
@@ -1364,7 +1389,7 @@ def check_firmware_status(robot_id):
 
 def _compare_versions(v1: str, v2: str) -> int:
     """比較兩個版本號
-    
+
     Returns:
         -1 if v1 < v2
         0 if v1 == v2
@@ -1373,13 +1398,13 @@ def _compare_versions(v1: str, v2: str) -> int:
     try:
         parts1 = [int(x) for x in v1.split('.')]
         parts2 = [int(x) for x in v2.split('.')]
-        
+
         # Pad shorter version with zeros
         while len(parts1) < len(parts2):
             parts1.append(0)
         while len(parts2) < len(parts1):
             parts2.append(0)
-        
+
         for p1, p2 in zip(parts1, parts2):
             if p1 < p2:
                 return -1
@@ -1395,7 +1420,7 @@ def _compare_versions(v1: str, v2: str) -> int:
 @login_required
 def initiate_firmware_update():
     """啟動固件更新
-    
+
     Request Body (JSON):
         {
             "robot_id": 1,
@@ -1403,52 +1428,52 @@ def initiate_firmware_update():
         }
     """
     from WebUI.app.models import FirmwareVersion, FirmwareUpdate
-    
+
     try:
         data = request.get_json(silent=True) or {}
-        
+
         robot_id = data.get('robot_id')
         firmware_version_id = data.get('firmware_version_id')
-        
+
         if not robot_id or not firmware_version_id:
             return jsonify({
                 'success': False,
                 'error': '缺少必要參數：robot_id 和 firmware_version_id'
             }), 400
-        
+
         # 取得機器人
         robot = Robot.query.get_or_404(robot_id)
-        
+
         # 權限檢查
         if robot.owner != current_user and not current_user.is_admin():
             return jsonify({
                 'success': False,
                 'error': '您沒有權限更新此機器人'
             }), 403
-        
+
         # 取得目標固件版本
         firmware = FirmwareVersion.query.get_or_404(firmware_version_id)
-        
+
         # 驗證固件類型與機器人類型匹配
         if firmware.robot_type != robot.type:
             return jsonify({
                 'success': False,
                 'error': f'固件類型不匹配：固件適用於 {firmware.robot_type}，但機器人類型為 {robot.type}'
             }), 400
-        
+
         # 檢查是否已有進行中的更新
         existing_update = FirmwareUpdate.query.filter(
             FirmwareUpdate.robot_id == robot_id,
             FirmwareUpdate.status.in_(['pending', 'downloading', 'installing'])
         ).first()
-        
+
         if existing_update:
             return jsonify({
                 'success': False,
                 'error': '該機器人已有進行中的固件更新',
                 'existing_update_id': existing_update.id
             }), 409
-        
+
         # 建立固件更新記錄
         update = FirmwareUpdate(
             robot_id=robot.id,
@@ -1460,23 +1485,23 @@ def initiate_firmware_update():
         )
         db.session.add(update)
         db.session.commit()
-        
+
         logging.info(
             f'固件更新已啟動: robot={robot.name}, '
             f'version={firmware.version}, initiated_by={current_user.username}'
         )
-        
+
         # 觸發固件更新過程（在實際應用中這會是非同步任務）
         # 這裡模擬啟動更新
         _start_firmware_update_task(update.id)
-        
+
         return jsonify({
             'success': True,
             'message': f'已啟動固件更新至版本 {firmware.version}',
             'update_id': update.id,
             'update': update.to_dict()
         })
-        
+
     except Exception as e:
         db.session.rollback()
         logging.error(f'啟動固件更新失敗: {str(e)}', exc_info=True)
@@ -1488,40 +1513,40 @@ def initiate_firmware_update():
 
 def _start_firmware_update_task(update_id: int):
     """初始化固件更新任務（模擬實作）
-    
+
     注意：這是一個簡化的模擬實作，僅將狀態更新為 'downloading' 並設置進度為 10%。
     完整的更新流程需要透過 `/api/firmware/simulate-progress` API 手動推進。
-    
+
     在生產環境中，這應該是一個背景任務（如 Celery 任務）來處理：
     1. 下載固件檔案
     2. 驗證校驗碼
     3. 傳送到機器人
     4. 執行安裝
     5. 驗證安裝結果
-    
+
     TODO: 實作完整的非同步更新流程，包括進度追蹤和錯誤處理。
     """
     from WebUI.app.models import FirmwareUpdate
-    
+
     try:
         update = FirmwareUpdate.query.get(update_id)
         if not update:
             return
-        
+
         # 更新狀態為下載中
         update.status = 'downloading'
         update.progress = 10
         db.session.commit()
-        
+
         # 在實際應用中，這裡會執行：
         # 1. 下載固件檔案
         # 2. 驗證校驗碼
         # 3. 傳送到機器人
         # 4. 執行安裝
         # 5. 驗證安裝結果
-        
+
         logging.info(f'固件更新任務已啟動: update_id={update_id}')
-        
+
     except Exception as e:
         logging.error(f'固件更新任務啟動失敗: {str(e)}', exc_info=True)
 
@@ -1531,10 +1556,10 @@ def _start_firmware_update_task(update_id: int):
 def get_firmware_update_status(update_id):
     """查詢固件更新狀態"""
     from WebUI.app.models import FirmwareUpdate
-    
+
     try:
         update = FirmwareUpdate.query.get_or_404(update_id)
-        
+
         # 權限檢查
         if update.user != current_user and not current_user.is_admin():
             # 也允許機器人擁有者查看
@@ -1543,12 +1568,12 @@ def get_firmware_update_status(update_id):
                     'success': False,
                     'error': '您沒有權限查看此更新狀態'
                 }), 403
-        
+
         return jsonify({
             'success': True,
             'update': update.to_dict()
         })
-        
+
     except Exception as e:
         logging.error(f'查詢固件更新狀態失敗: {str(e)}', exc_info=True)
         return jsonify({
@@ -1562,21 +1587,21 @@ def get_firmware_update_status(update_id):
 def get_firmware_update_history(robot_id):
     """取得機器人的固件更新歷史"""
     from WebUI.app.models import FirmwareUpdate
-    
+
     try:
         robot = Robot.query.get_or_404(robot_id)
-        
+
         # 權限檢查
         if robot.owner != current_user and not current_user.is_admin():
             return jsonify({
                 'success': False,
                 'error': '您沒有權限查看此機器人'
             }), 403
-        
+
         updates = FirmwareUpdate.query.filter_by(
             robot_id=robot_id
         ).order_by(FirmwareUpdate.started_at.desc()).limit(20).all()
-        
+
         return jsonify({
             'success': True,
             'robot_id': robot_id,
@@ -1584,7 +1609,7 @@ def get_firmware_update_history(robot_id):
             'updates': [u.to_dict() for u in updates],
             'count': len(updates)
         })
-        
+
     except Exception as e:
         logging.error(f'取得固件更新歷史失敗: {str(e)}', exc_info=True)
         return jsonify({
@@ -1598,10 +1623,10 @@ def get_firmware_update_history(robot_id):
 def cancel_firmware_update(update_id):
     """取消進行中的固件更新"""
     from WebUI.app.models import FirmwareUpdate
-    
+
     try:
         update = FirmwareUpdate.query.get_or_404(update_id)
-        
+
         # 權限檢查
         if update.user != current_user and not current_user.is_admin():
             if update.robot.owner != current_user:
@@ -1609,30 +1634,30 @@ def cancel_firmware_update(update_id):
                     'success': False,
                     'error': '您沒有權限取消此更新'
                 }), 403
-        
+
         # 只能取消尚未完成的更新
         if update.status in ['completed', 'failed', 'cancelled']:
             return jsonify({
                 'success': False,
                 'error': f'無法取消已{update.status}的更新'
             }), 400
-        
+
         update.status = 'cancelled'
         from datetime import datetime
         update.completed_at = datetime.utcnow()
         db.session.commit()
-        
+
         logging.info(
             f'固件更新已取消: update_id={update_id}, '
             f'cancelled_by={current_user.username}'
         )
-        
+
         return jsonify({
             'success': True,
             'message': '固件更新已取消',
             'update': update.to_dict()
         })
-        
+
     except Exception as e:
         db.session.rollback()
         logging.error(f'取消固件更新失敗: {str(e)}', exc_info=True)
@@ -1648,20 +1673,20 @@ def cancel_firmware_update(update_id):
 def simulate_firmware_progress(update_id):
     """模擬固件更新進度（僅用於開發測試）"""
     from WebUI.app.models import FirmwareUpdate
-    
+
     try:
         if not current_user.is_admin():
             return jsonify({
                 'success': False,
                 'error': '只有管理員可以使用此功能'
             }), 403
-        
+
         update = FirmwareUpdate.query.get_or_404(update_id)
-        
+
         data = request.get_json(silent=True) or {}
         new_status = data.get('status')
         new_progress = data.get('progress')
-        
+
         if new_status:
             update.status = new_status
             if new_status in ['completed', 'failed', 'cancelled']:
@@ -1670,17 +1695,17 @@ def simulate_firmware_progress(update_id):
                 # 如果完成，更新機器人的固件版本
                 if new_status == 'completed' and update.robot:
                     update.robot.firmware_version = update.firmware_version.version
-        
+
         if new_progress is not None:
             update.progress = min(max(0, int(new_progress)), 100)
-        
+
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'update': update.to_dict()
         })
-        
+
     except Exception as e:
         db.session.rollback()
         logging.error(f'模擬固件更新進度失敗: {str(e)}', exc_info=True)
@@ -1688,3 +1713,201 @@ def simulate_firmware_progress(update_id):
             'success': False,
             'error': '模擬進度時發生錯誤'
         }), 500
+
+
+# 審計日誌介面（僅限 admin/auditor）
+
+
+@bp.route('/audit_logs')
+@login_required
+def audit_logs():
+    """顯示審計日誌列表（僅限 admin/auditor 角色）"""
+    # 檢查權限
+    if current_user.role not in ['admin', 'auditor']:
+        flash('您沒有權限訪問此頁面。')
+        abort(403)
+
+    # 獲取過濾參數
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
+    severity = request.args.get('severity', '')
+    category = request.args.get('category', '')
+    action = request.args.get('action', '')
+    user_id_str = request.args.get('user_id', '')
+    start_date = request.args.get('start_date', '')
+    end_date = request.args.get('end_date', '')
+    search = request.args.get('search', '')
+
+    # 建立查詢
+    query = AuditLog.query
+
+    # 應用過濾
+    if severity:
+        query = query.filter(AuditLog.severity == severity)
+    if category:
+        query = query.filter(AuditLog.category == category)
+    if action:
+        query = query.filter(AuditLog.action == action)
+    if user_id_str:
+        try:
+            query = query.filter(AuditLog.user_id == int(user_id_str))
+        except ValueError:
+            pass  # 無效的使用者 ID，忽略此過濾條件
+    if start_date:
+        try:
+            from datetime import datetime
+            start_dt = datetime.fromisoformat(start_date)
+            query = query.filter(AuditLog.timestamp >= start_dt)
+        except ValueError:
+            pass  # 無效的日期格式，忽略此過濾條件
+    if end_date:
+        try:
+            from datetime import datetime
+            end_dt = datetime.fromisoformat(end_date)
+            query = query.filter(AuditLog.timestamp <= end_dt)
+        except ValueError:
+            pass  # 無效的日期格式，忽略此過濾條件
+    if search:
+        query = query.filter(
+            db.or_(
+                AuditLog.message.ilike(f'%{search}%'),
+                AuditLog.trace_id.ilike(f'%{search}%')
+            )
+        )
+
+    # 排序（最新的在前）
+    query = query.order_by(AuditLog.timestamp.desc())
+
+    # 分頁
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    logs = pagination.items
+
+    # 獲取唯一的值用於過濾器
+    unique_severities = db.session.query(AuditLog.severity).distinct().all()
+    unique_categories = db.session.query(AuditLog.category).distinct().all()
+    unique_actions = db.session.query(AuditLog.action).distinct().all()
+
+    return render_template(
+        'audit_logs.html.j2',
+        logs=logs,
+        pagination=pagination,
+        severities=[s[0] for s in unique_severities if s[0]],
+        categories=[c[0] for c in unique_categories if c[0]],
+        actions=[a[0] for a in unique_actions if a[0]],
+        filters={
+            'severity': severity,
+            'category': category,
+            'action': action,
+            'user_id': user_id_str,
+            'start_date': start_date,
+            'end_date': end_date,
+            'search': search
+        }
+    )
+
+
+@bp.route('/audit_logs/<int:log_id>')
+@login_required
+def audit_log_detail(log_id):
+    """顯示單一審計日誌詳細資訊"""
+    # 檢查權限
+    if current_user.role not in ['admin', 'auditor']:
+        flash('您沒有權限訪問此頁面。')
+        abort(403)
+
+    log = AuditLog.query.get_or_404(log_id)
+    return render_template('audit_log_detail.html.j2', log=log)
+
+
+@bp.route('/audit_logs/export')
+@login_required
+def export_audit_logs():
+    """匯出審計日誌為 CSV 格式"""
+    # 檢查權限
+    if current_user.role not in ['admin', 'auditor']:
+        flash('您沒有權限訪問此頁面。')
+        abort(403)
+
+    import csv
+    from io import StringIO
+    from datetime import datetime
+
+    # 獲取過濾參數（與 audit_logs 路由相同）
+    severity = request.args.get('severity', '')
+    category = request.args.get('category', '')
+    action = request.args.get('action', '')
+    user_id_str = request.args.get('user_id', '')
+    start_date = request.args.get('start_date', '')
+    end_date = request.args.get('end_date', '')
+
+    # 建立查詢
+    query = AuditLog.query
+
+    # 應用過濾
+    if severity:
+        query = query.filter(AuditLog.severity == severity)
+    if category:
+        query = query.filter(AuditLog.category == category)
+    if action:
+        query = query.filter(AuditLog.action == action)
+    if user_id_str:
+        try:
+            query = query.filter(AuditLog.user_id == int(user_id_str))
+        except ValueError:
+            pass  # 無效的使用者 ID，忽略此過濾條件
+    if start_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date)
+            query = query.filter(AuditLog.timestamp >= start_dt)
+        except ValueError:
+            pass  # 無效的日期格式，忽略此過濾條件
+    if end_date:
+        try:
+            end_dt = datetime.fromisoformat(end_date)
+            query = query.filter(AuditLog.timestamp <= end_dt)
+        except ValueError:
+            pass  # 無效的日期格式，忽略此過濾條件
+
+    # 排序
+    query = query.order_by(AuditLog.timestamp.desc())
+
+    # 限制最大匯出數量
+    logs = query.limit(10000).all()
+
+    # 建立 CSV
+    output = StringIO()
+    writer = csv.writer(output)
+
+    # 寫入標題行
+    writer.writerow([
+        'ID', 'Trace ID', 'Timestamp', 'Severity', 'Category',
+        'Action', 'User', 'Message', 'Resource Type', 'Resource ID',
+        'IP Address', 'Status'
+    ])
+
+    # 寫入資料
+    for log in logs:
+        writer.writerow([
+            log.id,
+            log.trace_id,
+            log.timestamp.isoformat() if log.timestamp else '',
+            log.severity,
+            log.category,
+            log.action,
+            log.user.username if log.user else '',
+            log.message,
+            log.resource_type or '',
+            log.resource_id or '',
+            log.ip_address or '',
+            log.status or ''
+        ])
+
+    # 準備回應
+    from flask import make_response
+    output.seek(0)
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+    timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    response.headers['Content-Disposition'] = f'attachment; filename=audit_logs_{timestamp_str}.csv'
+
+    return response

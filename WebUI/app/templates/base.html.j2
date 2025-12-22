@@ -131,6 +131,13 @@
                             <i class="fa fa-trophy"></i> 排行榜
                         </a>
                     </li>
+                    {% if current_user.role in ['admin', 'auditor'] %}
+                    <li>
+                        <a href="{{ url_for('webui.audit_logs') }}">
+                            <i class="fa fa-shield"></i> 審計日誌
+                        </a>
+                    </li>
+                    {% endif %}
                     {% endif %}
                 </ul>
                 <ul class="nav navbar-nav navbar-right">

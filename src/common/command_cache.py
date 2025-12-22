@@ -340,7 +340,7 @@ class CommandResultCache(CommandCache):
             result = self.get(command_id)
             if result is None:
                 # 快取已過期或被淘汰，清理 trace_id 映射
-                del self._trace_to_command[trace_id]
+                self._trace_to_command.pop(trace_id, None)  # 使用 pop 避免 KeyError
             return result
 
     def delete_by_trace_id(self, trace_id: str) -> bool:
@@ -357,8 +357,8 @@ class CommandResultCache(CommandCache):
             if command_id is None:
                 return False
 
-            # 刪除對應關係
-            del self._trace_to_command[trace_id]
+            # 刪除對應關係（使用 pop 避免 KeyError）
+            self._trace_to_command.pop(trace_id, None)
 
             # 刪除快取項目
             return self.delete(command_id)

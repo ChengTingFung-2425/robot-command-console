@@ -1,4 +1,3 @@
-
 # imports
 
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -61,7 +60,7 @@ def load_user(id):
 
 class UserProfile(db.Model):
     """User engagement and gamification profile.
-    
+
     Stores user engagement metrics including:
     - Points: accumulated through various actions
     - Level: calculated based on points
@@ -71,18 +70,18 @@ class UserProfile(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, unique=True, index=True)
     user = db.relationship('User', backref=db.backref('profile', uselist=False))
-    
+
     # Engagement metrics
     points = db.Column(db.Integer, default=0, index=True)
     level = db.Column(db.Integer, default=1, index=True)
     title = db.Column(db.String(64), default='新手探索者')
-    
+
     # Statistics
     total_commands = db.Column(db.Integer, default=0)
     total_advanced_commands = db.Column(db.Integer, default=0)
     total_robots = db.Column(db.Integer, default=0)
     reputation = db.Column(db.Integer, default=0)
-    
+
     # Timestamps
     created_at = db.Column(db.DateTime, index=True, default=db.func.now())
     updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
@@ -90,7 +89,7 @@ class UserProfile(db.Model):
     @staticmethod
     def get_level_from_points(points: int) -> int:
         """Calculate level based on points.
-        
+
         Level ranges:
         - Bronze (L1-10): 0-500 points
         - Silver (L11-20): 501-2000 points
@@ -191,7 +190,7 @@ class UserProfile(db.Model):
         """Get progress info to next level."""
         current_points = self.points
         next_level_points = self.get_points_for_next_level()
-        
+
         # Get previous level points
         if self.level == 1:
             prev_points = 0
@@ -207,11 +206,11 @@ class UserProfile(db.Model):
                 if self.level - 1 < len(points_for_levels)
                 else 26000 + (self.level - 41) * 1000
             )
-        
+
         progress = current_points - prev_points
         needed = next_level_points - prev_points
         percent = int((progress / needed * 100)) if needed > 0 else 100
-        
+
         return {
             'current': current_points,
             'next_level_required': next_level_points,
@@ -239,7 +238,7 @@ class Robot(db.Model):
 
     def __repr__(self) -> str:
         return f'<Robot {self.name}>'
-    
+
     def set_battery(self, value: int) -> None:
         """設定電池電量，確保值在 0-100 範圍內"""
         if value < 0:
@@ -362,7 +361,7 @@ class AdvancedCommand(db.Model):
 
 class Achievement(db.Model):
     """Achievement/Badge template that users can earn.
-    
+
     Stores the definition of achievements/badges available in the system.
     Each achievement has specific criteria for earning (handled in business logic).
     """
@@ -374,16 +373,16 @@ class Achievement(db.Model):
     category = db.Column(db.String(32), nullable=False)  # exploration/contribution/social/challenge
     points_required = db.Column(db.Integer, default=0)  # points threshold for automatic awarding
     is_title = db.Column(db.Boolean, default=False)  # True if this is a title/badge level
-    
+
     created_at = db.Column(db.DateTime, index=True, default=db.func.now())
-    
+
     def __repr__(self) -> str:
         return f'<Achievement {self.name}>'
 
 
 class UserAchievement(db.Model):
     """Tracks which achievements a user has earned and when.
-    
+
     Junction table between User and Achievement.
     """
     __tablename__ = 'user_achievement'
@@ -391,22 +390,22 @@ class UserAchievement(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
     achievement_id = db.Column(db.Integer, db.ForeignKey('achievement.id'), nullable=False, index=True)
     earned_at = db.Column(db.DateTime, index=True, default=db.func.now())
-    
+
     user = db.relationship(
         'User',
         backref=db.backref('earned_achievements', lazy='dynamic', cascade='all, delete-orphan')
     )
     achievement = db.relationship('Achievement', backref=db.backref('earned_by_users', lazy='dynamic'))
-    
+
     __table_args__ = (db.UniqueConstraint('user_id', 'achievement_id', name='uq_user_achievement'),)
-    
+
     def __repr__(self) -> str:
         return f'<UserAchievement user_id={self.user_id} achievement_id={self.achievement_id}>'
 
 
 class FirmwareVersion(db.Model):
     """Available firmware versions for robots.
-    
+
     Stores information about available firmware versions that can be installed
     on different robot types.
     """
@@ -420,15 +419,15 @@ class FirmwareVersion(db.Model):
     file_size = db.Column(db.Integer)  # File size in bytes
     is_stable = db.Column(db.Boolean, default=True)  # True for stable releases
     min_required_version = db.Column(db.String(32))  # Minimum version required to upgrade
-    
+
     created_at = db.Column(db.DateTime, index=True, default=db.func.now())
     updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
-    
+
     # Unique constraint: only one version per robot type
     __table_args__ = (
         db.UniqueConstraint('version', 'robot_type', name='uq_firmware_version_type'),
     )
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary for API responses."""
         return {
@@ -442,14 +441,14 @@ class FirmwareVersion(db.Model):
             'min_required_version': self.min_required_version,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
-    
+
     def __repr__(self) -> str:
         return f'<FirmwareVersion {self.version} for {self.robot_type}>'
 
 
 class FirmwareUpdate(db.Model):
     """Tracks firmware update operations for robots.
-    
+
     Records the history of firmware updates including status, progress,
     and any errors that occurred during the update process.
     """
@@ -462,21 +461,21 @@ class FirmwareUpdate(db.Model):
         nullable=False
     )
     initiated_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    
+
     # Update status: pending, downloading, installing, completed, failed, cancelled
     status = db.Column(db.String(32), default='pending', index=True)
     progress = db.Column(db.Integer, default=0)  # Progress percentage (0-100)
     error_message = db.Column(db.Text)  # Error details if failed
     previous_version = db.Column(db.String(32))  # Version before update
-    
+
     started_at = db.Column(db.DateTime, default=db.func.now())
     completed_at = db.Column(db.DateTime)
-    
+
     # Relationships
     robot = db.relationship('Robot', backref=db.backref('firmware_updates', lazy='dynamic'))
     firmware_version = db.relationship('FirmwareVersion', backref='updates')
     user = db.relationship('User', backref=db.backref('initiated_updates', lazy='dynamic'))
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary for API responses."""
         return {
@@ -493,7 +492,68 @@ class FirmwareUpdate(db.Model):
             'completed_at': self.completed_at.isoformat() if self.completed_at else None,
             'initiated_by': self.user.username if self.user else None
         }
-    
+
     def __repr__(self) -> str:
         return f'<FirmwareUpdate robot={self.robot_id} version={self.firmware_version_id} status={self.status}>'
 
+
+class AuditLog(db.Model):
+    """Audit log for security and compliance tracking.
+
+    Records all security-sensitive operations including authentication,
+    authorization, data access, and configuration changes.
+    Follows the EventLog schema from docs/contract/event_log.schema.json.
+    """
+    __tablename__ = 'audit_log'
+    id = db.Column(db.Integer, primary_key=True)
+
+    # Core EventLog fields
+    trace_id = db.Column(db.String(64), nullable=False, index=True)  # UUID for request tracking
+    timestamp = db.Column(db.DateTime, nullable=False, index=True, default=db.func.now())
+    severity = db.Column(db.String(16), nullable=False, index=True)  # INFO, WARN, ERROR
+    category = db.Column(db.String(32), nullable=False, index=True)  # auth, command, audit, etc.
+    message = db.Column(db.Text, nullable=False)
+
+    # Context data (stored as JSON)
+    context = db.Column(db.JSON)  # Additional context data
+
+    # Enhanced audit fields
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), index=True)  # User who performed the action
+    action = db.Column(db.String(64), index=True)  # Action type (login, logout, command_execute, etc.)
+    resource_type = db.Column(db.String(64))  # Type of resource affected (user, robot, command, etc.)
+    resource_id = db.Column(db.String(64))  # ID of affected resource
+    ip_address = db.Column(db.String(64))  # Client IP address
+    user_agent = db.Column(db.String(512))  # Client user agent
+    status = db.Column(db.String(32))  # success, failure, denied
+
+    # Relationships
+    user = db.relationship('User', backref=db.backref('audit_logs', lazy='dynamic'))
+
+    # Indexes for common queries
+    __table_args__ = (
+        db.Index('idx_audit_timestamp_severity', 'timestamp', 'severity'),
+        db.Index('idx_audit_user_action', 'user_id', 'action'),
+        db.Index('idx_audit_category_timestamp', 'category', 'timestamp'),
+    )
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for API responses."""
+        return {
+            'id': self.id,
+            'trace_id': self.trace_id,
+            'timestamp': self.timestamp.isoformat() if self.timestamp else None,
+            'severity': self.severity,
+            'category': self.category,
+            'message': self.message,
+            'context': self.context,
+            'user_id': self.user_id,
+            'username': self.user.username if self.user else None,
+            'action': self.action,
+            'resource_type': self.resource_type,
+            'resource_id': self.resource_id,
+            'ip_address': self.ip_address,
+            'status': self.status
+        }
+
+    def __repr__(self) -> str:
+        return f'<AuditLog {self.id} {self.action} by user={self.user_id}>'

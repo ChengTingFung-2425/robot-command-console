@@ -1,0 +1,193 @@
+{% extends 'base.html.j2' %}
+
+{% block title %}審計日誌{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2>審計日誌 <small class="text-muted">安全與合規追蹤</small></h2>
+    
+    <!-- 過濾器 -->
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <h4 class="panel-title">
+                <a data-toggle="collapse" href="#filterPanel">
+                    <i class="glyphicon glyphicon-filter"></i> 過濾選項
+                </a>
+            </h4>
+        </div>
+        <div id="filterPanel" class="panel-collapse collapse">
+            <div class="panel-body">
+                <form method="get" action="{{ url_for('webui.audit_logs') }}" class="form-horizontal">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="col-sm-4 control-label">嚴重性</label>
+                                <div class="col-sm-8">
+                                    <select name="severity" class="form-control">
+                                        <option value="">-- 全部 --</option>
+                                        {% for s in severities %}
+                                        <option value="{{ s }}" {% if filters.severity == s %}selected{% endif %}>{{ s }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="col-sm-4 control-label">類別</label>
+                                <div class="col-sm-8">
+                                    <select name="category" class="form-control">
+                                        <option value="">-- 全部 --</option>
+                                        {% for c in categories %}
+                                        <option value="{{ c }}" {% if filters.category == c %}selected{% endif %}>{{ c }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="col-sm-4 control-label">動作</label>
+                                <div class="col-sm-8">
+                                    <select name="action" class="form-control">
+                                        <option value="">-- 全部 --</option>
+                                        {% for a in actions %}
+                                        <option value="{{ a }}" {% if filters.action == a %}selected{% endif %}>{{ a }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="col-sm-4 control-label">開始日期</label>
+                                <div class="col-sm-8">
+                                    <input type="datetime-local" name="start_date" class="form-control" value="{{ filters.start_date }}">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="col-sm-4 control-label">結束日期</label>
+                                <div class="col-sm-8">
+                                    <input type="datetime-local" name="end_date" class="form-control" value="{{ filters.end_date }}">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="col-sm-4 control-label">搜尋</label>
+                                <div class="col-sm-8">
+                                    <input type="text" name="search" class="form-control" placeholder="訊息或 Trace ID" value="{{ filters.search }}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <div class="col-sm-offset-4 col-sm-8">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="glyphicon glyphicon-search"></i> 套用過濾
+                            </button>
+                            <a href="{{ url_for('webui.audit_logs') }}" class="btn btn-default">
+                                <i class="glyphicon glyphicon-remove"></i> 清除
+                            </a>
+                            <a href="{{ url_for('webui.export_audit_logs', **filters) }}" class="btn btn-success pull-right">
+                                <i class="glyphicon glyphicon-download-alt"></i> 匯出 CSV
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 日誌表格 -->
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>時間戳</th>
+                    <th>嚴重性</th>
+                    <th>類別</th>
+                    <th>動作</th>
+                    <th>使用者</th>
+                    <th>訊息</th>
+                    <th>狀態</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr class="{% if log.severity == 'ERROR' %}danger{% elif log.severity == 'WARN' %}warning{% endif %}">
+                    <td>
+                        <small>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') if log.timestamp else 'N/A' }}</small>
+                    </td>
+                    <td>
+                        <span class="label label-{% if log.severity == 'ERROR' %}danger{% elif log.severity == 'WARN' %}warning{% else %}info{% endif %}">
+                            {{ log.severity }}
+                        </span>
+                    </td>
+                    <td><span class="label label-default">{{ log.category }}</span></td>
+                    <td><code>{{ log.action or 'N/A' }}</code></td>
+                    <td>
+                        {% if log.user %}
+                        <a href="{{ url_for('webui.user_profile', username=log.user.username) }}">
+                            {{ log.user.username }}
+                        </a>
+                        {% else %}
+                        <em class="text-muted">系統</em>
+                        {% endif %}
+                    </td>
+                    <td>{{ log.message[:100] }}{% if log.message|length > 100 %}...{% endif %}</td>
+                    <td>
+                        {% if log.status == 'success' %}
+                        <span class="label label-success">成功</span>
+                        {% elif log.status == 'failure' %}
+                        <span class="label label-danger">失敗</span>
+                        {% elif log.status == 'denied' %}
+                        <span class="label label-warning">拒絕</span>
+                        {% else %}
+                        <span class="label label-default">{{ log.status or 'N/A' }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('webui.audit_log_detail', log_id=log.id) }}" class="btn btn-xs btn-info">
+                            <i class="glyphicon glyphicon-eye-open"></i> 詳細
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-center text-muted">
+                        <em>沒有符合條件的審計日誌</em>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- 分頁 -->
+    {% if pagination.pages > 1 %}
+    <nav aria-label="頁面導航">
+        <ul class="pagination">
+            <li {% if not pagination.has_prev %}class="disabled"{% endif %}>
+                <a href="{% if pagination.has_prev %}{{ url_for('webui.audit_logs', page=pagination.prev_num, **filters) }}{% else %}#{% endif %}" aria-label="上一頁">
+                    <span aria-hidden="true">&laquo;</span>
+                </a>
+            </li>
+            {% for page_num in pagination.iter_pages() %}
+                {% if page_num %}
+                <li {% if page_num == pagination.page %}class="active"{% endif %}>
+                    <a href="{{ url_for('webui.audit_logs', page=page_num, **filters) }}">{{ page_num }}</a>
+                </li>
+                {% else %}
+                <li class="disabled"><span>...</span></li>
+                {% endif %}
+            {% endfor %}
+            <li {% if not pagination.has_next %}class="disabled"{% endif %}>
+                <a href="{% if pagination.has_next %}{{ url_for('webui.audit_logs', page=pagination.next_num, **filters) }}{% else %}#{% endif %}" aria-label="下一頁">
+                    <span aria-hidden="true">&raquo;</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+    {% endif %}
+    
+    <p class="text-muted">
+        <small>顯示第 {{ (pagination.page - 1) * pagination.per_page + 1 }} - {{ min(pagination.page * pagination.per_page, pagination.total) }} 筆，共 {{ pagination.total }} 筆</small>
+    </p>
+</div>
+{% endblock %}

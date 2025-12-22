@@ -1,0 +1,144 @@
+{% extends 'base.html.j2' %}
+
+{% block title %}審計日誌詳情 #{{ log.id }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2>審計日誌詳情 <small>#{{ log.id }}</small></h2>
+        <a href="{{ url_for('webui.audit_logs') }}" class="btn btn-default">
+            <i class="glyphicon glyphicon-arrow-left"></i> 返回列表
+        </a>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h4 class="panel-title">基本資訊</h4>
+                </div>
+                <div class="panel-body">
+                    <table class="table table-condensed">
+                        <tr>
+                            <th width="30%">ID</th>
+                            <td>{{ log.id }}</td>
+                        </tr>
+                        <tr>
+                            <th>Trace ID</th>
+                            <td><code>{{ log.trace_id }}</code></td>
+                        </tr>
+                        <tr>
+                            <th>時間戳</th>
+                            <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S.%f') if log.timestamp else 'N/A' }}</td>
+                        </tr>
+                        <tr>
+                            <th>嚴重性</th>
+                            <td>
+                                <span class="label label-{% if log.severity == 'ERROR' %}danger{% elif log.severity == 'WARN' %}warning{% else %}info{% endif %}">
+                                    {{ log.severity }}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>類別</th>
+                            <td><span class="label label-default">{{ log.category }}</span></td>
+                        </tr>
+                        <tr>
+                            <th>動作</th>
+                            <td><code>{{ log.action or 'N/A' }}</code></td>
+                        </tr>
+                        <tr>
+                            <th>狀態</th>
+                            <td>
+                                {% if log.status == 'success' %}
+                                <span class="label label-success">成功</span>
+                                {% elif log.status == 'failure' %}
+                                <span class="label label-danger">失敗</span>
+                                {% elif log.status == 'denied' %}
+                                <span class="label label-warning">拒絕</span>
+                                {% else %}
+                                <span class="label label-default">{{ log.status or 'N/A' }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h4 class="panel-title">使用者與請求資訊</h4>
+                </div>
+                <div class="panel-body">
+                    <table class="table table-condensed">
+                        <tr>
+                            <th width="30%">使用者</th>
+                            <td>
+                                {% if log.user %}
+                                <a href="{{ url_for('webui.user_profile', username=log.user.username) }}">
+                                    {{ log.user.username }}
+                                </a>
+                                <span class="label label-info">{{ log.user.role }}</span>
+                                {% else %}
+                                <em class="text-muted">系統/匿名</em>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>使用者 ID</th>
+                            <td>{{ log.user_id or 'N/A' }}</td>
+                        </tr>
+                        <tr>
+                            <th>IP 位址</th>
+                            <td><code>{{ log.ip_address or 'N/A' }}</code></td>
+                        </tr>
+                        <tr>
+                            <th>User Agent</th>
+                            <td>
+                                <small style="word-break: break-all;">{{ log.user_agent or 'N/A' }}</small>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>資源類型</th>
+                            <td>{{ log.resource_type or 'N/A' }}</td>
+                        </tr>
+                        <tr>
+                            <th>資源 ID</th>
+                            <td>{{ log.resource_id or 'N/A' }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <h4 class="panel-title">訊息</h4>
+        </div>
+        <div class="panel-body">
+            <p>{{ log.message }}</p>
+        </div>
+    </div>
+    
+    {% if log.context %}
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <h4 class="panel-title">上下文資料 (Context)</h4>
+        </div>
+        <div class="panel-body">
+            <pre>{{ log.context | tojson(indent=2) }}</pre>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="well well-sm">
+        <p class="text-muted"><small>
+            <i class="glyphicon glyphicon-info-sign"></i>
+            此審計日誌記錄不可修改或刪除，僅可查看與匯出。
+        </small></p>
+    </div>
+</div>
+{% endblock %}

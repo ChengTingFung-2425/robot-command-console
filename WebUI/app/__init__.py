@@ -28,12 +28,23 @@ app = None
 def create_app(config_name='default'):
     """Create and configure Flask application instance."""
     global app
-    
+
     flask_app = Flask(__name__)
-    
+
     # Ensure proper UTF-8 encoding for JSON responses
     flask_app.config['JSON_AS_ASCII'] = False
+
+    # Enable autoescaping for all templates including .html.j2
+    flask_app.jinja_env.autoescape = True
+    # Add .j2 extension to autoescape list
+    flask_app.jinja_env.autoescape_extensions = ('html', 'htm', 'xml', 'j2', 'html.j2')
     
+    # Add Python built-ins to Jinja2 environment
+    flask_app.jinja_env.globals.update({
+        'min': min,
+        'max': max,
+    })
+
     # Apply configuration
     if config_name == 'testing':
         flask_app.config['TESTING'] = True
@@ -44,7 +55,7 @@ def create_app(config_name='default'):
         flask_app.config['LANGUAGES'] = ['en', 'es', 'zh']
     else:
         flask_app.config.from_object(Config)
-    
+
     # Initialize extensions
     db.init_app(flask_app)
     migrate.init_app(flask_app, db)
@@ -54,7 +65,7 @@ def create_app(config_name='default'):
     bootstrap.init_app(flask_app)
     moment.init_app(flask_app)
     babel.init_app(flask_app)
-    
+
     # Configure logging (only for non-testing)
     if not flask_app.testing and not flask_app.debug:
         root = logging.getLogger()
@@ -92,6 +103,10 @@ def create_app(config_name='default'):
     from WebUI.app.routes import bp as webui_bp
     flask_app.register_blueprint(webui_bp)
 
+    # Register blueprint for Auth API routes
+    from WebUI.app.auth_api import auth_api_bp
+    flask_app.register_blueprint(auth_api_bp)
+
     # Register error handlers
     from WebUI.app.errors import register_error_handlers
     register_error_handlers(flask_app)
@@ -99,7 +114,7 @@ def create_app(config_name='default'):
     # Create app context and update global app
     if app is None:
         app = flask_app
-    
+
     return flask_app
 
 

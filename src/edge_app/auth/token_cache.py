@@ -1,438 +1,294 @@
 """
-Edge Token Cache Manager
+Edge Token Cache
 
-Provides secure token storage with OS-native keychain integration.
-Platform priority: Linux (primary) -> Windows (secondary) -> macOS (not supported)
-
-Zero-trust principle: Tokens are cached but not validated locally.
-All validation occurs on the Server.
+整合 DeviceIDGenerator、TokenEncryption 與 PlatformStorage，
+提供完整的 Token 管理功能。
 """
 
 import os
 import json
-import platform
-import hashlib
-import uuid
-from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
-from pathlib import Path
-from cryptography.fernet import Fernet
 import base64
+import time
+from typing import Optional, Dict, Any
+
+from .device_id import DeviceIDGenerator
+from .encryption import TokenEncryption
+from .platform_storage import PlatformStorage
 
 
 class EdgeTokenCache:
-    """
-    Token cache manager with OS-native keychain integration.
+    """Edge Token 快取管理器
     
-    Platform Support:
-    - Linux (Priority 1): Secret Service API (GNOME Keyring/KWallet) + Fernet fallback
-    - Windows (Priority 2): Credential Manager + Fernet fallback
-    - macOS: Not supported (Fallback mode only, not planned for release)
-    
-    Security Features:
-    - Fernet encryption (AES-128)
-    - Device ID binding
-    - OS-native keychain (when available)
-    - File permissions (chmod 600 on Linux, NTFS ACL on Windows)
-    - Automatic expiration detection
+    功能：
+    - Token 加密儲存（使用 PlatformStorage 或 fallback 至檔案）
+    - 自動過期檢測
+    - Device ID 管理
+    - 使用者資訊快取
     """
     
-    def __init__(self, app_name: str = 'robot-edge'):
-        self.app_name = app_name
-        self.platform = platform.system()
-        
-        # Token expiration times
-        self.access_token_lifetime = timedelta(minutes=15)
-        self.refresh_token_lifetime = timedelta(days=7)
-        
-        # Determine storage paths
-        if self.platform == 'Linux':
-            self.cache_dir = Path.home() / '.robot-edge'
-        elif self.platform == 'Windows':
-            self.cache_dir = Path(os.getenv('APPDATA', '')) / 'robot-edge'
-        else:  # macOS or other (Fallback only)
-            self.cache_dir = Path.home() / '.robot-edge'
-        
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
-        self.token_file = self.cache_dir / 'tokens.enc'
-        self.device_id_file = self.cache_dir / 'device.id'
-        
-        # Set file permissions (Linux)
-        if self.platform == 'Linux':
-            try:
-                os.chmod(self.cache_dir, 0o700)
-            except Exception:
-                # Ignore permission errors (may occur on read-only filesystems)
-                pass
-        
-        # Initialize encryption key
-        self._encryption_key = self._get_or_create_encryption_key()
-        self._fernet = Fernet(self._encryption_key)
-        
-        # Try to initialize platform-specific keychain
-        self._keychain_available = self._init_keychain()
-    
-    def _get_or_create_encryption_key(self) -> bytes:
-        """
-        Get or create encryption key for Fernet.
-        Derives key from machine-specific information.
-        """
-        key_file = self.cache_dir / 'key.bin'
-        
-        if key_file.exists():
-            with open(key_file, 'rb') as f:
-                return f.read()
-        
-        # Derive key from machine info
-        machine_info = self._get_machine_info()
-        key_material = hashlib.pbkdf2_hmac(
-            'sha256',
-            machine_info.encode('utf-8'),
-            b'robot-edge-salt',  # Fixed salt
-            100000
-        )
-        key = base64.urlsafe_b64encode(key_material[:32])
-        
-        # Save key
-        with open(key_file, 'wb') as f:
-            f.write(key)
-        
-        # Set permissions (Linux)
-        if self.platform == 'Linux':
-            try:
-                os.chmod(key_file, 0o600)
-            except Exception:
-                # Ignore permission errors (may occur on read-only filesystems)
-                pass
-        
-        return key
-    
-    def _get_machine_info(self) -> str:
-        """Get machine-specific information for key derivation."""
-        import psutil
-        
-        try:
-            # Get MAC address
-            mac = ':'.join(['{:02x}'.format((uuid.getnode() >> i) & 0xff)
-                           for i in range(0, 8 * 6, 8)][::-1])
-        except Exception:
-            mac = 'unknown-mac'
-        
-        try:
-            hostname = platform.node()
-        except Exception:
-            hostname = 'unknown-host'
-        
-        try:
-            cpu_count = str(psutil.cpu_count())
-        except Exception:
-            cpu_count = 'unknown-cpu'
-        
-        return f"{mac}-{hostname}-{self.platform}-{cpu_count}"
-    
-    def _init_keychain(self) -> bool:
-        """
-        Initialize platform-specific keychain.
-        Returns True if keychain is available.
-        """
-        if self.platform == 'Linux':
-            try:
-                import secretstorage
-                self._secret_storage = secretstorage
-                return True
-            except ImportError:
-                return False
-        elif self.platform == 'Windows':
-            try:
-                import keyring
-                self._keyring = keyring
-                return True
-            except ImportError:
-                return False
-        else:
-            # macOS not supported
-            return False
-    
-    def save_tokens(self, access_token: str, refresh_token: str,
-                    device_id: str, user_info: Dict[str, Any]) -> None:
-        """
-        Save tokens to secure storage.
+    def __init__(self, app_name: str = "robot-edge"):
+        """初始化 Edge Token Cache
         
         Args:
-            access_token: JWT access token (15 min lifetime)
-            refresh_token: JWT refresh token (7 day lifetime)
-            device_id: Device ID for binding
-            user_info: User information dict (id, username, role, etc.)
+            app_name: 應用程式名稱（用於隔離不同應用的儲存）
         """
-        now = datetime.utcnow()
-        token_data = {
-            'access_token': access_token,
-            'refresh_token': refresh_token,
-            'device_id': device_id,
-            'user_info': user_info,
-            'access_token_expires_at': (now + self.access_token_lifetime).isoformat(),
-            'refresh_token_expires_at': (now + self.refresh_token_lifetime).isoformat(),
-            'cached_at': now.isoformat()
-        }
+        self.app_name = app_name
+        self._device_id_gen = DeviceIDGenerator()
+        self._encryption = TokenEncryption()
+        self._platform_storage = PlatformStorage(app_name)
         
-        # Try platform-specific keychain first
-        if self._keychain_available:
+        # Cache directory
+        home = os.path.expanduser("~")
+        self._cache_dir = os.path.join(home, f".{app_name}")
+        os.makedirs(self._cache_dir, exist_ok=True)
+        
+        # Token file path (fallback)
+        self._token_file = os.path.join(self._cache_dir, "tokens.enc")
+        
+        # In-memory cache
+        self._access_token: Optional[str] = None
+        self._refresh_token: Optional[str] = None
+        self._device_id: Optional[str] = None
+        self._user_info: Optional[Dict] = None
+        
+        # Load tokens if exist
+        self._load_tokens()
+    
+    def save_tokens(self, access_token: str, refresh_token: str, 
+                   device_id: str, user_info: Dict) -> bool:
+        """儲存 Tokens 與使用者資訊
+        
+        Args:
+            access_token: Access Token (JWT)
+            refresh_token: Refresh Token (JWT)
+            device_id: Device ID
+            user_info: 使用者資訊
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Store in memory
+            self._access_token = access_token
+            self._refresh_token = refresh_token
+            self._device_id = device_id
+            self._user_info = user_info
+            
+            # Prepare data for storage
+            data = {
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "device_id": device_id,
+                "user_info": user_info
+            }
+            
+            data_json = json.dumps(data)
+            
+            # Try platform storage first
+            if self._platform_storage.is_available():
+                encrypted_str = self._encryption.encrypt(data_json)
+                success = self._platform_storage.save_secret(
+                    "tokens",
+                    encrypted_str
+                )
+                if success:
+                    return True
+            
+            # Fallback to file storage
+            encrypted_str = self._encryption.encrypt(data_json)
+            with open(self._token_file, 'w', encoding='utf-8') as f:
+                f.write(encrypted_str)
+            
+            # Set file permissions (chmod 600)
             try:
-                if self.platform == 'Linux':
-                    self._save_to_linux_keychain(token_data)
-                elif self.platform == 'Windows':
-                    self._save_to_windows_keychain(token_data)
-                return
-            except Exception:
-                pass  # Fall back to file storage
-        
-        # Fallback: Encrypted file storage
-        self._save_to_file(token_data)
-    
-    def _save_to_linux_keychain(self, token_data: Dict[str, Any]) -> None:
-        """Save tokens to Linux Secret Service (GNOME Keyring/KWallet)."""
-        connection = self._secret_storage.dbus_init()
-        collection = self._secret_storage.get_default_collection(connection)
-        
-        # Save each token separately
-        collection.create_item(
-            f'{self.app_name}-access-token',
-            {'app': self.app_name, 'type': 'access'},
-            token_data['access_token'].encode('utf-8'),
-            replace=True
-        )
-        collection.create_item(
-            f'{self.app_name}-refresh-token',
-            {'app': self.app_name, 'type': 'refresh'},
-            token_data['refresh_token'].encode('utf-8'),
-            replace=True
-        )
-        collection.create_item(
-            f'{self.app_name}-metadata',
-            {'app': self.app_name, 'type': 'metadata'},
-            json.dumps({
-                'device_id': token_data['device_id'],
-                'user_info': token_data['user_info'],
-                'access_token_expires_at': token_data['access_token_expires_at'],
-                'refresh_token_expires_at': token_data['refresh_token_expires_at'],
-                'cached_at': token_data['cached_at']
-            }).encode('utf-8'),
-            replace=True
-        )
-    
-    def _save_to_windows_keychain(self, token_data: Dict[str, Any]) -> None:
-        """Save tokens to Windows Credential Manager."""
-        self._keyring.set_password(self.app_name, 'access_token', token_data['access_token'])
-        self._keyring.set_password(self.app_name, 'refresh_token', token_data['refresh_token'])
-        self._keyring.set_password(self.app_name, 'metadata', json.dumps({
-            'device_id': token_data['device_id'],
-            'user_info': token_data['user_info'],
-            'access_token_expires_at': token_data['access_token_expires_at'],
-            'refresh_token_expires_at': token_data['refresh_token_expires_at'],
-            'cached_at': token_data['cached_at']
-        }))
-    
-    def _save_to_file(self, token_data: Dict[str, Any]) -> None:
-        """Save tokens to encrypted file (Fallback mode)."""
-        encrypted_data = self._fernet.encrypt(json.dumps(token_data).encode('utf-8'))
-        
-        with open(self.token_file, 'wb') as f:
-            f.write(encrypted_data)
-        
-        # Set file permissions (Linux)
-        if self.platform == 'Linux':
-            try:
-                os.chmod(self.token_file, 0o600)
-            except Exception:
-                # Ignore permission errors (may occur on read-only filesystems)
+                os.chmod(self._token_file, 0o600)
+            except:  # May fail on Windows or read-only FS
                 pass
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error saving tokens: {e}")
+            return False
     
     def get_access_token(self) -> Optional[str]:
-        """
-        Get access token from cache.
-        Returns None if token doesn't exist or is expired.
-        """
-        token_data = self._load_tokens()
-        if not token_data:
-            return None
+        """取得 Access Token
         
-        # Check expiration
-        try:
-            expires_at = datetime.fromisoformat(token_data['access_token_expires_at'])
-            if datetime.utcnow() >= expires_at:
-                return None  # Expired
-        except Exception:
-            return None
-        
-        return token_data.get('access_token')
+        Returns:
+            Access Token or None if not available
+        """
+        if not self._access_token:
+            self._load_tokens()
+        return self._access_token
     
     def get_refresh_token(self) -> Optional[str]:
-        """
-        Get refresh token from cache.
-        Returns None if token doesn't exist or is expired.
-        """
-        token_data = self._load_tokens()
-        if not token_data:
-            return None
+        """取得 Refresh Token
         
-        # Check expiration
-        try:
-            expires_at = datetime.fromisoformat(token_data['refresh_token_expires_at'])
-            if datetime.utcnow() >= expires_at:
-                return None  # Expired
-        except Exception:
-            return None
-        
-        return token_data.get('refresh_token')
+        Returns:
+            Refresh Token or None if not available
+        """
+        if not self._refresh_token:
+            self._load_tokens()
+        return self._refresh_token
     
     def is_access_token_valid(self) -> bool:
-        """Check if access token exists and is not expired."""
-        return self.get_access_token() is not None
+        """檢查 Access Token 是否有效（未過期）
+        
+        Returns:
+            True if valid, False otherwise
+        """
+        if not self._access_token:
+            return False
+        
+        try:
+            # Parse JWT to get exp claim
+            exp = self._parse_token_exp(self._access_token)
+            if exp is None:
+                return False
+            
+            # Check if expired
+            current_time = int(time.time())
+            return current_time < exp
+            
+        except:
+            return False
+    
+    def is_refresh_token_valid(self) -> bool:
+        """檢查 Refresh Token 是否有效（未過期）
+        
+        Returns:
+            True if valid, False otherwise
+        """
+        if not self._refresh_token:
+            return False
+        
+        try:
+            # Parse JWT to get exp claim
+            exp = self._parse_token_exp(self._refresh_token)
+            if exp is None:
+                return False
+            
+            # Check if expired
+            current_time = int(time.time())
+            return current_time < exp
+            
+        except:
+            return False
+    
+    def clear_tokens(self) -> bool:
+        """清除所有 Tokens 與快取
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Clear memory cache
+            self._access_token = None
+            self._refresh_token = None
+            self._device_id = None
+            self._user_info = None
+            
+            # Try platform storage first
+            if self._platform_storage.is_available():
+                self._platform_storage.delete_secret("tokens")
+            
+            # Remove file if exists
+            if os.path.exists(self._token_file):
+                os.remove(self._token_file)
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error clearing tokens: {e}")
+            return False
     
     def get_device_id(self) -> str:
+        """取得 Device ID
+        
+        Returns:
+            Device ID (64 char hex string)
         """
-        Get or generate device ID.
-        Device ID is stable and unique per machine.
+        if not self._device_id:
+            self._device_id = self._device_id_gen.get_or_create()
+        return self._device_id
+    
+    def get_user_info(self) -> Optional[Dict]:
+        """取得使用者資訊
+        
+        Returns:
+            User info dict or None if not available
         """
-        if self.device_id_file.exists():
-            with open(self.device_id_file, 'r') as f:
-                return f.read().strip()
-        
-        # Generate new device ID
-        machine_info = self._get_machine_info()
-        device_id = hashlib.sha256(machine_info.encode('utf-8')).hexdigest()
-        
-        # Save device ID
-        with open(self.device_id_file, 'w') as f:
-            f.write(device_id)
-        
-        # Set permissions (Linux)
-        if self.platform == 'Linux':
-            try:
-                os.chmod(self.device_id_file, 0o600)
-            except Exception:
-                # Ignore permission errors (may occur on read-only filesystems)
-                pass
-        
-        return device_id
+        if not self._user_info:
+            self._load_tokens()
+        return self._user_info
     
-    def get_user_info(self) -> Optional[Dict[str, Any]]:
-        """Get cached user information."""
-        token_data = self._load_tokens()
-        if not token_data:
-            return None
-        return token_data.get('user_info')
-    
-    def clear_tokens(self) -> None:
-        """Clear all cached tokens."""
-        # Try platform-specific keychain first
-        if self._keychain_available:
-            try:
-                if self.platform == 'Linux':
-                    self._clear_linux_keychain()
-                elif self.platform == 'Windows':
-                    self._clear_windows_keychain()
-            except Exception:
-                # Ignore keychain clearing errors (tokens may not exist)
-                pass
-        
-        # Remove encrypted file
-        if self.token_file.exists():
-            self.token_file.unlink()
-    
-    def _clear_linux_keychain(self) -> None:
-        """Clear tokens from Linux Secret Service."""
-        connection = self._secret_storage.dbus_init()
-        collection = self._secret_storage.get_default_collection(connection)
-        
-        for item in collection.get_all_items():
-            if item.get_label().startswith(self.app_name):
-                item.delete()
-    
-    def _clear_windows_keychain(self) -> None:
-        """Clear tokens from Windows Credential Manager."""
+    def _load_tokens(self):
+        """從儲存中載入 Tokens"""
         try:
-            self._keyring.delete_password(self.app_name, 'access_token')
-        except Exception:
-            # Ignore deletion errors (token may not exist)
-            pass
-        try:
-            self._keyring.delete_password(self.app_name, 'refresh_token')
-        except Exception:
-            # Ignore deletion errors (token may not exist)
-            pass
-        try:
-            self._keyring.delete_password(self.app_name, 'metadata')
-        except Exception:
-            # Ignore deletion errors (metadata may not exist)
-            pass
-    
-    def _load_tokens(self) -> Optional[Dict[str, Any]]:
-        """Load tokens from storage."""
-        # Try platform-specific keychain first
-        if self._keychain_available:
-            try:
-                if self.platform == 'Linux':
-                    return self._load_from_linux_keychain()
-                elif self.platform == 'Windows':
-                    return self._load_from_windows_keychain()
-            except Exception:
-                pass  # Fall back to file storage
-        
-        # Fallback: Encrypted file storage
-        return self._load_from_file()
-    
-    def _load_from_linux_keychain(self) -> Optional[Dict[str, Any]]:
-        """Load tokens from Linux Secret Service."""
-        connection = self._secret_storage.dbus_init()
-        collection = self._secret_storage.get_default_collection(connection)
-        
-        access_token = None
-        refresh_token = None
-        metadata = None
-        
-        for item in collection.get_all_items():
-            label = item.get_label()
-            if label == f'{self.app_name}-access-token':
-                access_token = item.get_secret().decode('utf-8')
-            elif label == f'{self.app_name}-refresh-token':
-                refresh_token = item.get_secret().decode('utf-8')
-            elif label == f'{self.app_name}-metadata':
-                metadata = json.loads(item.get_secret().decode('utf-8'))
-        
-        if access_token and refresh_token and metadata:
-            return {
-                'access_token': access_token,
-                'refresh_token': refresh_token,
-                **metadata
-            }
-        return None
-    
-    def _load_from_windows_keychain(self) -> Optional[Dict[str, Any]]:
-        """Load tokens from Windows Credential Manager."""
-        access_token = self._keyring.get_password(self.app_name, 'access_token')
-        refresh_token = self._keyring.get_password(self.app_name, 'refresh_token')
-        metadata_str = self._keyring.get_password(self.app_name, 'metadata')
-        
-        if access_token and refresh_token and metadata_str:
-            metadata = json.loads(metadata_str)
-            return {
-                'access_token': access_token,
-                'refresh_token': refresh_token,
-                **metadata
-            }
-        return None
-    
-    def _load_from_file(self) -> Optional[Dict[str, Any]]:
-        """Load tokens from encrypted file."""
-        if not self.token_file.exists():
-            return None
-        
-        try:
-            with open(self.token_file, 'rb') as f:
-                encrypted_data = f.read()
+            # Try platform storage first
+            if self._platform_storage.is_available():
+                encrypted_str = self._platform_storage.get_secret("tokens")
+                if encrypted_str:
+                    data_json = self._encryption.decrypt(encrypted_str)
+                    data = json.loads(data_json)
+                    
+                    self._access_token = data.get("access_token")
+                    self._refresh_token = data.get("refresh_token")
+                    self._device_id = data.get("device_id")
+                    self._user_info = data.get("user_info")
+                    return
             
-            decrypted_data = self._fernet.decrypt(encrypted_data)
-            return json.loads(decrypted_data.decode('utf-8'))
-        except Exception:
+            # Fallback to file storage
+            if os.path.exists(self._token_file):
+                with open(self._token_file, 'r', encoding='utf-8') as f:
+                    encrypted_str = f.read()
+                
+                data_json = self._encryption.decrypt(encrypted_str)
+                data = json.loads(data_json)
+                
+                self._access_token = data.get("access_token")
+                self._refresh_token = data.get("refresh_token")
+                self._device_id = data.get("device_id")
+                self._user_info = data.get("user_info")
+                
+        except Exception as e:
+            # Handle corrupted or invalid data
+            print(f"Error loading tokens: {e}")
+            self._access_token = None
+            self._refresh_token = None
+            self._device_id = None
+            self._user_info = None
+    
+    def _parse_token_exp(self, token: str) -> Optional[int]:
+        """解析 JWT Token 的 exp 欄位
+        
+        Args:
+            token: JWT token string
+            
+        Returns:
+            Expiration timestamp or None if parsing fails
+        """
+        try:
+            # JWT format: header.payload.signature
+            parts = token.split('.')
+            if len(parts) != 3:
+                return None
+            
+            # Decode payload (base64url)
+            payload_b64 = parts[1]
+            # Add padding if needed
+            padding = 4 - len(payload_b64) % 4
+            if padding != 4:
+                payload_b64 += '=' * padding
+            
+            # Replace URL-safe characters
+            payload_b64 = payload_b64.replace('-', '+').replace('_', '/')
+            
+            payload_json = base64.b64decode(payload_b64).decode('utf-8')
+            payload = json.loads(payload_json)
+            
+            return payload.get('exp')
+            
+        except Exception as e:
+            print(f"Error parsing token exp: {e}")
             return None

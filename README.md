@@ -297,9 +297,15 @@ python3 flask_service.py
 ## 參考與文件
 
 ### 核心文檔
+- [文件索引](docs/README.md) - 完整的文件目錄與導航
 - [架構說明](docs/architecture.md) - 完整的專案架構與目錄結構說明（Phase 2）
 - [Phase 2 遷移指南](docs/phase2/MIGRATION_GUIDE_PHASE2.md) - 從 Phase 1 遷移到 Phase 2 的詳細指南
 - [README](README.md) - 本文件，快速啟動與概覽
+
+### 使用者指南
+- **[版本選擇指引](docs/user_guide/TINY_VS_HEAVY.md)** - Heavy/Tiny 版本比較與選擇建議
+- **[Tiny 安裝指引](docs/user_guide/TINY_INSTALL_GUIDE.md)** - PyQt 輕量版安裝步驟（Windows/macOS/Linux）
+- **[TUI 使用指南](docs/user_guide/TUI_USER_GUIDE.md)** - 終端介面操作與功能說明
 
 ### API 與安全性
 - **[OpenAPI 規範](openapi.yaml)** - 完整的 API 合約定義（OpenAPI 3.1）

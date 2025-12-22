@@ -49,6 +49,15 @@ Phase 3（ALL-in-One Edge App）相關文件
 | [`PHASE3_1_STATUS_REPORT.md`](phase3/PHASE3_1_STATUS_REPORT.md) | Phase 3.1 狀態報告與經驗教訓 |
 | [`TEST_PLAN_PHASE3_1.md`](phase3/TEST_PLAN_PHASE3_1.md) | Phase 3.1 測試計畫 |
 
+### 📁 user_guide/
+使用者指南
+
+| 文件 | 說明 |
+|------|------|
+| [`TINY_VS_HEAVY.md`](user_guide/TINY_VS_HEAVY.md) | Heavy/Tiny 版本選擇指引 |
+| [`TINY_INSTALL_GUIDE.md`](user_guide/TINY_INSTALL_GUIDE.md) | Tiny 版本安裝指引 |
+| [`TUI_USER_GUIDE.md`](user_guide/TUI_USER_GUIDE.md) | TUI 終端介面使用指南 |
+
 ### 📁 development/
 開發指南與最佳實踐
 
@@ -104,6 +113,7 @@ JSON Schema 契約定義
 ## 快速導航
 
 - **入門**：[`proposal.md`](proposal.md) → [`architecture.md`](architecture.md)
+- **使用者指南**：[`user_guide/`](user_guide/) - 版本選擇、安裝指引、TUI 使用
 - **Phase 狀態**：[`plans/MASTER_PLAN.md`](plans/MASTER_PLAN.md)
 - **Phase 3**：[`plans/PHASE3_EDGE_ALL_IN_ONE.md`](plans/PHASE3_EDGE_ALL_IN_ONE.md) → [`phase3/PHASE3_1_STATUS_REPORT.md`](phase3/PHASE3_1_STATUS_REPORT.md)
 - **開發指南**：[`development/`](development/)
@@ -113,4 +123,4 @@ JSON Schema 契約定義
 
 ---
 
-**最後更新**：2025-12-04
+**最後更新**：2025-12-22

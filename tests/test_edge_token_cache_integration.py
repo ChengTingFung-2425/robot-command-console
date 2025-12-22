@@ -12,13 +12,11 @@ Phase 2.1 Step 5: Edge Token Cache 整合測試
 import json
 import os
 import tempfile
-import time
 import unittest
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 from src.edge_app.auth.token_cache import EdgeTokenCache
-from src.edge_app.auth.device_id import DeviceIDGenerator
 
 
 class TestEdgeTokenCacheIntegration(unittest.TestCase):

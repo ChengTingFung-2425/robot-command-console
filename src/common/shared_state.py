@@ -219,6 +219,10 @@ class SharedStateManager:
             "service": "shared_state"
         })
 
+    async def close(self) -> None:
+        """關閉共享狀態管理器（stop 的別名，用於相容性）"""
+        await self.stop()
+
     # ==================== 機器人狀態管理 ====================
 
     async def update_robot_status(

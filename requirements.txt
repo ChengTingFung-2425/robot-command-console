@@ -42,3 +42,6 @@ aiohttp>=3.9.0
 
 # TUI (Terminal User Interface)
 textual>=0.47.0
+
+# System monitoring
+psutil>=5.9.0

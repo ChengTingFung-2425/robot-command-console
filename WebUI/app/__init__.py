@@ -38,6 +38,12 @@ def create_app(config_name='default'):
     flask_app.jinja_env.autoescape = True
     # Add .j2 extension to autoescape list
     flask_app.jinja_env.autoescape_extensions = ('html', 'htm', 'xml', 'j2', 'html.j2')
+    
+    # Add Python built-ins to Jinja2 environment
+    flask_app.jinja_env.globals.update({
+        'min': min,
+        'max': max,
+    })
 
     # Apply configuration
     if config_name == 'testing':

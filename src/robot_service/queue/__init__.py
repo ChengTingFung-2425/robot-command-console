@@ -10,11 +10,15 @@ from .handler import QueueHandler
 from .offline_buffer import OfflineBuffer, BufferEntry, BufferEntryStatus
 from .offline_queue_service import OfflineQueueService
 
+# Alias for backward compatibility
+PriorityQueue = MemoryQueue
+
 __all__ = [
     "QueueInterface",
     "Message",
     "MessagePriority",
     "MemoryQueue",
+    "PriorityQueue",  # Alias for MemoryQueue
     "QueueHandler",
     # 離線模式
     "OfflineBuffer",

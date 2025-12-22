@@ -12,12 +12,11 @@ import shutil
 import time
 import json
 import base64
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.edge_app.auth.device_id import DeviceIDGenerator
 from src.edge_app.auth.encryption import TokenEncryption
 from src.edge_app.auth.platform_storage import PlatformStorage
 

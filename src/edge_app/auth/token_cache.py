@@ -9,7 +9,7 @@ import os
 import json
 import base64
 import time
-from typing import Optional, Dict, Any
+from typing import Optional, Dict
 
 from .device_id import DeviceIDGenerator
 from .encryption import TokenEncryption
@@ -54,8 +54,8 @@ class EdgeTokenCache:
         # Load tokens if exist
         self._load_tokens()
     
-    def save_tokens(self, access_token: str, refresh_token: str, 
-                   device_id: str, user_info: Dict) -> bool:
+    def save_tokens(self, access_token: str, refresh_token: str,
+                    device_id: str, user_info: Dict) -> bool:
         """儲存 Tokens 與使用者資訊
         
         Args:
@@ -102,7 +102,7 @@ class EdgeTokenCache:
             # Set file permissions (chmod 600)
             try:
                 os.chmod(self._token_file, 0o600)
-            except:  # May fail on Windows or read-only FS
+            except Exception:  # May fail on Windows or read-only FS
                 pass
             
             return True
@@ -150,7 +150,7 @@ class EdgeTokenCache:
             current_time = int(time.time())
             return current_time < exp
             
-        except:
+        except Exception:  # Invalid token format or decoding error
             return False
     
     def is_refresh_token_valid(self) -> bool:
@@ -172,7 +172,7 @@ class EdgeTokenCache:
             current_time = int(time.time())
             return current_time < exp
             
-        except:
+        except Exception:  # Invalid token format or decoding error
             return False
     
     def clear_tokens(self) -> bool:

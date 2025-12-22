@@ -5,6 +5,6 @@ This module provides authentication and token management for the Edge applicatio
 Supports Linux and Windows platforms with OS-native keychain integration.
 """
 
-from .token_cache import EdgeTokenCache
+from .device_id import DeviceIDGenerator  # noqa: F401
 
-__all__ = ['EdgeTokenCache']
+__all__ = ['DeviceIDGenerator']

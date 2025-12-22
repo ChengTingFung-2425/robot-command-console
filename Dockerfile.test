@@ -1,0 +1,29 @@
+# Dockerfile for Testing
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# 安裝系統依賴
+RUN apt-get update && apt-get install -y \
+    gcc \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# 複製依賴文件
+COPY requirements.txt .
+
+# 安裝 Python 依賴
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir pytest pytest-asyncio pytest-cov flake8
+
+# 複製源代碼
+COPY src/ ./src/
+COPY tests/ ./tests/
+COPY run_tests.py .
+
+# 設置環境變數
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+# 預設命令
+CMD ["python3", "run_tests.py", "all", "--with-rabbitmq", "--coverage"]

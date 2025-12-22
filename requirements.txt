@@ -45,3 +45,6 @@ textual>=0.47.0
 
 # System monitoring
 psutil>=5.9.0
+
+# Message Queue - RabbitMQ
+aio-pika>=9.0.0

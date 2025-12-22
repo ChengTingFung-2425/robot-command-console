@@ -4,9 +4,9 @@
 
 本文件描述 Robot Command Console 系統的威脅模型，識別潛在的安全威脅並提出相應的緩解措施。
 
-> **最後更新**：2025-12-17  
-> **架構版本**：Phase 3 (Server-Edge-Runner 三層架構)  
-> **狀態**：✅ 包含審計日誌系統與 Edge 部署安全考量
+> **最後更新**：2025-12-22  
+> **架構版本**：Phase 3 (Server-Edge-Runner 三層架構) + Phase 2.1 (Edge Token Cache)  
+> **狀態**：✅ 包含審計日誌系統、Edge Token Cache 與 Edge 部署安全考量
 
 ## 系統架構概覽
 

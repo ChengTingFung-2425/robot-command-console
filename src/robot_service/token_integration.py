@@ -46,8 +46,10 @@ class TokenIntegration:
     def _on_rotated(self, new_token: str, info) -> None:
         # persist token in cache and enqueue sync
         try:
-            self.cache.set('app', new_token, expires_in=None, metadata={'rotation_count': getattr(info, 'rotation_count', None)})
-            self.sync.enqueue('app', {'key': 'app', 'token': new_token, 'metadata': {'rotation_count': getattr(info, 'rotation_count', None)}})
+            self.cache.set('app', new_token, expires_in=None,
+                           metadata={'rotation_count': getattr(info, 'rotation_count', None)})
+            self.sync.enqueue('app', {'key': 'app', 'token': new_token,
+                                      'metadata': {'rotation_count': getattr(info, 'rotation_count', None)}})
         except Exception:
             logger.exception('Failed to persist/enqueue rotated token')
 

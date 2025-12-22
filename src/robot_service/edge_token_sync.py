@@ -23,7 +23,8 @@ class EdgeTokenSync:
     The `sync_callback` receives a dict with the queued item and should return True on success.
     """
 
-    def __init__(self, persist_path: str, sync_callback: Callable[[Dict], bool], encryption_key: Optional[bytes] = None):
+    def __init__(self, persist_path: str, sync_callback: Callable[[Dict], bool],
+                 encryption_key: Optional[bytes] = None):
         self.persist_path = persist_path
         os.makedirs(os.path.dirname(persist_path), exist_ok=True)
         self._lock = threading.RLock()

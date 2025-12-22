@@ -10,11 +10,10 @@ Platform Storage 測試套件
 import os
 import sys
 import unittest
-import platform
 import tempfile
 import shutil
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch, MagicMock
 
 # Add project root to path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))

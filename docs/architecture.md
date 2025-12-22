@@ -4,8 +4,8 @@
 
 Robot Command Console 是一個用於機器人指令管理、路由與執行的整合式控制台與服務平台。本文件說明專案的目錄結構、模組職責與設計原則。
 
-> **狀態**：Phase 3.1 已完成，Phase 3.2 進行中（Tiny 版本開發）
-> **最後更新**：2025-12-10
+> **狀態**：Phase 3.1 已完成，Phase 3.2 進行中（Tiny 版本核心架構完成，待整合測試）  
+> **最後更新**：2025-12-22
 
 ## 目錄結構（Phase 3）
 
@@ -87,15 +87,20 @@ robot-command-console/
 │   ├── architecture.md       # 本文件
 │   ├── proposal.md           # 權威規格
 │   ├── PROJECT_MEMORY.md     # 專案記憶與經驗教訓
+│   ├── README.md             # 文件索引
 │   ├── phase1/               # Phase 1 文檔
 │   ├── phase2/               # Phase 2 文檔
-│   ├── phase3/               # Phase 3 文檔 (Phase 3.1)
+│   ├── phase3/               # Phase 3 文檔
+│   ├── user_guide/           # 使用者指南（版本選擇、安裝、TUI）
 │   ├── development/          # 開發指南
 │   ├── plans/                # 規劃文檔
 │   ├── security/             # 安全文檔
 │   ├── mcp/                  # MCP 相關文檔
 │   ├── features/             # 功能文檔
-│   └── contract/             # JSON Schema 合約
+│   ├── contract/             # JSON Schema 合約
+│   ├── memory/               # 詳細經驗記錄
+│   ├── archive/              # 歷史文檔
+│   └── implementation/       # 實作細節
 │
 ├── examples/                  # 範例代碼
 │

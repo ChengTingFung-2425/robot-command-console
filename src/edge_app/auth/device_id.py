@@ -69,6 +69,7 @@ class DeviceIDGenerator:
                 if cpu_info:
                     characteristics.append(cpu_info)
         except Exception:
+            # Ignore CPU info retrieval errors (not critical for device ID)
             pass
         
         # Combine all characteristics

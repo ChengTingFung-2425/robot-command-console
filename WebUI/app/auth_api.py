@@ -1,14 +1,12 @@
 # imports
 import os
 import secrets
-import time
 from datetime import datetime, timedelta
 from functools import wraps
-from typing import Optional, Tuple
+from typing import Optional
 
 import jwt
 from flask import Blueprint, jsonify, request
-from flask_login import current_user, login_required
 
 from WebUI.app import db
 from WebUI.app.models import User

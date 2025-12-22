@@ -14,7 +14,6 @@ import sys
 import unittest
 import tempfile
 import shutil
-from pathlib import Path
 
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))

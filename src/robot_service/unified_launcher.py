@@ -211,6 +211,7 @@ class ProcessService(ServiceBase):
                             try:
                                 self._stderr_file.flush()
                             except Exception:
+                                # Ignore flush errors (file may be closed)
                                 pass
                             try:
                                 with open(f"/tmp/{self.name}.stderr.log", 'r', encoding='utf-8', errors='replace') as f:
@@ -224,6 +225,7 @@ class ProcessService(ServiceBase):
                             try:
                                 self._stdout_file.flush()
                             except Exception:
+                                # Ignore flush errors (file may be closed)
                                 pass
                             try:
                                 with open(f"/tmp/{self.name}.stdout.log", 'r', encoding='utf-8', errors='replace') as f:

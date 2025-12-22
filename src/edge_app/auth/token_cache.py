@@ -62,6 +62,7 @@ class EdgeTokenCache:
             try:
                 os.chmod(self.cache_dir, 0o700)
             except Exception:
+                # Ignore permission errors (may occur on read-only filesystems)
                 pass
         
         # Initialize encryption key
@@ -101,6 +102,7 @@ class EdgeTokenCache:
             try:
                 os.chmod(key_file, 0o600)
             except Exception:
+                # Ignore permission errors (may occur on read-only filesystems)
                 pass
         
         return key
@@ -242,6 +244,7 @@ class EdgeTokenCache:
             try:
                 os.chmod(self.token_file, 0o600)
             except Exception:
+                # Ignore permission errors (may occur on read-only filesystems)
                 pass
     
     def get_access_token(self) -> Optional[str]:
@@ -308,6 +311,7 @@ class EdgeTokenCache:
             try:
                 os.chmod(self.device_id_file, 0o600)
             except Exception:
+                # Ignore permission errors (may occur on read-only filesystems)
                 pass
         
         return device_id
@@ -329,6 +333,7 @@ class EdgeTokenCache:
                 elif self.platform == 'Windows':
                     self._clear_windows_keychain()
             except Exception:
+                # Ignore keychain clearing errors (tokens may not exist)
                 pass
         
         # Remove encrypted file
@@ -349,14 +354,17 @@ class EdgeTokenCache:
         try:
             self._keyring.delete_password(self.app_name, 'access_token')
         except Exception:
+            # Ignore deletion errors (token may not exist)
             pass
         try:
             self._keyring.delete_password(self.app_name, 'refresh_token')
         except Exception:
+            # Ignore deletion errors (token may not exist)
             pass
         try:
             self._keyring.delete_password(self.app_name, 'metadata')
         except Exception:
+            # Ignore deletion errors (metadata may not exist)
             pass
     
     def _load_tokens(self) -> Optional[Dict[str, Any]]:

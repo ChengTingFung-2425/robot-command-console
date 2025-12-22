@@ -24,6 +24,7 @@ requires_rabbitmq = pytest.mark.skipif(
 
 
 @pytest.fixture(params=["memory"])
+@pytest.mark.asyncio
 async def queue_impl(request):
     """參數化 fixture，支援多種佇列實作"""
     impl_type = request.param
@@ -50,6 +51,7 @@ async def queue_impl(request):
 
 
 @pytest.fixture(params=["memory", "rabbitmq"])
+@pytest.mark.asyncio
 async def queue_impl_all(request):
     """參數化 fixture，包含所有實作（需要 RabbitMQ）"""
     impl_type = request.param

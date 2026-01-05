@@ -78,14 +78,36 @@ python3 -m flake8 src/ MCP/ --select=E,F,W --exclude=.venv,node_modules,__pycach
 | **規劃** | [plans/MASTER_PLAN.md](plans/MASTER_PLAN.md) |
 | **開發指南** | [development/](development/) |
 | **安全文件** | [security/TOKEN_SECURITY.md](security/TOKEN_SECURITY.md) |
-| **使用者指引** | [user_guide/](user_guide/) |
+| **使用者指引** | [user_guide/USER_GUIDE_INDEX.md](user_guide/USER_GUIDE_INDEX.md) |
 | **詳細經驗** | [memory/](memory/)（Phase 3, CLI, TUI, 安全性等） |
+| **文件撰寫** | [development/USER_DOCUMENTATION_GUIDE.md](development/USER_DOCUMENTATION_GUIDE.md) |
 
 ---
 
-## 🎯 關鍵經驗精華（Top 15）
+## 🎯 關鍵經驗精華（Top 16）
 
 > 根據使用頻率排序，⭐⭐⭐ 為最高頻率
+
+### 0. 用戶文件撰寫原則⭐⭐⭐
+
+**使用頻率**：每次文件更新
+**相關文件**：[USER_DOCUMENTATION_GUIDE.md](development/USER_DOCUMENTATION_GUIDE.md)
+
+**核心原則**：
+- 使用者導向：按使用場景組織，不是按程式碼結構
+- 漸進式揭露：快速入門 → 功能概覽 → 完整參考
+- 實例優先：可執行的範例勝過抽象描述
+- 多層次文件：新手/進階/問題排解分開處理
+
+**文件結構**：
+```
+USER_GUIDE_INDEX.md    - 單一入口點
+QUICK_START.md         - 5 分鐘快速上手
+FAQ.md                 - 30+ 常見問題
+TROUBLESHOOTING.md     - 系統化診斷流程
+FEATURES_REFERENCE.md  - 完整功能說明
+WEBUI_USER_GUIDE.md    - 介面詳細指南
+```
 
 ### 1. Linting 自動修正（最常用）⭐⭐⭐
 

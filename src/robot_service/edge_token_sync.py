@@ -8,7 +8,8 @@ from .edge_token_cache import generate_key_from_env
 from cryptography.fernet import Fernet, InvalidToken
 
 
-DEFAULT_RETRY_INTERVAL = 5
+DEFAULT_RETRY_INTERVAL = 1  # Fast retries for better responsiveness, enables long polling
+DEFAULT_POLL_INTERVAL = 0.5  # Polling interval for checking queue
 
 
 class EdgeTokenSync:
@@ -24,7 +25,18 @@ class EdgeTokenSync:
     """
 
     def __init__(self, persist_path: str, sync_callback: Callable[[Dict], bool],
-                 encryption_key: Optional[bytes] = None):
+                 encryption_key: Optional[bytes] = None,
+                 retry_interval: int = DEFAULT_RETRY_INTERVAL,
+                 poll_interval: float = DEFAULT_POLL_INTERVAL):
+        """Initialize EdgeTokenSync with configurable polling.
+        
+        Args:
+            persist_path: Path to persist queue data
+            sync_callback: Callback function to sync items
+            encryption_key: Optional encryption key
+            retry_interval: Base retry interval in seconds (default: 2, enables long polling)
+            poll_interval: Polling interval in seconds (default: 0.5, enables long polling)
+        """
         self.persist_path = persist_path
         os.makedirs(os.path.dirname(persist_path), exist_ok=True)
         self._lock = threading.RLock()
@@ -32,6 +44,8 @@ class EdgeTokenSync:
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._sync_callback = sync_callback
+        self._retry_interval = retry_interval
+        self._poll_interval = poll_interval
         if encryption_key is None:
             encryption_key = generate_key_from_env()
         self._fernet = Fernet(encryption_key)
@@ -91,7 +105,7 @@ class EdgeTokenSync:
                 now = int(time.time())
                 last = data.get('last_try') or 0
                 attempts = data.get('attempts', 0)
-                backoff = DEFAULT_RETRY_INTERVAL * (2 ** attempts)
+                backoff = self._retry_interval * (2 ** attempts)
                 if now - last < backoff:
                     continue
                 success = False
@@ -115,7 +129,8 @@ class EdgeTokenSync:
                         if k in self._queue:
                             del self._queue[k]
                     self._persist()
-            time.sleep(1)
+            # Use configurable poll interval to support long polling
+            time.sleep(self._poll_interval)
 
     def pending_count(self) -> int:
         with self._lock:

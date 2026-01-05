@@ -108,8 +108,9 @@ def commands():
         })
     
     except Exception as e:
-        logger.error(f'Command execution error: {e}')
-        return jsonify({'error': str(e)}), 500
+        # Log detailed error information on the server, but return a generic message to the client
+        logger.error(f'Command execution error: {e}', exc_info=True)
+        return jsonify({'error': '指令執行發生內部錯誤'}), 500
 
 
 @bp_core.route('/commands/<int:cmd_id>', methods=['GET'])

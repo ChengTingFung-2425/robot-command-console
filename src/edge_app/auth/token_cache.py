@@ -63,6 +63,14 @@ class EdgeTokenCache:
         # Load tokens if exist
         self._load_tokens()
 
+    def _init_keychain(self):
+        """Initialize keychain/platform storage (stub for backward compatibility).
+        
+        Returns:
+            bool: True if keychain is available, False otherwise
+        """
+        return self._keychain_available
+
     @property
     def cache_dir(self):
         """Get cache directory path as Path object."""
@@ -79,6 +87,11 @@ class EdgeTokenCache:
     def platform(self):
         """Get platform name."""
         return self._platform_storage.platform
+
+    @platform.setter
+    def platform(self, value):
+        """Set platform name (for testing)."""
+        self._platform_storage.platform = value
 
     def save_tokens(self, access_token: str, refresh_token: str,
                     device_id: str, user_info: Dict) -> bool:

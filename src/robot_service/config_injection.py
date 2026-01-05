@@ -4,8 +4,7 @@ Configuration Export and Injection Utility
 """
 
 import os
-from typing import Dict, Any, Optional
-from .edge_queue_config import EdgeQueueConfig
+from typing import Dict, Optional
 
 
 class ConfigExporter:

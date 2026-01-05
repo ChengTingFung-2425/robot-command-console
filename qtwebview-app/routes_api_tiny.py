@@ -67,17 +67,19 @@ def download_file(filename):
     try:
         # TODO: Implement proper file path resolution and security checks
         download_dir = os.getenv('DOWNLOAD_DIR', '/tmp/downloads')
-        file_path = os.path.join(download_dir, filename)
-        
-        if not os.path.exists(file_path):
-            return jsonify({'error': 'File not found'}), 404
-        
-        # Security: Prevent directory traversal
-        if not os.path.abspath(file_path).startswith(os.path.abspath(download_dir)):
+        # Resolve real paths to prevent directory traversal via symlinks or ".."
+        download_dir_real = os.path.realpath(download_dir)
+        file_path_real = os.path.realpath(os.path.join(download_dir_real, filename))
+
+        # Security: Prevent directory traversal by ensuring the file is within download_dir
+        if os.path.commonpath([download_dir_real, file_path_real]) != download_dir_real:
             return jsonify({'error': 'Invalid file path'}), 403
-        
+
+        if not os.path.exists(file_path_real):
+            return jsonify({'error': 'File not found'}), 404
+
         logger.info(f"Downloading file: {filename}")
-        return send_file(file_path, as_attachment=True)
+        return send_file(file_path_real, as_attachment=True)
         
     except Exception as e:
         logger.error(f"Download failed for {filename}: {e}")

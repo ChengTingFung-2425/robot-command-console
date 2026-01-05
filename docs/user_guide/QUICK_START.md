@@ -24,7 +24,14 @@ Robot Command Console 提供三種使用方式：
 
 ## 📦 安裝步驟
 
+> 💡 **完整安裝說明**：見 [完整安裝指南](INSTALLATION_GUIDE.md)  
+> 本節提供快速安裝路徑
+
 ### 選項 A：Tiny 版本（推薦新手）
+
+**最簡單的方式**，適合一般使用者。
+
+📖 **詳細步驟**：見 [完整安裝指南 - Tiny 版本](INSTALLATION_GUIDE.md#tiny-版本安裝)
 
 **Windows 用戶**
 
@@ -45,18 +52,18 @@ Robot Command Console 提供三種使用方式：
 # 下載 AppImage
 wget https://github.com/ChengTingFung-2425/robot-command-console/releases/latest/download/robot-command-console-tiny-linux-x64.AppImage
 
-# 賦予執行權限
+# 賦予執行權限並執行
 chmod +x robot-command-console-tiny-*.AppImage
-
-# 執行
 ./robot-command-console-tiny-*.AppImage
 ```
 
-> 📖 詳細安裝說明：[Tiny 安裝指引](TINY_INSTALL_GUIDE.md)
+📖 **完整安裝說明**：[完整安裝指南](INSTALLATION_GUIDE.md#tiny-版本安裝)
 
 ---
 
 ### 選項 B：Heavy 版本（開發者）
+
+**適合對象**：開發者、需要完整開發工具
 
 ```bash
 # 1. 克隆倉庫
@@ -71,12 +78,16 @@ pip install -r requirements.txt
 npm start
 ```
 
+📖 **開發者詳細說明**：見主 [README.md](../../README.md#快速開始) 開發環境設定章節
+
 ---
 
 ### 選項 C：TUI 版本（終端機）
 
+**適合對象**：伺服器管理員、SSH 遠端操作
+
 ```bash
-# 1. 克隆倉庫並安裝依賴（同選項 B）
+# 1. 克隆倉庫並安裝依賴
 git clone https://github.com/ChengTingFung-2425/robot-command-console.git
 cd robot-command-console
 pip install -r requirements.txt

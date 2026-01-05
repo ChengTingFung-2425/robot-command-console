@@ -104,96 +104,49 @@
 
 ---
 
-## 快速啟動（開發者）
+## 快速開始
 
-### 1. 安裝依賴
+> **💡 一般使用者請參考** → [用戶快速入門指南](docs/user_guide/QUICK_START.md)  
+> 本節內容針對開發者與貢獻者
+
+### 開發環境設定
 
 ```bash
+# 1. 安裝依賴
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 pip install -r MCP/requirements.txt
-```
 
-### 2. 啟動整合系統
-
-#### 🚀 推薦：一鍵啟動所有服務
-
-```bash
-# 啟動完整整合系統（Flask + MCP + WebUI）
+# 2. 一鍵啟動所有服務（推薦）
 python3 start_all_services.py
-
-# 或使用統一啟動器
-python3 unified_launcher_cli.py
 ```
 
 這會自動啟動：
 - **Flask API** (port 5000) - Edge 本地服務
-- **MCP Service** (port 8000) - 指令中介層
+- **MCP Service** (port 8000) - 指令中介層  
 - **WebUI** (port 8080) - Web 管理介面
 
-詳細說明請參閱：[完整整合指南](docs/INTEGRATION_GUIDE.md)
+### 其他啟動方式
 
-#### 選項 A: Heavy 版本（Electron）
+| 方式 | 指令 | 說明 |
+|------|------|------|
+| **Electron 開發** | `npm start` | 自動啟動 Python 服務 + GUI |
+| **Tiny 開發** | `python qtwebview-app/main.py` | 輕量桌面應用 |
+| **CLI 模式** | `python3 run_service_cli.py` | 無頭部署測試 |
+| **手動啟動** | 見 [整合指南](docs/INTEGRATION_GUIDE.md) | 個別服務調試 |
 
-```bash
-# 由 Electron 自動啟動 Python 服務
-npm start
-```
-
-#### 選項 B: Tiny 版本（PyQt）
-
-```bash
-# 安裝額外依賴
-pip install -r qtwebview-app/requirements.txt
-
-# 啟動 Tiny 應用
-python qtwebview-app/main.py
-```
-
-#### 選項 C: 獨立 CLI 模式（無 GUI）
+### 執行測試
 
 ```bash
-# 執行 Robot Service（不依賴 Electron 或 PyQt）
-python3 run_service_cli.py --queue-size 1000 --workers 5
-
-# 執行批次操作 CLI（無頭部署，批次指令執行）
-python3 run_batch_cli.py --file examples/batches/demo_sequence.json --monitor
-```
-
-#### 選項 D: 手動啟動各服務
-
-```bash
-# 終端 1: 啟動 Flask 服務
-APP_TOKEN=your-token-here PORT=5000 python3 flask_service.py
-
-# 終端 2: 啟動 MCP 服務
-cd MCP
-python3 start.py
-
-# 終端 3: 啟動 WebUI
-cd WebUI
-python microblog.py
-```
-
-### 3. 執行測試
-
-```bash
-# 在專案根目錄執行所有測試
+# 完整測試套件
 python3 -m pytest tests/ -v
 
-# 執行端到端整合測試
-python3 -m pytest tests/test_e2e_integration.py -v
-
-# 執行特定測試
+# 特定測試
 python3 -m pytest tests/test_queue_system.py -v
-
-# 執行批次操作測試
-python3 -m pytest tests/test_batch_operations.py -v
-
-# JavaScript 整合測試（Electron POC）
-node test_integration.js
 ```
+
+📖 **詳細使用說明**：[用戶指南索引](docs/user_guide/USER_GUIDE_INDEX.md)
 
 ## 🔗 WebUI/MCP/Robot-Console 整合
 
@@ -303,15 +256,14 @@ python3 flask_service.py
 - [README](README.md) - 本文件，快速啟動與概覽
 
 ### 使用者指南
-- **[用戶指南索引](docs/user_guide/USER_GUIDE_INDEX.md)** - 完整的用戶文件導航 🆕
-- **[快速入門指南](docs/user_guide/QUICK_START.md)** - 5 分鐘快速上手 🆕
-- **[常見問題 FAQ](docs/user_guide/FAQ.md)** - 常見問題與解答 🆕
-- **[疑難排解指南](docs/user_guide/TROUBLESHOOTING.md)** - 問題診斷與解決 🆕
-- **[功能完整參考](docs/user_guide/FEATURES_REFERENCE.md)** - 所有功能詳細說明 🆕
-- **[版本選擇指引](docs/user_guide/TINY_VS_HEAVY.md)** - Heavy/Tiny 版本比較與選擇建議
-- **[Tiny 安裝指引](docs/user_guide/TINY_INSTALL_GUIDE.md)** - PyQt 輕量版安裝步驟（Windows/macOS/Linux）
+- **[用戶指南索引](docs/user_guide/USER_GUIDE_INDEX.md)** - 完整的用戶文件導航
+- **[快速入門指南](docs/user_guide/QUICK_START.md)** - 5 分鐘快速上手
+- **[完整安裝指南](docs/user_guide/INSTALLATION_GUIDE.md)** - 所有版本安裝說明 🆕
+- **[常見問題 FAQ](docs/user_guide/FAQ.md)** - 常見問題與解答
+- **[疑難排解指南](docs/user_guide/TROUBLESHOOTING.md)** - 問題診斷與解決
+- **[功能完整參考](docs/user_guide/FEATURES_REFERENCE.md)** - 所有功能詳細說明
+- **[WebUI 使用指南](docs/user_guide/WEBUI_USER_GUIDE.md)** - Web 介面詳細說明
 - **[TUI 使用指南](docs/user_guide/TUI_USER_GUIDE.md)** - 終端介面操作與功能說明
-- **[WebUI 使用指南](docs/user_guide/WEBUI_USER_GUIDE.md)** - Web 介面詳細說明 🆕
 
 ### API 與安全性
 - **[OpenAPI 規範](openapi.yaml)** - 完整的 API 合約定義（OpenAPI 3.1）

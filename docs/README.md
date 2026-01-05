@@ -54,15 +54,16 @@ Phase 3（ALL-in-One Edge App）相關文件
 
 | 文件 | 說明 |
 |------|------|
-| [`USER_GUIDE_INDEX.md`](user_guide/USER_GUIDE_INDEX.md) | **用戶指南索引** - 完整導航 🆕 |
-| [`QUICK_START.md`](user_guide/QUICK_START.md) | **快速入門指南** - 5 分鐘快速上手 🆕 |
-| [`FAQ.md`](user_guide/FAQ.md) | **常見問題與解答** - 30+ 問答 🆕 |
-| [`TROUBLESHOOTING.md`](user_guide/TROUBLESHOOTING.md) | **疑難排解指南** - 問題診斷與解決 🆕 |
-| [`FEATURES_REFERENCE.md`](user_guide/FEATURES_REFERENCE.md) | **功能完整參考** - 所有功能詳細說明 🆕 |
-| [`WEBUI_USER_GUIDE.md`](user_guide/WEBUI_USER_GUIDE.md) | **WebUI 使用指南** - Web 介面操作 🆕 |
+| [`USER_GUIDE_INDEX.md`](user_guide/USER_GUIDE_INDEX.md) | **用戶指南索引** - 完整導航 |
+| [`QUICK_START.md`](user_guide/QUICK_START.md) | **快速入門指南** - 5 分鐘快速上手 |
+| [`INSTALLATION_GUIDE.md`](user_guide/INSTALLATION_GUIDE.md) | **完整安裝指南** - 所有版本安裝說明 🆕 |
+| [`FAQ.md`](user_guide/FAQ.md) | **常見問題與解答** - 30+ 問答 |
+| [`TROUBLESHOOTING.md`](user_guide/TROUBLESHOOTING.md) | **疑難排解指南** - 問題診斷與解決 |
+| [`FEATURES_REFERENCE.md`](user_guide/FEATURES_REFERENCE.md) | **功能完整參考** - 所有功能詳細說明 |
+| [`WEBUI_USER_GUIDE.md`](user_guide/WEBUI_USER_GUIDE.md) | **WebUI 使用指南** - Web 介面操作 |
 | [`TUI_USER_GUIDE.md`](user_guide/TUI_USER_GUIDE.md) | TUI 使用指南 - 終端介面操作 |
-| [`TINY_VS_HEAVY.md`](user_guide/TINY_VS_HEAVY.md) | 版本選擇指引 - Heavy vs Tiny 對比 |
-| [`TINY_INSTALL_GUIDE.md`](user_guide/TINY_INSTALL_GUIDE.md) | Tiny 安裝指引 - 三平台安裝步驟 |
+| ~~[`TINY_VS_HEAVY.md`](user_guide/TINY_VS_HEAVY.md)~~ | 已整合至 INSTALLATION_GUIDE |
+| ~~[`TINY_INSTALL_GUIDE.md`](user_guide/TINY_INSTALL_GUIDE.md)~~ | 已整合至 INSTALLATION_GUIDE |
 
 ### 📁 user_guide/
 使用者指南

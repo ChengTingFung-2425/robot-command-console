@@ -1,7 +1,14 @@
 # Tiny 版本安裝指引
 
+> **⚠️ 本文件已整合至 [完整安裝指南](INSTALLATION_GUIDE.md)**  
 > **最後更新**：2025-12-10  
-> **適用版本**：v1.0.0+
+> **狀態**：已整合，保留供參考
+
+---
+
+**請參考新的整合文件**：[INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md)
+
+本文件內容已整合到完整安裝指南中，包含 Heavy、Tiny、TUI 所有版本的安裝說明。
 
 ---
 

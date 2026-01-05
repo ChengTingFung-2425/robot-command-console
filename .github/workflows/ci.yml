@@ -33,21 +33,21 @@ jobs:
           # 檢查主要 Python 檔案
           flake8 flask_service.py run_service_cli.py \
             --max-line-length=120 \
-            --ignore=W503,E203,W293 \
+            --ignore=W503,E203 \
             --statistics
 
       - name: 檢查 src/ 目錄
         run: |
           flake8 src/ \
             --max-line-length=120 \
-            --ignore=W503,E203,W293 \
+            --ignore=W503,E203 \
             --statistics
 
       - name: 檢查 MCP/ 目錄
         run: |
           flake8 MCP/ \
             --max-line-length=120 \
-            --ignore=W503,E203,W293 \
+            --ignore=W503,E203 \
             --exclude=MCP/__pycache__ \
             --statistics
   

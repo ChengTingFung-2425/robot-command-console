@@ -781,3 +781,83 @@ def get_robot_status():
 
 **檔案精簡**：2,633 行 → 450 行（保留核心，詳細內容移至專題文件）
 **最後更新**：2025-12-17
+
+### 2026-01-05: RabbitMQ & AWS SQS 佇列整合
+- **新增** RabbitMQ Queue 實作（450+ 行，完整實作 QueueInterface）
+- **新增** AWS SQS Queue 實作（470+ 行，支援 Standard/FIFO 佇列）
+- **新增** 配置匯出與注入工具（300+ 行，支援多種格式）
+- **更新** ServiceManager 支援動態佇列選擇（memory/rabbitmq/sqs）
+- **更新** Edge Queue 配置管理（17+ 環境變數）
+- **完成** 1150+ 行測試代碼（單元、整合、比較測試）
+- **完成** CI/CD Pipeline（GitHub Actions，多 Python 版本）
+- **完成** 文件更新（部署指南、測試指南、架構文件）
+- 詳見：[docs/RABBITMQ_INTEGRATION_TODOS.md](docs/RABBITMQ_INTEGRATION_TODOS.md)
+
+**關鍵經驗**：
+1. **QueueInterface 設計模式**
+   - 抽象介面統一三種實作（Memory/RabbitMQ/SQS）
+   - 確保行為一致性（參數化測試驗證）
+   - 便於未來擴展（Kafka、Redis 等）
+
+2. **RabbitMQ Best Practices**
+   - 使用 Topic Exchange + Priority Queue
+   - DLX/DLQ 處理失敗訊息
+   - 連線池與 Channel 池提升效能
+   - Publisher confirms 確保訊息不遺失
+
+3. **AWS SQS 整合要點**
+   - 長輪詢減少空請求成本
+   - FIFO vs Standard 選擇（順序 vs 吞吐量）
+   - IAM Role 優於 Access Key（安全性）
+   - CloudWatch 監控訊息流量
+
+4. **配置管理策略**
+   - 環境變數驅動配置
+   - 支援多種匯出格式（Shell Script、Docker .env、K8s ConfigMap）
+   - 配置合併與注入工具
+   - 便利函式簡化使用
+
+5. **測試策略**
+   - pytest 參數化 fixture 支援多種實作
+   - 使用 `TEST_WITH_RABBITMQ` 環境變數控制測試執行
+   - Docker Compose 提供測試環境
+   - 行為一致性測試確保介面合規
+
+6. **文件完整性**
+   - 部署指南（本地、Docker、雲端）
+   - 測試執行指南（單元、整合、自動化）
+   - 架構文件更新（比較表、使用場景、遷移指南）
+   - 程式碼註解與 docstring 完整
+
+**問題與解決**：
+- **問題**：pytest-asyncio fixture 標記問題
+  - **解決**：明確標記 `@pytest.fixture` 和 `@pytest.mark.asyncio`
+
+- **問題**：RabbitMQ 沒有原生 peek 支援
+  - **解決**：使用 get + nack(requeue=True) 模擬
+
+- **問題**：SQS 訊息優先權模擬
+  - **解決**：使用 Message Attributes 儲存優先權資訊
+
+- **問題**：配置注入的靈活性
+  - **解決**：建立 ConfigExporter 和 ConfigInjector 工具類
+
+**效能數據**：
+- MemoryQueue: <1ms 延遲，100K+ msg/s 吞吐量
+- RabbitMQ: 1-10ms 延遲，10K-50K msg/s 吞吐量
+- AWS SQS: 10-100ms 延遲，Standard 無限制，FIFO 3K msg/s
+
+**成本比較**（1M 訊息/月）：
+- MemoryQueue: 接近 $0
+- RabbitMQ (自建): $30-200/月（含基礎設施與維護）
+- AWS SQS: $0.50-2/月（按使用付費）
+
+**相關文件**：
+- [docs/deployment/RABBITMQ_DEPLOYMENT.md](docs/deployment/RABBITMQ_DEPLOYMENT.md)
+- [docs/deployment/TEST_EXECUTION.md](docs/deployment/TEST_EXECUTION.md)
+- [docs/features/queue-architecture.md](docs/features/queue-architecture.md)
+- [src/robot_service/queue/rabbitmq_queue.py](../src/robot_service/queue/rabbitmq_queue.py)
+- [src/robot_service/queue/sqs_queue.py](../src/robot_service/queue/sqs_queue.py)
+- [src/robot_service/config_injection.py](../src/robot_service/config_injection.py)
+
+---

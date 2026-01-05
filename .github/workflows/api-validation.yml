@@ -126,11 +126,11 @@ jobs:
       
       - name: 執行安全測試
         run: |
-          python3 -m pytest tests/test_security_features.py -v
+          PYTHONPATH="${PYTHONPATH}:${PWD}/src" python3 -m pytest tests/core/test_security_features.py -v
       
       - name: 執行認證測試
         run: |
-          python3 -m pytest tests/test_auth_compliance.py -v
+          PYTHONPATH="${PYTHONPATH}:${PWD}/src" python3 -m pytest tests/core/test_auth_compliance.py -v
   
   check-docs:
     name: 檢查安全文件
@@ -153,7 +153,7 @@ jobs:
       - name: 檢查安全檢查清單
         run: |
           if [ ! -f "docs/security/security-checklist.md" ]; then
-            echo "錯誤: 缺少 docs/security-checklist.md"
+            echo "錯誤: 缺少 docs/security/security-checklist.md"
             exit 1
           fi
           echo "✓ 安全檢查清單存在"

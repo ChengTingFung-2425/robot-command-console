@@ -6,6 +6,7 @@ Includes: Login, Logout, Register (simplified, no password reset)
 import logging
 from flask import Blueprint, request, render_template, redirect, url_for, flash
 from flask_login import current_user, login_user, logout_user
+from urllib.parse import urlparse
 from WebUI.app import db
 from WebUI.app.models import User, UserProfile
 from WebUI.app.forms import LoginForm, RegisterForm
@@ -78,9 +79,18 @@ def login():
         log_login_attempt(username=user.username, success=True, user_id=user.id)
         login_user(user, remember=form.remember_me.data if hasattr(form, 'remember_me') else False)
         
-        # 重定向到原本要訪問的頁面
-        next_page = request.args.get('next')
-        if not next_page or not next_page.startswith('/'):
+        # 重定向到原本要訪問的頁面（只允許站內相對路徑）
+        raw_next = request.args.get('next', '')
+        next_page = None
+        if raw_next:
+            # Normalize and parse the user-provided next parameter
+            candidate = raw_next.replace('\\', '').strip()
+            parsed = urlparse(candidate)
+            # Accept only relative paths without scheme/netloc and starting with '/'
+            if not parsed.scheme and not parsed.netloc and candidate.startswith('/'):
+                next_page = candidate
+        
+        if not next_page:
             next_page = url_for('core.dashboard')
         
         flash(f'歡迎回來，{user.username}！', 'success')

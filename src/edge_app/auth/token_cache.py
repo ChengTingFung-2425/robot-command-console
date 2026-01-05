@@ -51,8 +51,34 @@ class EdgeTokenCache:
         self._device_id: Optional[str] = None
         self._user_info: Optional[Dict] = None
 
+        # Keychain availability (for platform storage)
+        self._keychain_available = self._platform_storage.is_available()
+
+        # Encryption key (exposed for testing) - get it via the internal method
+        try:
+            self._encryption_key = self._encryption._get_or_create_key()
+        except Exception:
+            self._encryption_key = None
+
         # Load tokens if exist
         self._load_tokens()
+
+    @property
+    def cache_dir(self):
+        """Get cache directory path as Path object."""
+        from pathlib import Path
+        return Path(self._cache_dir)
+
+    @property
+    def token_file(self):
+        """Get token file path as Path object."""
+        from pathlib import Path
+        return Path(self._token_file)
+
+    @property
+    def platform(self):
+        """Get platform name."""
+        return self._platform_storage.platform
 
     def save_tokens(self, access_token: str, refresh_token: str,
                     device_id: str, user_info: Dict) -> bool:
@@ -223,10 +249,14 @@ class EdgeTokenCache:
         return self._user_info
 
     def _load_tokens(self):
-        """從儲存中載入 Tokens"""
+        """從儲存中載入 Tokens
+        
+        Returns:
+            Dict with token data or empty dict if not available
+        """
         try:
             # Try platform storage first
-            if self._platform_storage.is_available():
+            if self._keychain_available and self._platform_storage.is_available():
                 encrypted_str = self._platform_storage.get_secret("tokens")
                 if encrypted_str:
                     data_json = self._encryption.decrypt(encrypted_str)
@@ -236,7 +266,7 @@ class EdgeTokenCache:
                     self._refresh_token = data.get("refresh_token")
                     self._device_id = data.get("device_id")
                     self._user_info = data.get("user_info")
-                    return
+                    return data
 
             # Fallback to file storage
             if os.path.exists(self._token_file):
@@ -250,6 +280,7 @@ class EdgeTokenCache:
                 self._refresh_token = data.get("refresh_token")
                 self._device_id = data.get("device_id")
                 self._user_info = data.get("user_info")
+                return data
 
         except Exception as e:
             # Handle corrupted or invalid data
@@ -258,6 +289,36 @@ class EdgeTokenCache:
             self._refresh_token = None
             self._device_id = None
             self._user_info = None
+
+        return {}
+
+    def _save_to_file(self, data: Dict) -> bool:
+        """儲存資料至檔案（用於測試和回退機制）
+        
+        Args:
+            data: 資料字典
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            data_json = json.dumps(data)
+            encrypted_str = self._encryption.encrypt(data_json)
+            
+            with open(self._token_file, 'w', encoding='utf-8') as f:
+                f.write(encrypted_str)
+
+            # Set file permissions (chmod 600)
+            try:
+                os.chmod(self._token_file, 0o600)
+            except Exception:  # May fail on Windows or read-only FS
+                pass
+
+            return True
+
+        except Exception as e:
+            print(f"Error saving to file: {e}")
+            return False
 
     def _parse_token_exp(self, token: str) -> Optional[int]:
         """解析 JWT Token 的 exp 欄位

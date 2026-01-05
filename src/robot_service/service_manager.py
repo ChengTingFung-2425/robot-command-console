@@ -1,13 +1,15 @@
 """
 Service Manager
 服務管理器，協調佇列與指令處理
+支援 MemoryQueue（單機）、RabbitMQ（分散式）與 AWS SQS（雲端）
 """
 
 import logging
+import os
 import threading
 from typing import Any, Callable, Dict, List, Optional
 
-from .queue import Message, MessagePriority, MemoryQueue, QueueHandler
+from .queue import Message, MessagePriority, MemoryQueue, RabbitMQQueue, SQSQueue, QueueHandler, QueueInterface
 from .command_processor import CommandProcessor
 
 
@@ -30,30 +32,95 @@ class ServiceManager:
         queue_max_size: Optional[int] = None,
         max_workers: int = 5,
         poll_interval: float = 0.1,
+        queue_type: str = "memory",
+        rabbitmq_url: Optional[str] = None,
+        rabbitmq_config: Optional[Dict[str, Any]] = None,
+        sqs_config: Optional[Dict[str, Any]] = None,
     ):
         """
         初始化服務管理器
 
         Args:
-            queue_max_size: 佇列最大大小
+            queue_max_size: 佇列最大大小（僅用於 MemoryQueue）
             max_workers: 最大並行工作數
             poll_interval: 輪詢間隔（秒）
+            queue_type: 佇列類型 ("memory", "rabbitmq", 或 "sqs")
+            rabbitmq_url: RabbitMQ 連線 URL（當 queue_type="rabbitmq" 時必需）
+            rabbitmq_config: RabbitMQ 額外配置（exchange、queue 名稱等）
+            sqs_config: AWS SQS 配置（queue_url、region 等）
         """
-        self.queue = MemoryQueue(max_size=queue_max_size)
-        self.handler: Optional[QueueHandler] = None
+        self.queue_type = queue_type
         self.max_workers = max_workers
         self.poll_interval = poll_interval
         self._started = False
 
+        # 根據配置建立佇列
+        if queue_type == "rabbitmq":
+            rabbitmq_url = rabbitmq_url or os.getenv(
+                "RABBITMQ_URL",
+                "amqp://guest:guest@localhost:5672/"
+            )
+            config = rabbitmq_config or {}
+
+            self.queue: QueueInterface = RabbitMQQueue(
+                url=rabbitmq_url,
+                exchange_name=config.get("exchange_name", "robot.commands"),
+                queue_name=config.get("queue_name", "robot.commands.queue"),
+                dlx_name=config.get("dlx_name", "robot.commands.dlx"),
+                dlq_name=config.get("dlq_name", "robot.commands.dlq"),
+                prefetch_count=config.get("prefetch_count", max_workers),
+                connection_pool_size=config.get("connection_pool_size", 2),
+                channel_pool_size=config.get("channel_pool_size", 10),
+            )
+
+            logger.info("ServiceManager initialized with RabbitMQ", extra={
+                "rabbitmq_url": rabbitmq_url,
+                "exchange": config.get("exchange_name", "robot.commands"),
+                "queue": config.get("queue_name", "robot.commands.queue"),
+                "max_workers": max_workers,
+                "service": "robot_service"
+            })
+
+        elif queue_type == "sqs":
+            config = sqs_config or {}
+
+            self.queue = SQSQueue(
+                queue_url=config.get("queue_url"),
+                queue_name=config.get("queue_name", "robot-edge-commands-queue"),
+                dlq_name=config.get("dlq_name", "robot-edge-commands-dlq"),
+                region_name=config.get("region_name", "us-east-1"),
+                aws_access_key_id=config.get("aws_access_key_id"),
+                aws_secret_access_key=config.get("aws_secret_access_key"),
+                visibility_timeout=config.get("visibility_timeout", 30),
+                wait_time_seconds=config.get("wait_time_seconds", 20),  # 使用長輪詢
+                max_messages=config.get("max_messages", 10),
+                use_fifo=config.get("use_fifo", False),
+            )
+
+            logger.info("ServiceManager initialized with AWS SQS", extra={
+                "queue_name": config.get("queue_name", "robot-edge-commands-queue"),
+                "region": config.get("region_name", "us-east-1"),
+                "use_fifo": config.get("use_fifo", False),
+                "wait_time_seconds": config.get("wait_time_seconds", 20),
+                "max_workers": max_workers,
+                "service": "robot_service"
+            })
+
+        else:
+            # 預設使用 MemoryQueue
+            self.queue = MemoryQueue(max_size=queue_max_size)
+
+            logger.info("ServiceManager initialized with MemoryQueue", extra={
+                "queue_max_size": queue_max_size,
+                "max_workers": max_workers,
+                "service": "robot_service"
+            })
+
+        self.handler: Optional[QueueHandler] = None
+
         # 初始化 CommandProcessor（使用預設分派器）
         self._command_processor = CommandProcessor()
         self._processor_lock = threading.Lock()
-
-        logger.info("ServiceManager initialized", extra={
-            "queue_max_size": queue_max_size,
-            "max_workers": max_workers,
-            "service": "robot_service"
-        })
 
     async def start(self, processor=None) -> None:
         """
@@ -67,6 +134,13 @@ class ServiceManager:
                 "service": "robot_service"
             })
             return
+
+        # 初始化 RabbitMQ 或 SQS（如果使用）
+        if self.queue_type in ("rabbitmq", "sqs") and hasattr(self.queue, 'initialize'):
+            await self.queue.initialize()
+            logger.info(f"{self.queue_type.upper()} queue initialized", extra={
+                "service": "robot_service"
+            })
 
         # 使用預設或自訂處理器
         if processor is None:
@@ -83,6 +157,7 @@ class ServiceManager:
         self._started = True
 
         logger.info("ServiceManager started", extra={
+            "queue_type": self.queue_type,
             "service": "robot_service"
         })
 
@@ -102,6 +177,13 @@ class ServiceManager:
 
         if self.handler:
             await self.handler.stop(timeout=timeout)
+
+        # 關閉 RabbitMQ 或 SQS 連線（如果使用）
+        if self.queue_type in ("rabbitmq", "sqs") and hasattr(self.queue, 'close'):
+            await self.queue.close()
+            logger.info(f"{self.queue_type.upper()} connection closed", extra={
+                "service": "robot_service"
+            })
 
         self._started = False
 
@@ -200,17 +282,26 @@ class ServiceManager:
             })
 
     async def health_check(self) -> Dict[str, Any]:
-        """健康檢查"""
-        handler_health = {}
-        if self.handler:
-            handler_health = await self.handler.health_check()
+        """
+        健康檢查
 
-        return {
-            "status": "healthy" if self._started else "stopped",
-            "started": self._started,
-            "handler": handler_health,
-        }
+        Returns:
+            健康狀態資訊
+        """
+        return await self.queue.health_check()
 
     async def get_queue_stats(self) -> Dict[str, Any]:
-        """取得佇列統計資訊"""
-        return await self.queue.health_check()
+        """
+        取得佇列統計資訊
+
+        Returns:
+            佇列統計資訊
+        """
+        health = await self.queue.health_check()
+        return {
+            "queue_type": self.queue_type,
+            "queue_size": await self.queue.size(),
+            "health": health,
+            "handler_running": self._started,
+            "max_workers": self.max_workers,
+        }

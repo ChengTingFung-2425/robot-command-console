@@ -92,7 +92,8 @@ class ServiceManager:
                 aws_access_key_id=config.get("aws_access_key_id"),
                 aws_secret_access_key=config.get("aws_secret_access_key"),
                 visibility_timeout=config.get("visibility_timeout", 30),
-                wait_time_seconds=config.get("wait_time_seconds", 10),
+                wait_time_seconds=config.get("wait_time_seconds", 20),  # 使用長輪詢
+                max_messages=config.get("max_messages", 10),
                 use_fifo=config.get("use_fifo", False),
             )
 
@@ -100,6 +101,7 @@ class ServiceManager:
                 "queue_name": config.get("queue_name", "robot-edge-commands-queue"),
                 "region": config.get("region_name", "us-east-1"),
                 "use_fifo": config.get("use_fifo", False),
+                "wait_time_seconds": config.get("wait_time_seconds", 20),
                 "max_workers": max_workers,
                 "service": "robot_service"
             })

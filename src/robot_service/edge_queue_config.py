@@ -93,6 +93,39 @@ class EdgeQueueConfig:
         return config
 
     @staticmethod
+    def get_sqs_config() -> Dict[str, Any]:
+        """
+        取得 AWS SQS 配置
+
+        Returns:
+            SQS 配置字典
+        """
+        config = {
+            "queue_name": os.getenv("SQS_QUEUE_NAME", "robot-edge-commands-queue"),
+            "dlq_name": os.getenv("SQS_DLQ_NAME", "robot-edge-commands-dlq"),
+            "region_name": os.getenv("AWS_REGION", "us-east-1"),
+            "visibility_timeout": int(os.getenv("SQS_VISIBILITY_TIMEOUT", "30")),
+            "wait_time_seconds": int(os.getenv("SQS_WAIT_TIME_SECONDS", "20")),
+            "max_messages": int(os.getenv("SQS_MAX_MESSAGES", "10")),
+            "use_fifo": os.getenv("SQS_USE_FIFO", "false").lower() == "true",
+        }
+
+        # 可選參數
+        queue_url = os.getenv("SQS_QUEUE_URL")
+        if queue_url:
+            config["queue_url"] = queue_url
+
+        aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
+        if aws_access_key_id:
+            config["aws_access_key_id"] = aws_access_key_id
+
+        aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+        if aws_secret_access_key:
+            config["aws_secret_access_key"] = aws_secret_access_key
+
+        return config
+
+    @staticmethod
     def is_rabbitmq_enabled() -> bool:
         """
         檢查是否啟用 RabbitMQ

@@ -65,7 +65,7 @@ class SQSQueue(QueueInterface):
         aws_access_key_id: Optional[str] = None,
         aws_secret_access_key: Optional[str] = None,
         visibility_timeout: int = 30,
-        wait_time_seconds: int = 10,
+        wait_time_seconds: int = 20,
         max_messages: int = 10,
         use_fifo: bool = False,
     ):
@@ -80,9 +80,13 @@ class SQSQueue(QueueInterface):
             aws_access_key_id: AWS Access Key（可選，使用 IAM role 時不需要）
             aws_secret_access_key: AWS Secret Key（可選）
             visibility_timeout: 訊息可見性超時（秒）
-            wait_time_seconds: 長輪詢等待時間（秒）
+            wait_time_seconds: 長輪詢等待時間（秒，建議使用最大值 20 以減少成本）
             max_messages: 每次接收的最大訊息數
             use_fifo: 是否使用 FIFO 佇列
+
+        Note:
+            使用長輪詢（wait_time_seconds=20）可大幅減少空請求次數，降低成本。
+            SQS 最大支援 20 秒長輪詢。
         """
         if not AIOBOTO3_AVAILABLE:
             raise ImportError(
@@ -263,13 +267,25 @@ class SQSQueue(QueueInterface):
             return False
 
     async def dequeue(self, timeout: Optional[float] = None) -> Optional[Message]:
-        """從 SQS 接收訊息"""
+        """
+        從 SQS 接收訊息
+
+        使用長輪詢（Long Polling）以減少空請求和成本。
+        當 timeout 未指定時，使用配置的 wait_time_seconds（預設 20 秒）。
+
+        Args:
+            timeout: 等待超時（秒），最大 20 秒（SQS 限制）
+
+        Returns:
+            訊息物件或 None
+        """
         if not self._initialized:
             await self.initialize()
 
         try:
             async with self._session.client('sqs') as sqs:
-                # SQS 使用長輪詢
+                # SQS 使用長輪詢（Long Polling）
+                # 建議使用最大值 20 秒以減少空請求成本
                 wait_time = min(int(timeout or self.wait_time_seconds), 20)
 
                 response = await sqs.receive_message(
@@ -290,15 +306,19 @@ class SQSQueue(QueueInterface):
                 body = json.loads(sqs_message['Body'])
                 message = Message.from_dict(body)
 
-                # 儲存 SQS 特定資訊以便後續 ack/nack
+                # 儲存 SQS 特定資訊
+                # 重要：將 message.id 設為 ReceiptHandle，因為 ack/nack 需要它
+                message._original_message_id = message.id  # 保留原始 ID
                 message._sqs_receipt_handle = sqs_message['ReceiptHandle']
                 message._sqs_message_id = sqs_message['MessageId']
+                message.id = sqs_message['ReceiptHandle']  # 用 ReceiptHandle 作為 ID
 
                 self._total_dequeued += 1
 
                 logger.info("Message received from SQS", extra={
-                    "message_id": message.id,
+                    "message_id": message._original_message_id,
                     "sqs_message_id": sqs_message['MessageId'],
+                    "receipt_handle": sqs_message['ReceiptHandle'][:20] + "...",
                     "priority": message.priority.name,
                     "trace_id": message.trace_id,
                     "service": "robot_service.queue.sqs"
@@ -346,32 +366,87 @@ class SQSQueue(QueueInterface):
         """
         確認訊息已處理（刪除訊息）
 
-        注意：實際的 ack 需要透過 message._sqs_receipt_handle
+        Args:
+            message_id: 訊息 ID（應該是 ReceiptHandle）
+
+        Returns:
+            是否成功刪除
         """
-        self._total_acked += 1
+        if not self._initialized:
+            await self.initialize()
 
-        logger.info("Message acknowledged", extra={
-            "message_id": message_id,
-            "service": "robot_service.queue.sqs"
-        })
+        try:
+            async with self._session.client('sqs') as sqs:
+                # message_id 應該是 ReceiptHandle
+                await sqs.delete_message(
+                    QueueUrl=self.queue_url,
+                    ReceiptHandle=message_id,
+                )
 
-        return True
+            self._total_acked += 1
+
+            logger.info("Message acknowledged and deleted", extra={
+                "message_id": message_id,
+                "service": "robot_service.queue.sqs"
+            })
+
+            return True
+
+        except Exception as e:
+            logger.error("Failed to acknowledge message", extra={
+                "message_id": message_id,
+                "error": str(e),
+                "service": "robot_service.queue.sqs"
+            })
+            return False
 
     async def nack(self, message_id: str, requeue: bool = True) -> bool:
         """
         拒絕訊息（處理失敗）
 
-        注意：實際的 nack 需要透過改變 visibility timeout
+        Args:
+            message_id: 訊息 ID（應該是 ReceiptHandle）
+            requeue: 是否重新排隊（True: 立即可見, False: 刪除訊息）
+
+        Returns:
+            是否成功處理
         """
-        self._total_nacked += 1
+        if not self._initialized:
+            await self.initialize()
 
-        logger.info("Message nacked", extra={
-            "message_id": message_id,
-            "requeue": requeue,
-            "service": "robot_service.queue.sqs"
-        })
+        try:
+            async with self._session.client('sqs') as sqs:
+                if requeue:
+                    # 將可見性超時設為 0，讓訊息立即重新可見
+                    await sqs.change_message_visibility(
+                        QueueUrl=self.queue_url,
+                        ReceiptHandle=message_id,
+                        VisibilityTimeout=0,
+                    )
+                else:
+                    # 不重新排隊，直接刪除訊息
+                    await sqs.delete_message(
+                        QueueUrl=self.queue_url,
+                        ReceiptHandle=message_id,
+                    )
 
-        return True
+            self._total_nacked += 1
+
+            logger.info("Message nacked", extra={
+                "message_id": message_id,
+                "requeue": requeue,
+                "service": "robot_service.queue.sqs"
+            })
+
+            return True
+
+        except Exception as e:
+            logger.error("Failed to nack message", extra={
+                "message_id": message_id,
+                "error": str(e),
+                "service": "robot_service.queue.sqs"
+            })
+            return False
 
     async def size(self) -> int:
         """取得佇列大小（近似值）"""

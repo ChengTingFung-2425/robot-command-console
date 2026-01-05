@@ -74,7 +74,8 @@ class ConfigExporter:
         aws_access_key_id: Optional[str] = None,
         aws_secret_access_key: Optional[str] = None,
         visibility_timeout: int = 30,
-        wait_time_seconds: int = 10,
+        wait_time_seconds: int = 20,
+        max_messages: int = 10,
         use_fifo: bool = False,
     ) -> Dict[str, str]:
         """
@@ -88,11 +89,16 @@ class ConfigExporter:
             aws_access_key_id: AWS Access Key
             aws_secret_access_key: AWS Secret Key
             visibility_timeout: 可見性超時（秒）
-            wait_time_seconds: 長輪詢等待時間（秒）
+            wait_time_seconds: 長輪詢等待時間（秒，建議使用 20 以減少成本）
+            max_messages: 每次接收的最大訊息數
             use_fifo: 是否使用 FIFO 佇列
 
         Returns:
             環境變數字典
+
+        Note:
+            這些環境變數會被 EdgeQueueConfig.get_sqs_config() 讀取並傳遞給 SQSQueue。
+            使用長輪詢 wait_time_seconds=20（最大值）可減少約 90% 的空請求成本。
         """
         config = {
             "EDGE_QUEUE_TYPE": "sqs",
@@ -101,6 +107,7 @@ class ConfigExporter:
             "AWS_REGION": region_name,
             "SQS_VISIBILITY_TIMEOUT": str(visibility_timeout),
             "SQS_WAIT_TIME_SECONDS": str(wait_time_seconds),
+            "SQS_MAX_MESSAGES": str(max_messages),
             "SQS_USE_FIFO": "true" if use_fifo else "false",
         }
 

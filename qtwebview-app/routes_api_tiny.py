@@ -7,6 +7,7 @@ from functools import wraps
 import logging
 import os
 from datetime import datetime
+from pathlib import Path
 
 # Create blueprint
 api_bp = Blueprint('api_tiny', __name__, url_prefix='/api')
@@ -65,21 +66,22 @@ def download_file(filename):
         filename: File path to download
     """
     try:
-        # TODO: Implement proper file path resolution and security checks
+        # Resolve base download directory and requested file path safely
         download_dir = os.getenv('DOWNLOAD_DIR', '/tmp/downloads')
-        # Resolve real paths to prevent directory traversal via symlinks or ".."
-        download_dir_real = os.path.realpath(download_dir)
-        file_path_real = os.path.realpath(os.path.join(download_dir_real, filename))
+        base_dir = Path(download_dir).resolve()
+        requested_path = (base_dir / filename).resolve()
 
-        # Security: Prevent directory traversal by ensuring the file is within download_dir
-        if os.path.commonpath([download_dir_real, file_path_real]) != download_dir_real:
+        # Security: Prevent directory traversal by ensuring the file is within base_dir
+        try:
+            requested_path.relative_to(base_dir)
+        except ValueError:
             return jsonify({'error': 'Invalid file path'}), 403
 
-        if not os.path.exists(file_path_real):
+        if not requested_path.is_file():
             return jsonify({'error': 'File not found'}), 404
 
         logger.info(f"Downloading file: {filename}")
-        return send_file(file_path_real, as_attachment=True)
+        return send_file(str(requested_path), as_attachment=True)
         
     except Exception as e:
         logger.error(f"Download failed for {filename}: {e}")

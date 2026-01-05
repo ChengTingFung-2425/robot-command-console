@@ -8,6 +8,7 @@ import logging
 from datetime import datetime
 import paramiko
 import os
+import shlex
 
 # Create blueprint
 firmware_bp = Blueprint('firmware_tiny', __name__, url_prefix='/firmware')
@@ -59,7 +60,7 @@ def list_firmware():
         
     except Exception as e:
         logger.error(f"Failed to list firmware: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Failed to list firmware'}), 500
 
 
 @firmware_bp.route('/upload', methods=['POST'])
@@ -93,7 +94,7 @@ def upload_firmware():
         
     except Exception as e:
         logger.error(f"Firmware upload failed: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Firmware upload failed'}), 500
 
 
 @firmware_bp.route('/deploy/sftp', methods=['POST'])
@@ -135,8 +136,10 @@ def deploy_via_sftp():
         sftp = paramiko.SFTPClient.from_transport(transport)
         
         # TODO: Get actual firmware file path
-        local_firmware_path = f"/tmp/firmware/{data['firmware_id']}.bin"
-        remote_firmware_path = os.path.join(data['remote_path'], f"{data['firmware_id']}.bin")
+        # Sanitize firmware_id to prevent path traversal
+        safe_firmware_id = os.path.basename(data['firmware_id'])
+        local_firmware_path = f"/tmp/firmware/{safe_firmware_id}.bin"
+        remote_firmware_path = os.path.join(data['remote_path'], f"{safe_firmware_id}.bin")
         
         # Upload firmware
         sftp.put(local_firmware_path, remote_firmware_path)
@@ -164,10 +167,10 @@ def deploy_via_sftp():
         return jsonify({'error': 'Authentication failed'}), 401
     except paramiko.SSHException as e:
         logger.error(f"SFTP connection error: {e}")
-        return jsonify({'error': f'SFTP error: {str(e)}'}), 500
+        return jsonify({'error': 'SFTP connection failed'}), 500
     except Exception as e:
         logger.error(f"SFTP deployment failed: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'SFTP deployment failed'}), 500
 
 
 @firmware_bp.route('/deploy/ssh/exec', methods=['POST'])
@@ -211,15 +214,18 @@ def deploy_and_execute_via_ssh():
         sftp = paramiko.SFTPClient.from_transport(transport)
         
         # Upload firmware
-        local_firmware_path = f"/tmp/firmware/{data['firmware_id']}.bin"
-        remote_firmware_path = os.path.join(data['remote_path'], f"{data['firmware_id']}.bin")
+        # Sanitize firmware_id to prevent path traversal
+        safe_firmware_id = os.path.basename(data['firmware_id'])
+        local_firmware_path = f"/tmp/firmware/{safe_firmware_id}.bin"
+        remote_firmware_path = os.path.join(data['remote_path'], f"{safe_firmware_id}.bin")
         sftp.put(local_firmware_path, remote_firmware_path)
         
         sftp.close()
         
         # Step 2: SSH execution
         ssh_client = paramiko.SSHClient()
-        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        # Security: Reject unknown host keys instead of auto-accepting
+        ssh_client.set_missing_host_key_policy(paramiko.RejectPolicy())
         
         if 'key_file' in data:
             private_key = paramiko.RSAKey.from_private_key_file(data['key_file'])
@@ -238,7 +244,10 @@ def deploy_and_execute_via_ssh():
             )
         
         # Execute installation script
-        install_cmd = f"{data['install_script']} {remote_firmware_path}"
+        # Security: Use shlex built-in command escaping
+        install_script_safe = shlex.quote(data['install_script'])
+        firmware_path_safe = shlex.quote(remote_firmware_path)
+        install_cmd = f"{install_script_safe} {firmware_path_safe}"
         if data.get('auto_reboot'):
             install_cmd += " && sudo reboot"
         
@@ -275,10 +284,10 @@ def deploy_and_execute_via_ssh():
         return jsonify({'error': 'Authentication failed'}), 401
     except paramiko.SSHException as e:
         logger.error(f"SSH connection error: {e}")
-        return jsonify({'error': f'SSH error: {str(e)}'}), 500
+        return jsonify({'error': 'SSH connection failed'}), 500
     except Exception as e:
         logger.error(f"SSH deployment failed: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'SSH deployment failed'}), 500
 
 
 @firmware_bp.route('/deploy/status/<task_id>', methods=['GET'])
@@ -303,7 +312,7 @@ def get_deployment_status(task_id):
         
     except Exception as e:
         logger.error(f"Failed to get deployment status: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Failed to get deployment status'}), 500
 
 
 @firmware_bp.route('/robot/<robot_id>/vars', methods=['GET', 'POST'])
@@ -355,7 +364,7 @@ def robot_variables(robot_id):
             
     except Exception as e:
         logger.error(f"Failed to manage variables for robot {robot_id}: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Failed to manage robot variables'}), 500
 
 
 @firmware_bp.route('/robot/<robot_id>/vars/cast', methods=['POST'])
@@ -390,7 +399,8 @@ def cast_variables_to_robot(robot_id):
         
         # Initialize SSH connection
         ssh_client = paramiko.SSHClient()
-        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        # Security: Reject unknown host keys instead of auto-accepting
+        ssh_client.set_missing_host_key_policy(paramiko.RejectPolicy())
         
         if 'key_file' in data:
             private_key = paramiko.RSAKey.from_private_key_file(data['key_file'])
@@ -411,18 +421,24 @@ def cast_variables_to_robot(robot_id):
         # Build variable export commands
         var_commands = []
         for key, value in data['variables'].items():
-            # Escape special characters in value
-            safe_value = str(value).replace('"', '\\"')
-            var_commands.append(f'export {key}="{safe_value}"')
+            # Validate variable name (alphanumeric and underscore only)
+            if not key.replace('_', '').isalnum():
+                ssh_client.close()
+                return jsonify({'error': f'Invalid variable name: {key}'}), 400
+            # Safely quote the value
+            safe_value = shlex.quote(str(value))
+            var_commands.append(f'export {key}={safe_value}')
         
-        # Create backup of existing config
-        backup_cmd = f"sudo cp {data['config_file']} {data['config_file']}.backup"
+        # Create backup of existing config (safely quote config_file path)
+        config_file_safe = shlex.quote(data['config_file'])
+        backup_cmd = f"sudo cp {config_file_safe} {config_file_safe}.backup"
         stdin, stdout, stderr = ssh_client.exec_command(backup_cmd)
         stdout.channel.recv_exit_status()
         
-        # Write variables to config file
+        # Write variables to config file (using safe quoting)
         config_content = '\n'.join(var_commands)
-        write_cmd = f"echo '{config_content}' | sudo tee {data['config_file']}"
+        config_content_safe = shlex.quote(config_content)
+        write_cmd = f"echo {config_content_safe} | sudo tee {config_file_safe}"
         stdin, stdout, stderr = ssh_client.exec_command(write_cmd)
         write_exit_code = stdout.channel.recv_exit_status()
         
@@ -437,7 +453,8 @@ def cast_variables_to_robot(robot_id):
         # Optionally reload service
         reload_output = None
         if 'reload_service' in data:
-            reload_cmd = f"sudo systemctl reload {data['reload_service']}"
+            service_name_safe = shlex.quote(data['reload_service'])
+            reload_cmd = f"sudo systemctl reload {service_name_safe}"
             stdin, stdout, stderr = ssh_client.exec_command(reload_cmd)
             reload_exit_code = stdout.channel.recv_exit_status()
             reload_output = {
@@ -467,10 +484,10 @@ def cast_variables_to_robot(robot_id):
         return jsonify({'error': 'Authentication failed'}), 401
     except paramiko.SSHException as e:
         logger.error(f"SSH connection error: {e}")
-        return jsonify({'error': f'SSH error: {str(e)}'}), 500
+        return jsonify({'error': 'SSH connection failed'}), 500
     except Exception as e:
         logger.error(f"Failed to cast variables to robot {robot_id}: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Failed to cast variables to robot'}), 500
 
 
 # Error handlers

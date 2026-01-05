@@ -1,7 +1,7 @@
 """
 Service Manager
 服務管理器，協調佇列與指令處理
-支援 MemoryQueue（單機）與 RabbitMQ（分散式）
+支援 MemoryQueue（單機）、RabbitMQ（分散式）與 AWS SQS（雲端）
 """
 
 import logging
@@ -9,7 +9,7 @@ import os
 import threading
 from typing import Any, Callable, Dict, List, Optional
 
-from .queue import Message, MessagePriority, MemoryQueue, RabbitMQQueue, QueueHandler, QueueInterface
+from .queue import Message, MessagePriority, MemoryQueue, RabbitMQQueue, SQSQueue, QueueHandler, QueueInterface
 from .command_processor import CommandProcessor
 
 
@@ -35,6 +35,7 @@ class ServiceManager:
         queue_type: str = "memory",
         rabbitmq_url: Optional[str] = None,
         rabbitmq_config: Optional[Dict[str, Any]] = None,
+        sqs_config: Optional[Dict[str, Any]] = None,
     ):
         """
         初始化服務管理器
@@ -43,9 +44,10 @@ class ServiceManager:
             queue_max_size: 佇列最大大小（僅用於 MemoryQueue）
             max_workers: 最大並行工作數
             poll_interval: 輪詢間隔（秒）
-            queue_type: 佇列類型 ("memory" 或 "rabbitmq")
+            queue_type: 佇列類型 ("memory", "rabbitmq", 或 "sqs")
             rabbitmq_url: RabbitMQ 連線 URL（當 queue_type="rabbitmq" 時必需）
             rabbitmq_config: RabbitMQ 額外配置（exchange、queue 名稱等）
+            sqs_config: AWS SQS 配置（queue_url、region 等）
         """
         self.queue_type = queue_type
         self.max_workers = max_workers
@@ -78,6 +80,30 @@ class ServiceManager:
                 "max_workers": max_workers,
                 "service": "robot_service"
             })
+
+        elif queue_type == "sqs":
+            config = sqs_config or {}
+
+            self.queue = SQSQueue(
+                queue_url=config.get("queue_url"),
+                queue_name=config.get("queue_name", "robot-edge-commands-queue"),
+                dlq_name=config.get("dlq_name", "robot-edge-commands-dlq"),
+                region_name=config.get("region_name", "us-east-1"),
+                aws_access_key_id=config.get("aws_access_key_id"),
+                aws_secret_access_key=config.get("aws_secret_access_key"),
+                visibility_timeout=config.get("visibility_timeout", 30),
+                wait_time_seconds=config.get("wait_time_seconds", 10),
+                use_fifo=config.get("use_fifo", False),
+            )
+
+            logger.info("ServiceManager initialized with AWS SQS", extra={
+                "queue_name": config.get("queue_name", "robot-edge-commands-queue"),
+                "region": config.get("region_name", "us-east-1"),
+                "use_fifo": config.get("use_fifo", False),
+                "max_workers": max_workers,
+                "service": "robot_service"
+            })
+
         else:
             # 預設使用 MemoryQueue
             self.queue = MemoryQueue(max_size=queue_max_size)
@@ -107,10 +133,10 @@ class ServiceManager:
             })
             return
 
-        # 初始化 RabbitMQ（如果使用）
-        if self.queue_type == "rabbitmq" and hasattr(self.queue, 'initialize'):
+        # 初始化 RabbitMQ 或 SQS（如果使用）
+        if self.queue_type in ("rabbitmq", "sqs") and hasattr(self.queue, 'initialize'):
             await self.queue.initialize()
-            logger.info("RabbitMQ queue initialized", extra={
+            logger.info(f"{self.queue_type.upper()} queue initialized", extra={
                 "service": "robot_service"
             })
 
@@ -150,10 +176,10 @@ class ServiceManager:
         if self.handler:
             await self.handler.stop(timeout=timeout)
 
-        # 關閉 RabbitMQ 連線（如果使用）
-        if self.queue_type == "rabbitmq" and hasattr(self.queue, 'close'):
+        # 關閉 RabbitMQ 或 SQS 連線（如果使用）
+        if self.queue_type in ("rabbitmq", "sqs") and hasattr(self.queue, 'close'):
             await self.queue.close()
-            logger.info("RabbitMQ connection closed", extra={
+            logger.info(f"{self.queue_type.upper()} connection closed", extra={
                 "service": "robot_service"
             })
 

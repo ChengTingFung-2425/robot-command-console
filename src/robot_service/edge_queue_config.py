@@ -18,7 +18,7 @@ class EdgeQueueConfig:
         從環境變數 EDGE_QUEUE_TYPE 讀取，預設為 memory
 
         Returns:
-            "memory" 或 "rabbitmq"
+            "memory", "rabbitmq", 或 "sqs"
         """
         return os.getenv("EDGE_QUEUE_TYPE", "memory").lower()
 
@@ -85,6 +85,8 @@ class EdgeQueueConfig:
         if queue_type == "rabbitmq":
             config["rabbitmq_url"] = EdgeQueueConfig.get_rabbitmq_url()
             config["rabbitmq_config"] = EdgeQueueConfig.get_rabbitmq_config()
+        elif queue_type == "sqs":
+            config["sqs_config"] = EdgeQueueConfig.get_sqs_config()
         else:
             config["queue_max_size"] = int(os.getenv("EDGE_QUEUE_MAX_SIZE", "1000"))
 
@@ -99,6 +101,16 @@ class EdgeQueueConfig:
             是否啟用 RabbitMQ
         """
         return EdgeQueueConfig.get_queue_type() == "rabbitmq"
+
+    @staticmethod
+    def is_sqs_enabled() -> bool:
+        """
+        檢查是否啟用 AWS SQS
+
+        Returns:
+            是否啟用 AWS SQS
+        """
+        return EdgeQueueConfig.get_queue_type() == "sqs"
 
     @staticmethod
     def get_health_check_config() -> Dict[str, Any]:
@@ -143,12 +155,17 @@ def get_queue_info() -> Dict[str, Any]:
     info = {
         "queue_type": queue_type,
         "rabbitmq_enabled": EdgeQueueConfig.is_rabbitmq_enabled(),
+        "sqs_enabled": EdgeQueueConfig.is_sqs_enabled(),
     }
 
     if queue_type == "rabbitmq":
         info.update({
             "rabbitmq_url": EdgeQueueConfig.get_rabbitmq_url(),
             "rabbitmq_config": EdgeQueueConfig.get_rabbitmq_config(),
+        })
+    elif queue_type == "sqs":
+        info.update({
+            "sqs_config": EdgeQueueConfig.get_sqs_config(),
         })
 
     return info

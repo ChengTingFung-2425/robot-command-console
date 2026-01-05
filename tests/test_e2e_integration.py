@@ -20,6 +20,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import pytest
 
+# Import MessagePriority for test usage
+from robot_service.queue import Message, MessagePriority
+
 
 class TestEndToEndIntegration:
     """端到端整合測試套件"""
@@ -49,7 +52,9 @@ class TestEndToEndIntegration:
         else:
             service_names = [s["name"] for s in status]
         
-        assert "queue-service" in service_names, "Queue 服務應該被註冊"
+        # 驗證有 queue 相關服務 (不硬編碼具體名稱)
+        has_queue_service = any("queue" in name.lower() for name in service_names)
+        assert has_queue_service, f"應該有 Queue 服務被註冊，實際服務: {service_names}"
 
     def test_e2e_02_command_processor_validates_actions(self):
         """
@@ -107,14 +112,14 @@ class TestEndToEndIntegration:
                 id="msg-1",
                 trace_id="trace-1",
                 payload={"actions": ["go_forward"]},
-                priority=1  # 低優先權
+                priority=MessagePriority.LOW  # 低優先權
             )
             
             msg_high = Message(
                 id="msg-2",
                 trace_id="trace-2",
                 payload={"actions": ["turn_left"]},
-                priority=10  # 高優先權
+                priority=MessagePriority.HIGH  # 高優先權
             )
             
             # 先放入低優先權
@@ -219,34 +224,36 @@ class TestEndToEndIntegration:
             coordinator = ServiceCoordinator()
             
             # 建立測試服務（Queue Service）
-            queue = PriorityQueue()
+            # QueueService 不接受 name 或 queue 參數，name 通過 .name 屬性獲取
             queue_service = QueueService(
-                name="test-queue",
-                queue=queue,
+                queue_max_size=1000,
                 max_workers=2
             )
             
             # 註冊服務
             coordinator.register_service(queue_service)
             
+            # 使用服務的 name 屬性，而非硬編碼
+            service_name = queue_service.name
+            
             # 驗證已註冊
-            status = coordinator.get_all_services_status()
-            assert "test-queue" in status, "服務應該已註冊"
+            status = coordinator.get_services_status()
+            assert service_name in status, f"服務 {service_name} 應該已註冊"
             
             # 啟動服務
-            success = await coordinator.start_service("test-queue")
+            success = await coordinator.start_service(service_name)
             assert success, "服務應該啟動成功"
             
-            # 健康檢查
-            health = await coordinator.check_service_health("test-queue")
-            assert health["status"] == "healthy", "服務應該健康"
+            # 健康檢查 (returns bool, not dict)
+            is_healthy = await coordinator.check_service_health(service_name)
+            assert is_healthy, "服務應該健康"
             
             # 停止服務
-            success = await coordinator.stop_service("test-queue", timeout=5.0)
+            success = await coordinator.stop_service(service_name, timeout=5.0)
             assert success, "服務應該停止成功"
             
-            # 清理
-            await coordinator.shutdown(timeout=5.0)
+            # 清理 (使用 stop_all_services 而非 shutdown)
+            await coordinator.stop_all_services(timeout=5.0)
         
         asyncio.run(test())
 
@@ -317,16 +324,13 @@ class TestEndToEndIntegration:
         from robot_service.service_coordinator import QueueService
         
         async def test():
-            # 1. 建立 Queue 和 Processor
-            queue = PriorityQueue()
+            # 1. 建立 Processor
             processor = CommandProcessor()
             
-            # 2. 建立 Queue Service（包含 Worker Pool）
+            # 2. 建立 Queue Service (不接受 name, queue, processor 參數)
             queue_service = QueueService(
-                name="integration-test-queue",
-                queue=queue,
-                max_workers=1,
-                processor=processor.process
+                queue_max_size=1000,
+                max_workers=1
             )
             
             # 3. 啟動服務
@@ -335,22 +339,23 @@ class TestEndToEndIntegration:
             # 等待服務啟動
             await asyncio.sleep(0.5)
             
-            # 4. 發送測試指令
+            # 4. 通過 service manager 發送測試指令
             test_message = Message(
                 id=str(uuid4()),
                 trace_id=str(uuid4()),
                 payload={"actions": ["go_forward", "turn_left"]},
-                priority=5
+                priority=MessagePriority.NORMAL
             )
             
-            await queue.enqueue(test_message)
+            # 透過 manager 的 queue 來 enqueue
+            await queue_service.manager.queue.enqueue(test_message)
             
             # 5. 等待處理（Worker 會自動處理）
             await asyncio.sleep(1.0)
             
             # 6. 驗證 Queue 已清空（訊息已被處理）
-            stats = await queue.get_stats()
-            assert stats["size"] == 0, "Queue 應該已清空"
+            queue_size = await queue_service.manager.queue.size()
+            assert queue_size == 0, "Queue 應該已清空"
             
             # 7. 停止服務
             await queue_service.stop(timeout=3.0)

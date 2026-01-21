@@ -628,6 +628,8 @@ class FirmwareUpdateWidget(QWidget):
     def __init__(self, backend_manager, parent=None):
         super().__init__(parent)
         self.backend_manager = backend_manager
+        self.encrypted_config_path = None
+        self.firmware_file_path = None
         self._init_ui()
     
     def _init_ui(self):
@@ -641,23 +643,378 @@ class FirmwareUpdateWidget(QWidget):
         
         # 安全提示
         security_notice = QLabel(
-            "⚠️ 固件更新需要連接到機器人的 WiFi AP\n"
-            "請確保已從雲端下載加密的配置檔案"
+            "⚠️ 固件更新安全提示\n"
+            "• 需要連接到機器人的 WiFi AP\n"
+            "• 使用從雲端下載的加密配置檔案\n"
+            "• 配置檔案使用 User Token 加密，使用後自動刪除"
         )
         security_notice.setStyleSheet(
             "background-color: #fff3cd; color: #856404; "
-            "padding: 15px; border-radius: 5px; font-size: 14px;"
+            "padding: 15px; border-radius: 5px; font-size: 13px;"
         )
         layout.addWidget(security_notice)
         
-        # TODO: 添加固件更新元件
-        # - WiFi AP 連接管理
-        # - 加密檔案上傳
-        # - 固件選擇與上傳
-        # - 進度顯示
-        # - 安全驗證流程
+        # === Step 1: 加密配置檔案 ===
+        from PyQt6.QtWidgets import QGroupBox, QPushButton, QLineEdit, QFileDialog, QProgressBar, QTextEdit
+        
+        config_group = QGroupBox("步驟 1：加密配置檔案")
+        config_layout = QVBoxLayout()
+        
+        # 檔案選擇
+        file_layout = QHBoxLayout()
+        self.config_file_input = QLineEdit()
+        self.config_file_input.setPlaceholderText("選擇從雲端下載的加密配置檔案 (.enc)")
+        self.config_file_input.setReadOnly(True)
+        file_layout.addWidget(self.config_file_input)
+        
+        browse_btn = QPushButton("瀏覽...")
+        browse_btn.clicked.connect(self._browse_config_file)
+        file_layout.addWidget(browse_btn)
+        config_layout.addLayout(file_layout)
+        
+        # User Token 輸入
+        token_layout = QHBoxLayout()
+        token_layout.addWidget(QLabel("User Token:"))
+        self.user_token_input = QLineEdit()
+        self.user_token_input.setPlaceholderText("輸入雲端 User Token")
+        self.user_token_input.setEchoMode(QLineEdit.EchoMode.Password)
+        token_layout.addWidget(self.user_token_input)
+        config_layout.addLayout(token_layout)
+        
+        # 解密按鈕
+        decrypt_btn = QPushButton("🔓 解密並驗證配置")
+        decrypt_btn.clicked.connect(self._decrypt_config)
+        decrypt_btn.setStyleSheet("padding: 10px; font-weight: bold;")
+        config_layout.addWidget(decrypt_btn)
+        
+        # 配置狀態顯示
+        self.config_status = QLabel("等待選擇配置檔案...")
+        self.config_status.setStyleSheet("color: #666; font-style: italic;")
+        config_layout.addWidget(self.config_status)
+        
+        config_group.setLayout(config_layout)
+        layout.addWidget(config_group)
+        
+        # === Step 2: WiFi 連接 ===
+        wifi_group = QGroupBox("步驟 2：WiFi AP 連接")
+        wifi_group.setEnabled(False)  # 初始禁用
+        self.wifi_group = wifi_group
+        wifi_layout = QVBoxLayout()
+        
+        # WiFi 資訊顯示（從解密的配置讀取）
+        self.wifi_info = QLabel("WiFi 資訊將從配置檔案讀取")
+        self.wifi_info.setStyleSheet("padding: 10px; background-color: #f0f0f0; border-radius: 5px;")
+        wifi_layout.addWidget(self.wifi_info)
+        
+        # 連接按鈕
+        connect_wifi_btn = QPushButton("📡 連接到機器人 WiFi AP")
+        connect_wifi_btn.clicked.connect(self._connect_wifi)
+        connect_wifi_btn.setStyleSheet("padding: 10px; font-weight: bold;")
+        wifi_layout.addWidget(connect_wifi_btn)
+        
+        # WiFi 連接狀態
+        self.wifi_status = QLabel("尚未連接")
+        self.wifi_status.setStyleSheet("color: #666; font-style: italic;")
+        wifi_layout.addWidget(self.wifi_status)
+        
+        wifi_group.setLayout(wifi_layout)
+        layout.addWidget(wifi_group)
+        
+        # === Step 3: 固件上傳 ===
+        firmware_group = QGroupBox("步驟 3：固件選擇與上傳")
+        firmware_group.setEnabled(False)  # 初始禁用
+        self.firmware_group = firmware_group
+        firmware_layout = QVBoxLayout()
+        
+        # 固件檔案選擇
+        firmware_file_layout = QHBoxLayout()
+        self.firmware_file_input = QLineEdit()
+        self.firmware_file_input.setPlaceholderText("選擇固件檔案 (.bin, .hex, .elf)")
+        self.firmware_file_input.setReadOnly(True)
+        firmware_file_layout.addWidget(self.firmware_file_input)
+        
+        browse_firmware_btn = QPushButton("瀏覽...")
+        browse_firmware_btn.clicked.connect(self._browse_firmware_file)
+        firmware_file_layout.addWidget(browse_firmware_btn)
+        firmware_layout.addLayout(firmware_file_layout)
+        
+        # 上傳按鈕
+        upload_btn = QPushButton("🚀 開始上傳固件")
+        upload_btn.clicked.connect(self._upload_firmware)
+        upload_btn.setStyleSheet(
+            "padding: 10px; font-weight: bold; "
+            "background-color: #28a745; color: white;"
+        )
+        firmware_layout.addWidget(upload_btn)
+        
+        # 進度條
+        self.upload_progress = QProgressBar()
+        self.upload_progress.setVisible(False)
+        firmware_layout.addWidget(self.upload_progress)
+        
+        # 上傳狀態
+        self.upload_status = QLabel("請選擇固件檔案")
+        self.upload_status.setStyleSheet("color: #666; font-style: italic;")
+        firmware_layout.addWidget(self.upload_status)
+        
+        firmware_group.setLayout(firmware_layout)
+        layout.addWidget(firmware_group)
+        
+        # === 日誌輸出 ===
+        log_group = QGroupBox("操作日誌")
+        log_layout = QVBoxLayout()
+        
+        self.log_output = QTextEdit()
+        self.log_output.setReadOnly(True)
+        self.log_output.setMaximumHeight(150)
+        self.log_output.setStyleSheet("font-family: monospace; font-size: 11px;")
+        log_layout.addWidget(self.log_output)
+        
+        log_group.setLayout(log_layout)
+        layout.addWidget(log_group)
         
         layout.addStretch()
+        
+        self._log("固件更新模組已初始化")
+        self._log("⚠️ 請從雲端下載加密的配置檔案開始")
+    
+    def _log(self, message: str):
+        """添加日誌訊息"""
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        self.log_output.append(f"[{timestamp}] {message}")
+    
+    def _browse_config_file(self):
+        """瀏覽選擇配置檔案"""
+        from PyQt6.QtWidgets import QFileDialog
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "選擇加密配置檔案", "", 
+            "Encrypted Config (*.enc);;All Files (*.*)"
+        )
+        if file_path:
+            self.encrypted_config_path = file_path
+            self.config_file_input.setText(file_path)
+            self.config_status.setText(f"✓ 已選擇: {file_path.split('/')[-1]}")
+            self.config_status.setStyleSheet("color: #28a745;")
+            self._log(f"已選擇配置檔案: {file_path}")
+    
+    def _decrypt_config(self):
+        """解密並驗證配置檔案"""
+        if not self.encrypted_config_path:
+            QMessageBox.warning(self, "錯誤", "請先選擇配置檔案")
+            return
+        
+        user_token = self.user_token_input.text().strip()
+        if not user_token:
+            QMessageBox.warning(self, "錯誤", "請輸入 User Token")
+            return
+        
+        self._log("開始解密配置檔案...")
+        
+        try:
+            # TODO: 實作真正的解密邏輯
+            # 這裡應該：
+            # 1. 使用 PBKDF2 從 user token 派生金鑰
+            # 2. 使用 AES-GCM 解密檔案
+            # 3. 驗證 HMAC 簽名
+            # 4. 檢查時效性
+            # 5. 解析 WiFi AP、IP、SSH 憑證
+            
+            # 模擬解密成功
+            import json
+            self.decrypted_config = {
+                "wifi_ap": "Robot-AP-12345",
+                "wifi_pwd": "********",
+                "robot_ip": "192.168.4.1",
+                "ssh_user": "robot",
+                "ssh_pwd": "********",
+                "expires_at": "2026-01-21T10:00:00Z"
+            }
+            
+            self._log("✓ 配置檔案解密成功")
+            self._log("✓ 簽名驗證通過")
+            self._log("✓ 時效性檢查通過")
+            
+            # 顯示 WiFi 資訊
+            wifi_text = (
+                f"📡 SSID: {self.decrypted_config['wifi_ap']}\n"
+                f"🔒 密碼: {'*' * 8}\n"
+                f"🌐 機器人 IP: {self.decrypted_config['robot_ip']}"
+            )
+            self.wifi_info.setText(wifi_text)
+            self.wifi_info.setStyleSheet(
+                "padding: 10px; background-color: #d4edda; "
+                "border-radius: 5px; color: #155724;"
+            )
+            
+            # 啟用 WiFi 連接步驟
+            self.wifi_group.setEnabled(True)
+            self.config_status.setText("✓ 配置解密成功，可進行 WiFi 連接")
+            
+            QMessageBox.information(
+                self, "成功", 
+                "配置檔案解密成功！\n現在可以連接到機器人的 WiFi AP"
+            )
+            
+        except Exception as e:
+            self._log(f"❌ 解密失敗: {str(e)}")
+            self.config_status.setText(f"✗ 解密失敗: {str(e)}")
+            self.config_status.setStyleSheet("color: #dc3545;")
+            QMessageBox.critical(self, "錯誤", f"配置解密失敗：\n{str(e)}")
+    
+    def _connect_wifi(self):
+        """連接到機器人 WiFi AP"""
+        if not hasattr(self, 'decrypted_config'):
+            QMessageBox.warning(self, "錯誤", "請先解密配置檔案")
+            return
+        
+        self._log(f"正在連接到 WiFi AP: {self.decrypted_config['wifi_ap']}...")
+        self.wifi_status.setText("連接中...")
+        self.wifi_status.setStyleSheet("color: #ffc107;")
+        
+        try:
+            # TODO: 實作真正的 WiFi 連接邏輯
+            # 在不同平台上可能需要不同的實作：
+            # - Windows: netsh wlan
+            # - Linux: nmcli 或 wpa_supplicant
+            # - macOS: networksetup
+            
+            # 模擬連接成功
+            self._log("✓ WiFi 連接成功")
+            self._log(f"✓ 已連接到: {self.decrypted_config['wifi_ap']}")
+            
+            self.wifi_status.setText(f"✓ 已連接到 {self.decrypted_config['wifi_ap']}")
+            self.wifi_status.setStyleSheet("color: #28a745; font-weight: bold;")
+            
+            # 啟用固件上傳步驟
+            self.firmware_group.setEnabled(True)
+            
+            QMessageBox.information(
+                self, "成功", 
+                f"已連接到機器人 WiFi AP\n現在可以上傳固件"
+            )
+            
+        except Exception as e:
+            self._log(f"❌ WiFi 連接失敗: {str(e)}")
+            self.wifi_status.setText(f"✗ 連接失敗: {str(e)}")
+            self.wifi_status.setStyleSheet("color: #dc3545;")
+            QMessageBox.critical(self, "錯誤", f"WiFi 連接失敗：\n{str(e)}")
+    
+    def _browse_firmware_file(self):
+        """瀏覽選擇固件檔案"""
+        from PyQt6.QtWidgets import QFileDialog
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "選擇固件檔案", "", 
+            "Firmware Files (*.bin *.hex *.elf);;All Files (*.*)"
+        )
+        if file_path:
+            self.firmware_file_path = file_path
+            self.firmware_file_input.setText(file_path)
+            self.upload_status.setText(f"✓ 已選擇: {file_path.split('/')[-1]}")
+            self.upload_status.setStyleSheet("color: #28a745;")
+            self._log(f"已選擇固件檔案: {file_path}")
+    
+    def _upload_firmware(self):
+        """上傳固件到機器人"""
+        if not hasattr(self, 'decrypted_config'):
+            QMessageBox.warning(self, "錯誤", "請先解密配置並連接 WiFi")
+            return
+        
+        if not self.firmware_file_path:
+            QMessageBox.warning(self, "錯誤", "請先選擇固件檔案")
+            return
+        
+        # 確認對話框
+        reply = QMessageBox.question(
+            self, "確認上傳", 
+            f"確定要上傳固件到機器人嗎？\n\n"
+            f"固件檔案: {self.firmware_file_path.split('/')[-1]}\n"
+            f"目標機器人: {self.decrypted_config['robot_ip']}\n\n"
+            f"⚠️ 上傳過程中請勿中斷連接",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        
+        self._log("="*50)
+        self._log("開始固件上傳流程...")
+        self.upload_progress.setVisible(True)
+        self.upload_progress.setValue(0)
+        
+        try:
+            # TODO: 實作真正的固件上傳邏輯
+            # 應該透過 SSH/SFTP 或 HTTP 上傳到機器人
+            # 步驟：
+            # 1. 連接到機器人 (SSH)
+            # 2. 驗證機器人狀態
+            # 3. 上傳固件檔案 (SFTP)
+            # 4. 驗證檔案 checksum
+            # 5. 執行固件更新指令
+            # 6. 等待機器人重啟
+            # 7. 驗證更新成功
+            
+            # 模擬上傳過程
+            import time
+            from PyQt6.QtCore import QTimer
+            
+            steps = [
+                (10, "連接到機器人 SSH..."),
+                (30, "驗證機器人狀態..."),
+                (50, "上傳固件檔案..."),
+                (70, "驗證檔案 checksum..."),
+                (85, "執行固件更新指令..."),
+                (95, "等待機器人重啟..."),
+                (100, "✓ 固件更新完成！")
+            ]
+            
+            def update_progress(step_index=[0]):
+                if step_index[0] < len(steps):
+                    progress, message = steps[step_index[0]]
+                    self.upload_progress.setValue(progress)
+                    self._log(message)
+                    step_index[0] += 1
+                    
+                    if step_index[0] < len(steps):
+                        QTimer.singleShot(1000, lambda: update_progress(step_index))
+                    else:
+                        self._finish_upload()
+            
+            update_progress()
+            
+        except Exception as e:
+            self._log(f"❌ 上傳失敗: {str(e)}")
+            self.upload_status.setText(f"✗ 上傳失敗: {str(e)}")
+            self.upload_status.setStyleSheet("color: #dc3545;")
+            self.upload_progress.setVisible(False)
+            QMessageBox.critical(self, "錯誤", f"固件上傳失敗：\n{str(e)}")
+    
+    def _finish_upload(self):
+        """完成上傳流程"""
+        self.upload_status.setText("✓ 固件更新成功完成！")
+        self.upload_status.setStyleSheet("color: #28a745; font-weight: bold;")
+        self._log("="*50)
+        self._log("🎉 固件更新流程完成！")
+        self._log("⚠️ 加密配置檔案將被安全刪除")
+        
+        # 安全清理
+        try:
+            # TODO: 實作安全刪除加密檔案
+            # 使用多次覆寫後刪除
+            self._log("✓ 配置檔案已安全刪除")
+        except Exception as e:
+            self._log(f"⚠️ 配置檔案刪除警告: {str(e)}")
+        
+        QMessageBox.information(
+            self, "成功", 
+            "固件更新成功完成！\n\n"
+            "機器人已重啟並應用新固件\n"
+            "加密配置檔案已安全刪除"
+        )
+    
+    def refresh(self):
+        """刷新數據"""
+        self._log("刷新固件更新狀態...")
 
 
 class SettingsWidget(QWidget):

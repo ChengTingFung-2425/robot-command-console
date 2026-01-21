@@ -51,7 +51,7 @@ def health_check():
         logger.error(f"Health check failed: {e}")
         return jsonify({
             'status': 'unhealthy',
-            'error': str(e),
+            'error': '健康檢查失敗',
             'timestamp': datetime.utcnow().isoformat()
         }), 503
 
@@ -66,26 +66,32 @@ def download_file(filename):
         filename: File path to download
     """
     try:
+        # Security: Sanitize filename to prevent directory traversal
+        # Use os.path.basename to get only the filename without path
+        safe_filename = os.path.basename(filename)
+        
         # Resolve base download directory and requested file path safely
         download_dir = os.getenv('DOWNLOAD_DIR', '/tmp/downloads')
         base_dir = Path(download_dir).resolve()
-        requested_path = (base_dir / filename).resolve()
+        requested_path = (base_dir / safe_filename).resolve()
 
         # Security: Prevent directory traversal by ensuring the file is within base_dir
         try:
             requested_path.relative_to(base_dir)
         except ValueError:
-            return jsonify({'error': 'Invalid file path'}), 403
+            logger.warning(f"Path traversal attempt detected: {filename}")
+            return jsonify({'error': '檔案路徑無效'}), 403
 
         if not requested_path.is_file():
-            return jsonify({'error': 'File not found'}), 404
+            logger.warning(f"File not found: {safe_filename}")
+            return jsonify({'error': '檔案不存在'}), 404
 
-        logger.info(f"Downloading file: {filename}")
+        logger.info(f"Downloading file: {safe_filename}")
         return send_file(str(requested_path), as_attachment=True)
         
     except Exception as e:
-        logger.error(f"Download failed for {filename}: {e}")
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Download failed: {e}")
+        return jsonify({'error': '下載失敗'}), 500
 
 
 @api_bp.route('/queue/channel', methods=['GET'])
@@ -120,7 +126,7 @@ def get_queue_channel():
         
     except Exception as e:
         logger.error(f"Failed to get queue channels: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': '獲取佇列通道狀態失敗'}), 500
 
 
 @api_bp.route('/queue/channel/<channel_name>', methods=['POST'])
@@ -153,7 +159,7 @@ def send_to_queue(channel_name):
         
     except Exception as e:
         logger.error(f"Failed to send message to {channel_name}: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': '發送訊息到佇列失敗'}), 500
 
 
 @api_bp.route('/queue/channel/<channel_name>/consume', methods=['GET'])
@@ -181,7 +187,7 @@ def consume_from_queue(channel_name):
         
     except Exception as e:
         logger.error(f"Failed to consume from {channel_name}: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': '從佇列消費訊息失敗'}), 500
 
 
 # Error handlers

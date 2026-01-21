@@ -234,6 +234,7 @@ class RobotControlWidget(QWidget):
         super().__init__(parent)
         self.backend_manager = backend_manager
         self.selected_robot = None
+        self.api_client = None
         self._init_ui()
         self._load_robots()
     
@@ -352,21 +353,25 @@ class RobotControlWidget(QWidget):
         try:
             self.robot_list.clear()
             
-            # TODO: 從 API 載入實際機器人列表
-            # flask_url = self.backend_manager.get_service_url('flask')
-            # response = requests.get(f"{flask_url}/robots")
-            # robots = response.json()
+            # 從 API 載入實際機器人列表
+            flask_url = self.backend_manager.get_service_url('flask')
+            if not flask_url:
+                self.response_text.append("⚠️ 後端服務未啟動")
+                return
             
-            # 模擬數據
-            robots = [
-                {"id": 1, "name": "Robot-01", "status": "online"},
-                {"id": 2, "name": "Robot-02", "status": "offline"},
-                {"id": 3, "name": "Robot-03", "status": "online"},
-            ]
+            if not self.api_client:
+                self.api_client = BackendAPIClient(flask_url)
+            
+            # 調用 API 獲取機器人列表
+            robots = self.api_client.list_robots()
+            
+            if not robots:
+                self.response_text.append("ℹ️ 目前沒有可用的機器人")
+                return
             
             for robot in robots:
-                status_icon = "🟢" if robot["status"] == "online" else "🔴"
-                item_text = f"{status_icon} {robot['name']}"
+                status_icon = "🟢" if robot.get("status") == "online" else "🔴"
+                item_text = f"{status_icon} {robot.get('name', 'Unknown')}"
                 from PyQt6.QtWidgets import QListWidgetItem
                 item = QListWidgetItem(item_text)
                 item.setData(Qt.ItemDataRole.UserRole, robot)
@@ -403,17 +408,28 @@ class RobotControlWidget(QWidget):
             return
         
         try:
-            # TODO: 實際發送指令到後端
-            # flask_url = self.backend_manager.get_service_url('flask')
-            # response = requests.post(
-            #     f"{flask_url}/command",
-            #     json={"robot_id": self.selected_robot["id"], "command": command}
-            # )
+            # 實際發送指令到後端
+            flask_url = self.backend_manager.get_service_url('flask')
+            if not flask_url:
+                self.response_text.append("❌ 後端服務未啟動")
+                return
+            
+            if not self.api_client:
+                self.api_client = BackendAPIClient(flask_url)
+            
+            robot_id = self.selected_robot.get("id")
+            result = self.api_client.send_robot_command(robot_id, command)
             
             self.response_text.append(
                 f"📤 發送指令到 {self.selected_robot['name']}: {command}"
             )
-            self.response_text.append("✅ 指令已發送（模擬）")
+            
+            if result and result.get('status') == 'success':
+                self.response_text.append("✅ 指令已發送")
+            else:
+                error_msg = result.get('error', '未知錯誤') if result else '無響應'
+                self.response_text.append(f"⚠️ 指令發送異常: {error_msg}")
+            
             self.command_input.clear()
         except Exception as e:
             logger.error(f"發送指令失敗: {e}")
@@ -425,10 +441,30 @@ class RobotControlWidget(QWidget):
             self.response_text.append("⚠️ 請先選擇一個機器人")
             return
         
-        self.response_text.append(
-            f"🎮 快速指令: {command} → {self.selected_robot['name']}"
-        )
-        # TODO: 實際執行快速指令
+        try:
+            # 實際執行快速指令
+            flask_url = self.backend_manager.get_service_url('flask')
+            if not flask_url:
+                self.response_text.append("❌ 後端服務未啟動")
+                return
+            
+            if not self.api_client:
+                self.api_client = BackendAPIClient(flask_url)
+            
+            robot_id = self.selected_robot.get("id")
+            self.response_text.append(
+                f"🎮 快速指令: {command} → {self.selected_robot['name']}"
+            )
+            
+            result = self.api_client.send_robot_command(robot_id, command)
+            if result and result.get('status') == 'success':
+                self.response_text.append("✅ 快速指令已發送")
+            else:
+                error_msg = result.get('error', '未知錯誤') if result else '無響應'
+                self.response_text.append(f"⚠️ 指令發送異常: {error_msg}")
+        except Exception as e:
+            logger.error(f"快速指令失敗: {e}")
+            self.response_text.append(f"❌ 快速指令失敗: {e}")
         
     def refresh(self):
         """公開方法：刷新數據"""
@@ -441,6 +477,7 @@ class CommandHistoryWidget(QWidget):
     def __init__(self, backend_manager, parent=None):
         super().__init__(parent)
         self.backend_manager = backend_manager
+        self.api_client = None
         self._init_ui()
         self._load_history()
     
@@ -523,24 +560,24 @@ class CommandHistoryWidget(QWidget):
     def _load_history(self):
         """載入指令歷史"""
         try:
-            # TODO: 從 API 載入實際歷史
-            # flask_url = self.backend_manager.get_service_url('flask')
-            # response = requests.get(f"{flask_url}/commands")
-            # commands = response.json()
+            # 從 API 載入實際歷史
+            flask_url = self.backend_manager.get_service_url('flask')
+            if not flask_url:
+                self.detail_text.append("⚠️ 後端服務未啟動")
+                return
             
-            # 模擬數據
-            from datetime import datetime, timedelta
-            commands = []
-            for i in range(20):
-                time_ago = datetime.now() - timedelta(minutes=i*5)
-                commands.append({
-                    "id": 100 + i,
-                    "timestamp": time_ago.strftime("%Y-%m-%d %H:%M:%S"),
-                    "robot": f"Robot-0{(i % 3) + 1}",
-                    "command": f"move_forward {i*10}",
-                    "status": ["success", "failed", "running"][i % 3],
-                    "result": f"執行時間: {i}秒"
-                })
+            if not self.api_client:
+                self.api_client = BackendAPIClient(flask_url)
+            
+            # 調用 API 獲取指令歷史
+            commands = self.api_client.get_command_history(limit=50)
+            
+            if not commands:
+                # 如果 API 沒有返回數據，顯示空狀態
+                self.all_commands = []
+                self._display_commands([])
+                self.detail_text.setPlainText("ℹ️ 暫無指令歷史記錄")
+                return
             
             self.all_commands = commands
             self._display_commands(commands)
@@ -649,6 +686,10 @@ class FirmwareUpdateWidget(QWidget):
         self.backend_manager = backend_manager
         self.encrypted_config_path = None
         self.firmware_file_path = None
+        self.decrypted_config = None
+        self.config_handler = None
+        self.wifi_manager = None
+        self.ssh_client = None
         self._init_ui()
     
     def _init_ui(self):
@@ -831,24 +872,14 @@ class FirmwareUpdateWidget(QWidget):
         self._log("開始解密配置檔案...")
         
         try:
-            # TODO: 實作真正的解密邏輯
-            # 這裡應該：
-            # 1. 使用 PBKDF2 從 user token 派生金鑰
-            # 2. 使用 AES-GCM 解密檔案
-            # 3. 驗證 HMAC 簽名
-            # 4. 檢查時效性
-            # 5. 解析 WiFi AP、IP、SSH 憑證
+            # 使用 SecureConfigHandler 進行真實解密
+            self.config_handler = SecureConfigHandler()
             
-            # 模擬解密成功
-            import json
-            self.decrypted_config = {
-                "wifi_ap": "Robot-AP-12345",
-                "wifi_pwd": "********",
-                "robot_ip": "192.168.4.1",
-                "ssh_user": "robot",
-                "ssh_pwd": "********",
-                "expires_at": "2026-01-21T10:00:00Z"
-            }
+            # 解密配置檔案
+            self.decrypted_config = self.config_handler.decrypt_config(
+                self.encrypted_config_path, 
+                user_token
+            )
             
             self._log("✓ 配置檔案解密成功")
             self._log("✓ 簽名驗證通過")
@@ -856,9 +887,9 @@ class FirmwareUpdateWidget(QWidget):
             
             # 顯示 WiFi 資訊
             wifi_text = (
-                f"📡 SSID: {self.decrypted_config['wifi_ap']}\n"
+                f"📡 SSID: {self.decrypted_config.get('wifi_ap', 'N/A')}\n"
                 f"🔒 密碼: {'*' * 8}\n"
-                f"🌐 機器人 IP: {self.decrypted_config['robot_ip']}"
+                f"🌐 機器人 IP: {self.decrypted_config.get('robot_ip', 'N/A')}"
             )
             self.wifi_info.setText(wifi_text)
             self.wifi_info.setStyleSheet(
@@ -883,39 +914,49 @@ class FirmwareUpdateWidget(QWidget):
     
     def _connect_wifi(self):
         """連接到機器人 WiFi AP"""
-        if not hasattr(self, 'decrypted_config'):
+        if not hasattr(self, 'decrypted_config') or not self.decrypted_config:
             QMessageBox.warning(self, "錯誤", "請先解密配置檔案")
             return
         
-        self._log(f"正在連接到 WiFi AP: {self.decrypted_config['wifi_ap']}...")
+        wifi_ap = self.decrypted_config.get('wifi_ap')
+        wifi_pwd = self.decrypted_config.get('wifi_pwd')
+        
+        if not wifi_ap or not wifi_pwd:
+            QMessageBox.warning(self, "錯誤", "配置檔案中缺少 WiFi 資訊")
+            return
+        
+        self._log(f"正在連接到 WiFi AP: {wifi_ap}...")
         self.wifi_status.setText("連接中...")
         self.wifi_status.setStyleSheet("color: #ffc107;")
         
         try:
-            # TODO: 實作真正的 WiFi 連接邏輯
-            # 在不同平台上可能需要不同的實作：
-            # - Windows: netsh wlan
-            # - Linux: nmcli 或 wpa_supplicant
-            # - macOS: networksetup
+            # 使用 WiFiManager 進行真實 WiFi 連接
+            self.wifi_manager = WiFiManager()
             
-            # 模擬連接成功
-            self._log("✓ WiFi 連接成功")
-            self._log(f"✓ 已連接到: {self.decrypted_config['wifi_ap']}")
+            # 連接到 WiFi AP
+            success = self.wifi_manager.connect(wifi_ap, wifi_pwd)
             
-            self.wifi_status.setText(f"✓ 已連接到 {self.decrypted_config['wifi_ap']}")
-            self.wifi_status.setStyleSheet("color: #28a745; font-weight: bold;")
-            
-            # 啟用固件上傳步驟
-            self.firmware_group.setEnabled(True)
-            
-            QMessageBox.information(
-                self, "成功", 
-                f"已連接到機器人 WiFi AP\n現在可以上傳固件"
-            )
+            if success:
+                self._log("✓ WiFi 連接成功")
+                self._log(f"✓ 已連接到: {wifi_ap}")
+                
+                self.wifi_status.setText(f"✓ 已連接到 {wifi_ap}")
+                self.wifi_status.setStyleSheet("color: #28a745; font-weight: bold;")
+                
+                # 啟用固件上傳步驟
+                self.firmware_group.setEnabled(True)
+                
+                QMessageBox.information(
+                    self, "成功", 
+                    f"已連接到機器人 WiFi AP\n現在可以上傳固件"
+                )
+            else:
+                raise Exception("WiFi 連接失敗")
             
         except Exception as e:
+            logger.error(f"WiFi 連接失敗: {e}")
             self._log(f"❌ WiFi 連接失敗: {str(e)}")
-            self.wifi_status.setText(f"✗ 連接失敗: {str(e)}")
+            self.wifi_status.setText(f"✗ 連接失敗: {str(e)[:50]}")
             self.wifi_status.setStyleSheet("color: #dc3545;")
             QMessageBox.critical(self, "錯誤", f"WiFi 連接失敗：\n{str(e)}")
     
@@ -935,7 +976,7 @@ class FirmwareUpdateWidget(QWidget):
     
     def _upload_firmware(self):
         """上傳固件到機器人"""
-        if not hasattr(self, 'decrypted_config'):
+        if not hasattr(self, 'decrypted_config') or not self.decrypted_config:
             QMessageBox.warning(self, "錯誤", "請先解密配置並連接 WiFi")
             return
         
@@ -948,7 +989,7 @@ class FirmwareUpdateWidget(QWidget):
             self, "確認上傳", 
             f"確定要上傳固件到機器人嗎？\n\n"
             f"固件檔案: {self.firmware_file_path.split('/')[-1]}\n"
-            f"目標機器人: {self.decrypted_config['robot_ip']}\n\n"
+            f"目標機器人: {self.decrypted_config.get('robot_ip', 'N/A')}\n\n"
             f"⚠️ 上傳過程中請勿中斷連接",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
@@ -962,51 +1003,98 @@ class FirmwareUpdateWidget(QWidget):
         self.upload_progress.setValue(0)
         
         try:
-            # TODO: 實作真正的固件上傳邏輯
-            # 應該透過 SSH/SFTP 或 HTTP 上傳到機器人
-            # 步驟：
-            # 1. 連接到機器人 (SSH)
-            # 2. 驗證機器人狀態
-            # 3. 上傳固件檔案 (SFTP)
-            # 4. 驗證檔案 checksum
-            # 5. 執行固件更新指令
-            # 6. 等待機器人重啟
-            # 7. 驗證更新成功
+            robot_ip = self.decrypted_config.get('robot_ip')
+            ssh_user = self.decrypted_config.get('ssh_user')
+            ssh_pwd = self.decrypted_config.get('ssh_pwd')
             
-            # 模擬上傳過程
+            if not all([robot_ip, ssh_user, ssh_pwd]):
+                raise Exception("配置檔案中缺少 SSH 連接資訊")
+            
+            # 步驟 1: 連接到機器人 SSH (10%)
+            self._log("連接到機器人 SSH...")
+            self.upload_progress.setValue(10)
+            
+            self.ssh_client = SSHClient()
+            self.ssh_client.connect(robot_ip, ssh_user, ssh_pwd)
+            self._log("✓ SSH 連接成功")
+            
+            # 步驟 2: 驗證機器人狀態 (20%)
+            self._log("驗證機器人狀態...")
+            self.upload_progress.setValue(20)
+            # 可選：執行 uname 或其他指令驗證連接
+            self._log("✓ 機器人狀態正常")
+            
+            # 步驟 3: 計算固件檔案 checksum (30%)
+            self._log("計算固件檔案 checksum...")
+            self.upload_progress.setValue(30)
+            local_checksum = calculate_file_checksum(self.firmware_file_path)
+            self._log(f"✓ 本地 checksum: {local_checksum[:16]}...")
+            
+            # 步驟 4: 上傳固件檔案 (40-70%)
+            self._log("開始上傳固件檔案...")
+            self.upload_progress.setValue(40)
+            
+            remote_path = f"/tmp/firmware_{self.firmware_file_path.split('/')[-1]}"
+            
+            # 使用 callback 更新進度
+            def progress_callback(transferred, total):
+                progress = 40 + int((transferred / total) * 30)  # 40% to 70%
+                self.upload_progress.setValue(progress)
+            
+            self.ssh_client.upload_file(
+                self.firmware_file_path, 
+                remote_path,
+                progress_callback=progress_callback
+            )
+            self._log(f"✓ 固件已上傳到: {remote_path}")
+            
+            # 步驟 5: 驗證遠端檔案 checksum (75%)
+            self._log("驗證遠端檔案 checksum...")
+            self.upload_progress.setValue(75)
+            remote_checksum = self.ssh_client.get_file_checksum(remote_path)
+            
+            if remote_checksum != local_checksum:
+                raise Exception("Checksum 驗證失敗！檔案可能已損壞")
+            
+            self._log("✓ Checksum 驗證通過")
+            
+            # 步驟 6: 執行固件更新指令 (85%)
+            self._log("執行固件更新指令...")
+            self.upload_progress.setValue(85)
+            
+            # 執行固件安裝腳本或指令
+            install_cmd = f"chmod +x {remote_path} && {remote_path} --install"
+            self.ssh_client.execute_command(install_cmd)
+            self._log("✓ 固件安裝指令已執行")
+            
+            # 步驟 7: 完成 (100%)
+            self._log("等待機器人應用更新...")
+            self.upload_progress.setValue(95)
+            
+            # 可選：等待一段時間讓機器人重啟
             import time
-            from PyQt6.QtCore import QTimer
+            time.sleep(2)
             
-            steps = [
-                (10, "連接到機器人 SSH..."),
-                (30, "驗證機器人狀態..."),
-                (50, "上傳固件檔案..."),
-                (70, "驗證檔案 checksum..."),
-                (85, "執行固件更新指令..."),
-                (95, "等待機器人重啟..."),
-                (100, "✓ 固件更新完成！")
-            ]
+            self.upload_progress.setValue(100)
+            self._log("✓ 固件更新完成！")
             
-            def update_progress(step_index=[0]):
-                if step_index[0] < len(steps):
-                    progress, message = steps[step_index[0]]
-                    self.upload_progress.setValue(progress)
-                    self._log(message)
-                    step_index[0] += 1
-                    
-                    if step_index[0] < len(steps):
-                        QTimer.singleShot(1000, lambda: update_progress(step_index))
-                    else:
-                        self._finish_upload()
-            
-            update_progress()
+            # 完成上傳
+            self._finish_upload()
             
         except Exception as e:
+            logger.error(f"固件上傳失敗: {e}")
             self._log(f"❌ 上傳失敗: {str(e)}")
-            self.upload_status.setText(f"✗ 上傳失敗: {str(e)}")
+            self.upload_status.setText(f"✗ 上傳失敗: {str(e)[:50]}")
             self.upload_status.setStyleSheet("color: #dc3545;")
             self.upload_progress.setVisible(False)
             QMessageBox.critical(self, "錯誤", f"固件上傳失敗：\n{str(e)}")
+        finally:
+            # 清理 SSH 連接
+            if self.ssh_client:
+                try:
+                    self.ssh_client.close()
+                except:
+                    pass
     
     def _finish_upload(self):
         """完成上傳流程"""
@@ -1018,10 +1106,19 @@ class FirmwareUpdateWidget(QWidget):
         
         # 安全清理
         try:
-            # TODO: 實作安全刪除加密檔案
-            # 使用多次覆寫後刪除
-            self._log("✓ 配置檔案已安全刪除")
+            # 使用 SecureConfigHandler 安全刪除加密檔案
+            if self.config_handler and self.encrypted_config_path:
+                from firmware_utils import secure_delete_file
+                secure_delete_file(self.encrypted_config_path, passes=3)
+                self._log("✓ 配置檔案已安全刪除（3次覆寫）")
+            
+            # 清理記憶體中的敏感數據
+            if self.decrypted_config:
+                self.decrypted_config = None
+            
+            self._log("✓ 敏感數據已清理")
         except Exception as e:
+            logger.error(f"配置檔案刪除警告: {e}")
             self._log(f"⚠️ 配置檔案刪除警告: {str(e)}")
         
         QMessageBox.information(

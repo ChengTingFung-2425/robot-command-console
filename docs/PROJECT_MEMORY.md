@@ -780,7 +780,96 @@ def get_robot_status():
 ---
 
 **檔案精簡**：2,633 行 → 450 行（保留核心，詳細內容移至專題文件）
-**最後更新**：2025-12-17
+**最後更新**：2026-01-21
+
+### 2026-01-21: Phase 3.2 - Qt Widgets 完全真實化與 CodeQL 安全修復
+- **完成** Phase 1 WIP 替換（10/47 項目，21%）
+- **移除** 所有 Qt Widgets 模擬數據，使用真實 API 調用
+- **整合** 標準 Python 套件（pywifi, paramiko, scp, cryptography, tqdm）
+- **創建** backend_client.py（完整 REST API 客戶端，無模擬）
+- **創建** firmware_utils.py（真實 WiFi/SSH/加密實作）
+- **修復** CodeQL 安全問題（路徑遍歷、資訊洩露）
+- **建立** WIP 替換追蹤系統（docs/temp/WIP_REPLACEMENT_TRACKING.md）
+- 詳見：[memory/phase3_lessons.md](memory/phase3_lessons.md)
+
+**關鍵經驗**：
+1. **不重造輪子原則**
+   - 使用 pywifi 替代自製 subprocess WiFi 呼叫
+   - 使用 paramiko + scp 簡化 SSH/SFTP 實作
+   - 使用 cryptography 提供生產級加密
+   - 標準套件提供跨平台支援和社群維護
+
+2. **系統化 WIP 替換策略**
+   - 創建追蹤文件記錄所有 TODO/WIP 項目（47 個）
+   - 按優先級分為 4 個 Phase（Qt Widgets → API Routes → Edge Services → MCP）
+   - 逐步替換，確保每個階段可驗證
+   - 使用 docs/temp/ 存放臨時追蹤文件
+
+3. **CodeQL 安全修復模式**
+   - **路徑遍歷防護**：使用 `os.path.basename()` 淨化檔案名稱
+   - **資訊洩露防護**：所有異常替換為通用中文錯誤訊息
+   - 詳細錯誤僅記錄於伺服器日誌（`logger.error`）
+   - 增加安全事件警告日誌（路徑遍歷嘗試）
+
+4. **真實 API 整合架構**
+   - BackendAPIClient 統一管理所有 REST API 調用
+   - 所有 Widget 注入 api_client 依賴
+   - 錯誤處理統一（try-except + 日誌 + 用戶反饋）
+   - 支援模擬模式後備（開發測試用）
+
+5. **固件更新安全流程**
+   - SecureConfigHandler：PBKDF2 + Fernet 加密
+   - WiFiManager：pywifi 跨平台 WiFi 連接
+   - SSHClient：paramiko + scp 安全上傳
+   - secure_delete_file：3 次覆寫安全刪除
+   - 記憶體敏感數據清理（finally 區塊）
+
+6. **Qt Widgets 真實化模式**
+   ```python
+   # ✅ 注入真實 API 客戶端
+   class RobotControlWidget(QWidget):
+       def __init__(self):
+           self.api_client = BackendAPIClient(base_url=BACKEND_URL)
+       
+       def _load_robots(self):
+           try:
+               robots = self.api_client.list_robots()
+               self.populate_list(robots)
+           except Exception as e:
+               logger.error(f"Failed to load robots: {e}")
+               self.show_error("無法載入機器人列表")
+   ```
+
+7. **Code Review 清理建議**
+   - 移除未使用的 import（降低依賴）
+   - 空 except 子句添加說明註解
+   - 避免直接捕獲 BaseException（使用 Exception）
+   - 使用 logger.warning/debug 替代 pass
+
+**問題與解決**：
+- **問題**：Qt Widgets 初期使用模擬數據，無法測試真實功能
+  - **解決**：創建 backend_client.py 和 firmware_utils.py，統一真實實作
+
+- **問題**：CodeQL 發現路徑遍歷漏洞（用戶可傳入 `../../../etc/passwd`）
+  - **解決**：使用 `os.path.basename()` 移除路徑分隔符
+
+- **問題**：異常堆棧暴露給客戶端（資訊洩露風險）
+  - **解決**：所有 `str(e)` 替換為中文通用錯誤訊息
+
+- **問題**：47 個 TODO 項目難以追蹤
+  - **解決**：創建 WIP_REPLACEMENT_TRACKING.md，系統化管理
+
+**效能改進**：
+- Qt 原生 Widgets 效能優於 WebView（減少記憶體與 CPU 使用）
+- requests Session 重用減少連線建立開銷
+- pywifi 提供更穩定的跨平台 WiFi 管理
+
+**相關文件**：
+- [docs/temp/WIP_REPLACEMENT_TRACKING.md](../docs/temp/WIP_REPLACEMENT_TRACKING.md)
+- [qtwebview-app/backend_client.py](../qtwebview-app/backend_client.py)
+- [qtwebview-app/firmware_utils.py](../qtwebview-app/firmware_utils.py)
+- [qtwebview-app/main_window.py](../qtwebview-app/main_window.py)
+- [memory/phase3_lessons.md](memory/phase3_lessons.md)
 
 ### 2026-01-05: RabbitMQ & AWS SQS 佇列整合
 - **新增** RabbitMQ Queue 實作（450+ 行，完整實作 QueueInterface）

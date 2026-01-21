@@ -8,6 +8,19 @@ pyinstaller>=6.0.0
 # HTTP 請求
 requests>=2.31.0
 
+# 加密與安全
+cryptography>=41.0.0
+
+# SSH/SFTP 支援
+paramiko>=3.3.0
+scp>=0.14.5
+
+# WiFi 管理（跨平台）
+pywifi>=1.1.12
+
+# 進度條顯示
+tqdm>=4.66.0
+
 # 注意：運行前需先安裝主專案依賴：
 #   pip install -r ../requirements.txt
 # 或使用統一安裝：

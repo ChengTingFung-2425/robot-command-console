@@ -17,6 +17,10 @@ from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEnginePage
 
+# 導入後端客戶端和工具模組
+from backend_client import BackendAPIClient
+from firmware_utils import SecureConfigHandler, WiFiManager, SSHClient, calculate_file_checksum
+
 logger = logging.getLogger(__name__)
 
 
@@ -86,6 +90,7 @@ class DashboardWidget(QWidget):
     def __init__(self, backend_manager, parent=None):
         super().__init__(parent)
         self.backend_manager = backend_manager
+        self.api_client = None
         self._init_ui()
         self._load_data()
     
@@ -174,25 +179,39 @@ class DashboardWidget(QWidget):
                     "border-radius: 5px; color: #155724;"
                 )
                 
-                # TODO: 實際從 API 載入數據
-                # import requests
-                # response = requests.get(f"{flask_url}/api/health")
-                # data = response.json()
-                
-                # 模擬數據
-                self.robot_count_label.setText("機器人: 3 台")
-                self.command_count_label.setText("指令: 12 條")
-                
-                # 添加活動項目
-                self.activity_list.clear()
-                activities = [
-                    "✅ 機器人 #1 已連接",
-                    "📤 指令已發送到機器人 #2",
-                    "🔄 系統狀態更新",
-                    "✅ 固件檢查完成",
-                ]
-                for activity in activities:
-                    self.activity_list.addItem(activity)
+                # 實際從 API 載入數據
+                try:
+                    if not self.api_client:
+                        self.api_client = BackendAPIClient(flask_url)
+                    
+                    # 獲取機器人統計
+                    robot_stats = self.api_client.get_robot_stats()
+                    if 'total' in robot_stats:
+                        self.robot_count_label.setText(f"機器人: {robot_stats['total']} 台")
+                    else:
+                        self.robot_count_label.setText("機器人: 載入中...")
+                    
+                    # 獲取指令統計
+                    command_stats = self.api_client.get_command_stats()
+                    if 'total' in command_stats:
+                        self.command_count_label.setText(f"指令: {command_stats['total']} 條")
+                    else:
+                        self.command_count_label.setText("指令: 載入中...")
+                    
+                    # 獲取最近活動
+                    self.activity_list.clear()
+                    activities = self.api_client.get_recent_activity(limit=5)
+                    if activities:
+                        for activity in activities:
+                            self.activity_list.addItem(activity.get('message', '未知活動'))
+                    else:
+                        # Fallback 如果 API 未返回數據
+                        self.activity_list.addItem("暫無最近活動")
+                        
+                except Exception as e:
+                    logger.error(f"載入數據失敗: {e}")
+                    self.robot_count_label.setText("機器人: 錯誤")
+                    self.command_count_label.setText("指令: 錯誤")
             else:
                 self.backend_status.setText("後端: 未啟動")
                 self.backend_status.setStyleSheet(

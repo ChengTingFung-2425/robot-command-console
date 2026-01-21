@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import QApplication, QMessageBox
 from PyQt6.QtCore import QCoreApplication
 
 from webview_window import WebViewWindow
+from main_window import HybridMainWindow
 
 # 導入統一後端服務管理器
 from src.common.backend_service_manager import BackendServiceManagerSync
@@ -82,8 +83,9 @@ def main():
         )
         sys.exit(1)
 
-    # 建立主視窗
-    window = WebViewWindow(backend_manager)
+    # 建立主視窗 (使用混合架構 - Approach B)
+    # window = WebViewWindow(backend_manager)  # 舊版 WebView
+    window = HybridMainWindow(backend_manager)  # 新版混合架構
     
     # 關閉啟動畫面
     if splash:

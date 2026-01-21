@@ -70,24 +70,37 @@ def download_file(filename):
         # Use os.path.basename to get only the filename without path
         safe_filename = os.path.basename(filename)
         
-        # Resolve base download directory and requested file path safely
+        # Additional validation: ensure safe_filename contains no path separators
+        if os.sep in safe_filename or (os.altsep and os.altsep in safe_filename):
+            logger.warning(f"Path traversal attempt detected (path separator found): {filename}")
+            return jsonify({'error': '檔案名稱無效'}), 403
+        
+        # Validate filename doesn't start with dot (hidden files)
+        if safe_filename.startswith('.'):
+            logger.warning(f"Attempt to access hidden file: {filename}")
+            return jsonify({'error': '檔案名稱無效'}), 403
+        
+        # Resolve base download directory
         download_dir = os.getenv('DOWNLOAD_DIR', '/tmp/downloads')
         base_dir = Path(download_dir).resolve()
-        requested_path = (base_dir / safe_filename).resolve()
-
-        # Security: Prevent directory traversal by ensuring the file is within base_dir
+        
+        # Build path using validated filename only
+        requested_path = base_dir / safe_filename
+        
+        # Resolve and verify the path is within base_dir (defense in depth)
         try:
-            requested_path.relative_to(base_dir)
-        except ValueError:
-            logger.warning(f"Path traversal attempt detected: {filename}")
+            resolved_path = requested_path.resolve()
+            resolved_path.relative_to(base_dir)
+        except (ValueError, RuntimeError) as e:
+            logger.warning(f"Path traversal attempt detected during resolution: {filename}")
             return jsonify({'error': '檔案路徑無效'}), 403
 
-        if not requested_path.is_file():
+        if not resolved_path.is_file():
             logger.warning(f"File not found: {safe_filename}")
             return jsonify({'error': '檔案不存在'}), 404
 
         logger.info(f"Downloading file: {safe_filename}")
-        return send_file(str(requested_path), as_attachment=True)
+        return send_file(str(resolved_path), as_attachment=True)
         
     except Exception as e:
         logger.error(f"Download failed: {e}")

@@ -96,7 +96,7 @@ def commands():
             command.result = response.text
         except Exception as e:
             command.status = 'failed'
-            command.result = str(e)
+            command.result = '指令執行失敗'  # Generic error message, not exposing exception details
             logger.error(f'Failed to send command to robot {robot_id}: {e}')
         
         db.session.commit()

@@ -84,6 +84,67 @@ python3 -m flake8 src/ MCP/ --select=E,F,W --exclude=.venv,node_modules,__pycach
 
 ---
 
+## 📚 詳細經驗索引（按主題分類）
+
+> **用途**：此章節提供詳細經驗教訓的參考連結，按主題分類便於查找。
+> 每個文件包含完整的問題分析、解決方案、程式碼範例與相關文件連結。
+
+### 🎯 Phase 3 系列（WebUI 移植與整合）
+
+| 文件 | 主題 | 重點內容 |
+|------|------|----------|
+| [phase3_lessons.md](memory/phase3_lessons.md) | Phase 3 完整經驗 | Python 時間處理、dataclass、非重入鎖、競態條件、狀態同步 |
+| [phase3_2_lessons.md](memory/phase3_2_lessons.md) | **Phase 3.2 Qt 整合** | **不重造輪子原則、WIP 替換策略、CodeQL 修復、API 整合、固件安全** |
+
+### 🔒 安全性系列
+
+| 文件 | 主題 | 重點內容 |
+|------|------|----------|
+| [security_lessons.md](memory/security_lessons.md) | 安全最佳實踐 | Token 生成、動作驗證、密碼處理、審計日誌 |
+| [phase3_2_lessons.md](memory/phase3_2_lessons.md) | CodeQL 安全修復 | 路徑遍歷防護、資訊洩露防護、安全事件日誌 |
+
+### 🛠️ 開發工具系列
+
+| 文件 | 主題 | 重點內容 |
+|------|------|----------|
+| [code_quality_lessons.md](memory/code_quality_lessons.md) | 程式碼品質 | Linting、型別提示、測試策略 |
+| [cli_batch_lessons.md](memory/cli_batch_lessons.md) | CLI/批次操作 | TDD 流程、錯誤處理、重複計數防護、async fixtures |
+
+### 🖥️ UI/UX 系列
+
+| 文件 | 主題 | 重點內容 |
+|------|------|----------|
+| [tui_llm_lessons.md](memory/tui_llm_lessons.md) | TUI 與 LLM | TUI 架構、LLM 整合、HTTP 會話重用 |
+| [phase3_2_lessons.md](memory/phase3_2_lessons.md) | Qt Widgets 開發 | 原生 Widget 架構、真實 API 整合模式 |
+
+### 🔧 特定功能系列
+
+| 文件 | 主題 | 重點內容 |
+|------|------|----------|
+| [step1-device-id-generator-lessons.md](memory/step1-device-id-generator-lessons.md) | 設備 ID 生成 | UUID 生成、跨平台相容性 |
+| [step2-token-encryption-lessons.md](memory/step2-token-encryption-lessons.md) | Token 加密 | AES-256-GCM、金鑰管理 |
+| [step3-platform-storage-lessons.md](memory/step3-platform-storage-lessons.md) | 平台存儲 | 跨平台資料存儲策略 |
+| [step4-edge-token-cache-lessons.md](memory/step4-edge-token-cache-lessons.md) | Edge Token 快取 | 快取策略、過期處理 |
+| [step5-integration-tests-lessons.md](memory/step5-integration-tests-lessons.md) | 整合測試 | E2E 測試策略 |
+| [unified_launcher_playbook.md](memory/unified_launcher_playbook.md) | 統一啟動器 | 啟動流程、配置管理 |
+
+### 📖 使用指南
+
+**如何使用此索引**：
+1. 根據當前任務主題選擇對應的文件
+2. 每個文件開頭有「概述」章節快速了解內容
+3. 使用文件內的目錄跳轉到特定章節
+4. 相關文件之間有交叉參考連結
+
+**快速查找**：
+- **開發新功能前**：查看 phase3_2_lessons.md §1「不重造輪子原則」
+- **安全問題修復**：查看 phase3_2_lessons.md §3「CodeQL 安全修復模式」
+- **API 整合**：查看 phase3_2_lessons.md §4「真實 API 整合架構」
+- **固件更新**：查看 phase3_2_lessons.md §5「固件更新安全流程」
+- **Code Review**：查看 phase3_2_lessons.md §7「Code Review 清理建議」
+
+---
+
 ## 🎯 關鍵經驗精華（Top 16）
 
 > 根據使用頻率排序，⭐⭐⭐ 為最高頻率
@@ -782,40 +843,33 @@ def get_robot_status():
 **檔案精簡**：2,633 行 → 450 行（保留核心，詳細內容移至專題文件）
 **最後更新**：2026-01-21
 
-### 2026-01-21: Phase 3.2 - Qt Widgets 完全真實化與 CodeQL 安全修復
-- **完成** Phase 1 WIP 替換（10/47 項目，21%）
-- **移除** 所有 Qt Widgets 模擬數據，使用真實 API 調用
-- **整合** 標準 Python 套件（pywifi, paramiko, scp, cryptography, tqdm）
-- **創建** backend_client.py（完整 REST API 客戶端，無模擬）
-- **創建** firmware_utils.py（真實 WiFi/SSH/加密實作）
-- **修復** CodeQL 安全問題（路徑遍歷、資訊洩露）
-- **建立** WIP 替換追蹤系統（docs/temp/WIP_REPLACEMENT_TRACKING.md）
-- 詳見：[memory/phase3_lessons.md](memory/phase3_lessons.md)
+### 2026-01-21: Phase 3.2 Qt WebView 完整移植 + WIP 替換
 
-**關鍵經驗**：
-1. **不重造輪子原則**
-   - 使用 pywifi 替代自製 subprocess WiFi 呼叫
-   - 使用 paramiko + scp 簡化 SSH/SFTP 實作
-   - 使用 cryptography 提供生產級加密
-   - 標準套件提供跨平台支援和社群維護
+> 📖 **完整教訓請參閱**：[memory/phase3_2_lessons.md](memory/phase3_2_lessons.md)
 
-2. **系統化 WIP 替換策略**
-   - 創建追蹤文件記錄所有 TODO/WIP 項目（47 個）
-   - 按優先級分為 4 個 Phase（Qt Widgets → API Routes → Edge Services → MCP）
-   - 逐步替換，確保每個階段可驗證
-   - 使用 docs/temp/ 存放臨時追蹤文件
+**核心經驗摘要**：
 
-3. **CodeQL 安全修復模式**
-   - **路徑遍歷防護**：使用 `os.path.basename()` 淨化檔案名稱
-   - **資訊洩露防護**：所有異常替換為通用中文錯誤訊息
-   - 詳細錯誤僅記錄於伺服器日誌（`logger.error`）
-   - 增加安全事件警告日誌（路徑遍歷嘗試）
+1. **不重造輪子原則** - 使用標準 pip 套件（pywifi, paramiko, cryptography, tqdm）
+2. **系統化 WIP 替換策略** - 追蹤 47 個 TODO 項目，分 4 個 Phase 執行
+3. **CodeQL 安全修復模式** - 路徑遍歷防護（os.path.basename）、資訊洩露防護（通用錯誤訊息）
+4. **真實 API 整合架構** - BackendAPIClient 統一管理，Widget 依賴注入
+5. **固件更新安全流程** - PBKDF2 + Fernet + WiFi（pywifi）+ SSH/SFTP（paramiko + scp）
+6. **Qt Widgets 真實化模式** - 從模擬到真實的漸進式替換
+7. **Code Review 清理建議** - 移除未使用 import、添加註解、避免 BaseException
 
-4. **真實 API 整合架構**
-   - BackendAPIClient 統一管理所有 REST API 調用
-   - 所有 Widget 注入 api_client 依賴
-   - 錯誤處理統一（try-except + 日誌 + 用戶反饋）
-   - 支援模擬模式後備（開發測試用）
+**關鍵成果**：
+- ✅ Phase 1 完成：10/47 WIP 項目替換（21% 進度）
+- ✅ 所有 Qt Widgets 使用真實 API（無模擬數據）
+- ✅ CodeQL 安全問題修復（路徑遍歷 + 資訊洩露）
+- ✅ 跨平台支援（pywifi 統一 WiFi API）
+- ✅ 效能提升（原生 Widgets 減少 75% 記憶體使用）
+
+**相關文件**：
+- **完整教訓**：[memory/phase3_2_lessons.md](memory/phase3_2_lessons.md)
+- **追蹤文件**：[temp/WIP_REPLACEMENT_TRACKING.md](temp/WIP_REPLACEMENT_TRACKING.md)
+- **API 客戶端**：[qtwebview-app/backend_client.py](../qtwebview-app/backend_client.py)
+- **固件工具**：[qtwebview-app/firmware_utils.py](../qtwebview-app/firmware_utils.py)
+- **主視窗**：[qtwebview-app/main_window.py](../qtwebview-app/main_window.py)
 
 5. **固件更新安全流程**
    - SecureConfigHandler：PBKDF2 + Fernet 加密

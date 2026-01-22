@@ -8,7 +8,6 @@ import json
 import hashlib
 import logging
 from typing import Dict, Optional, Tuple
-from pathlib import Path
 from datetime import datetime
 
 # 使用現有套件

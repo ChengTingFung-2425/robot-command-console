@@ -4,8 +4,8 @@ Includes: Audit logs, Robot registration
 """
 
 import logging
-from datetime import datetime, timedelta
-from flask import Blueprint, jsonify, request, render_template, redirect, url_for, flash, make_response
+from datetime import datetime
+from flask import Blueprint, request, render_template, redirect, url_for, flash, make_response
 from flask_login import current_user, login_required
 from WebUI.app import db
 from WebUI.app.models import Robot, AuditLog
@@ -81,13 +81,15 @@ def audit_logs():
             start_dt = datetime.fromisoformat(start_date)
             query = query.filter(AuditLog.timestamp >= start_dt)
         except ValueError:
-            pass
+            # 若開始日期格式不正確，忽略該過濾條件但記錄警告日誌
+            logger.warning("Invalid start_date format in audit_logs query: %r", start_date)
     if end_date:
         try:
             end_dt = datetime.fromisoformat(end_date)
             query = query.filter(AuditLog.timestamp <= end_dt)
         except ValueError:
-            pass
+            # 若結束日期格式不正確，忽略該過濾條件但記錄警告日誌
+            logger.warning("Invalid end_date format in audit_logs query: %r", end_date)
     
     pagination = query.order_by(AuditLog.timestamp.desc()).paginate(
         page=page, per_page=per_page, error_out=False
@@ -129,13 +131,15 @@ def export_audit_logs():
             start_dt = datetime.fromisoformat(start_date)
             query = query.filter(AuditLog.timestamp >= start_dt)
         except ValueError:
-            pass
+            # Ignore invalid start_date format but log for auditing/debugging
+            logger.warning("Invalid start_date format in export_audit_logs: %s", start_date)
     if end_date:
         try:
             end_dt = datetime.fromisoformat(end_date)
             query = query.filter(AuditLog.timestamp <= end_dt)
         except ValueError:
-            pass
+            # Ignore invalid end_date format but log for auditing/debugging
+            logger.warning("Invalid end_date format in export_audit_logs: %s", end_date)
     
     logs = query.order_by(AuditLog.timestamp.desc()).limit(10000).all()
     

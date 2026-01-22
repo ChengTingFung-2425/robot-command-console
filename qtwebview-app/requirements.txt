@@ -7,6 +7,7 @@ pyinstaller>=6.0.0
 
 # HTTP 請求
 requests>=2.31.0
+urllib3>=2.6.3  # 修復 Dependabot 安全警告：解壓縮炸彈保護繞過漏洞
 
 # 加密與安全
 cryptography>=41.0.0

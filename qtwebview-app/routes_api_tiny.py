@@ -90,17 +90,26 @@ def download_file(filename):
         # Resolve and verify the path is within base_dir (defense in depth)
         try:
             resolved_path = requested_path.resolve()
+            # CRITICAL: Verify resolved path is still within base_dir
             resolved_path.relative_to(base_dir)
         except (ValueError, RuntimeError) as e:
             logger.warning(f"Path traversal attempt detected during resolution: {filename}")
+            return jsonify({'error': '檔案路徑無效'}), 403
+
+        # Additional check: Ensure resolved path starts with base_dir (extra safety)
+        if not str(resolved_path).startswith(str(base_dir)):
+            logger.warning(f"Path traversal attempt: resolved path outside base_dir: {filename}")
             return jsonify({'error': '檔案路徑無效'}), 403
 
         if not resolved_path.is_file():
             logger.warning(f"File not found: {safe_filename}")
             return jsonify({'error': '檔案不存在'}), 404
 
+        # Use the validated safe_filename with base_dir for final file access
+        # This ensures we're always using the sanitized filename, not the resolved path
+        final_path = base_dir / safe_filename
         logger.info(f"Downloading file: {safe_filename}")
-        return send_file(str(resolved_path), as_attachment=True)
+        return send_file(str(final_path), as_attachment=True)
         
     except Exception as e:
         logger.error(f"Download failed: {e}")

@@ -288,7 +288,16 @@ class ServiceManager:
         Returns:
             健康狀態資訊
         """
-        return await self.queue.health_check()
+        queue_health = await self.queue.health_check()
+        # Add ServiceManager-specific fields
+        return {
+            **queue_health,
+            "started": self._started,
+            "handler": {
+                "running": self._started,
+                "max_workers": self.max_workers,
+            }
+        }
 
     async def get_queue_stats(self) -> Dict[str, Any]:
         """

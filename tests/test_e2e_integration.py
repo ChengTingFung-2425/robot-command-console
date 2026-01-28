@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import pytest
 
 # Import MessagePriority for test usage
-from robot_service.queue import Message, MessagePriority
+from robot_service.queue import MessagePriority
 
 
 class TestEndToEndIntegration:

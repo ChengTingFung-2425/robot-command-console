@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QSplitter, QStackedWidget, QListWidget, QListWidgetItem,
     QLabel, QMessageBox, QStatusBar, QToolBar
 )
-from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtGui import QAction
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEnginePage
 
@@ -1093,8 +1093,9 @@ class FirmwareUpdateWidget(QWidget):
             if self.ssh_client:
                 try:
                     self.ssh_client.close()
-                except:
-                    pass
+                except Exception as e:
+                    # SSH 連線清理失敗不應中斷主流程，僅記錄除錯資訊
+                    logger.debug(f"SSH client close failed: {e}")
     
     def _finish_upload(self):
         """完成上傳流程"""

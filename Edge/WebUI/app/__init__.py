@@ -107,6 +107,10 @@ def create_app(config_name='default'):
     from WebUI.app.auth_api import auth_api_bp
     flask_app.register_blueprint(auth_api_bp)
 
+    # Register blueprint for Tiny routes
+    from WebUI.app.routes_tiny import tiny_routes
+    flask_app.register_blueprint(tiny_routes)
+
     # Register error handlers
     from WebUI.app.errors import register_error_handlers
     register_error_handlers(flask_app)

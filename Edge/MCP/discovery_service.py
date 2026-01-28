@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from .models import ProviderManifest, ProviderHealth, Skill
 from .scanner import FilesystemScanner
 from .probe import EndpointProbe
+from src.common.llm_manager import LLMManager
 
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,7 @@ class DiscoveryService:
     """
 
     def __init__(self):
+        self.llm_manager = LLMManager()
         self._providers: Dict[str, ProviderManifest] = {}
         self._health_cache: Dict[str, ProviderHealth] = {}
         self.scanner = FilesystemScanner()

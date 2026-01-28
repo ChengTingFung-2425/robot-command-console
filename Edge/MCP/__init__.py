@@ -13,6 +13,7 @@ from .models import (
     Skill,
     AntiDecryptionConfig,
 )
+from src.common.llm_manager import LLMManager
 from .scanner import FilesystemScanner
 from .probe import EndpointProbe
 from .discovery_service import DiscoveryService
@@ -36,6 +37,7 @@ __all__ = [
     "MCPAdapter",
     "MCPErrorCode",
     "SkillTranslator",
+    "LLMManager",
 ]
 
 __version__ = "1.0.0"

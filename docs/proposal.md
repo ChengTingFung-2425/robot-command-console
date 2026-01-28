@@ -71,6 +71,11 @@ Phase 2 開始演進為 Server-Edge-Runner 三層架構，Phase 3 將完整實�
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
+### MCP Service Update
+
+- **Unified MCP and LLM Discovery**: The MCP module now integrates LLM discovery functionality, providing a single interface for managing providers, health checks, and skill discovery.
+- **Shared Utilities**: Common functionality has been abstracted into the `LLMManager` module, ensuring reusability and reducing redundancy.
+
 ### 層級職責
 
 | 層級 | 目錄 | 職責 |

@@ -14,6 +14,7 @@ from .llm_provider_base import (
     ProviderStatus,
 )
 from .providers import LMStudioProvider, OllamaProvider
+from src.common.llm_manager import LLMManager
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,7 @@ class LLMProviderManager:
             custom_providers: 自訂提供商類別列表（用於擴充）
             mcp_tool_interface: MCP 工具介面，用於注入到提供商
         """
+        self.llm_manager = LLMManager()
         self.providers: Dict[str, LLMProviderBase] = {}
         self.provider_classes = self.DEFAULT_PROVIDERS.copy()
 
@@ -324,3 +326,17 @@ class LLMProviderManager:
         self.logger.error("沒有可用的備用提供商")
         self._selected_provider = None
         return False
+
+    def register_providers(self):
+        """
+        Register default and custom providers using the unified LLMManager.
+        """
+        for provider_cls in self.DEFAULT_PROVIDERS:
+            provider_instance = provider_cls()
+            self.llm_manager.register_provider(provider_instance)
+
+    def check_provider_health(self, provider_name):
+        """
+        Check health of a provider using the unified LLMManager.
+        """
+        return self.llm_manager.check_health(provider_name)

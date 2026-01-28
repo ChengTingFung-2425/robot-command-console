@@ -2,6 +2,7 @@ import os
 from aio_pika import logger
 import toml
 import platform
+from src.common.config import BaseConfig
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 # Determine the appropriate configuration directory based on the OS
@@ -47,7 +48,7 @@ if not os.path.exists(config_path):
 # Load configuration from the final path
 config_data = toml.load(config_path)
 
-class Config(object):
+class Config(BaseConfig):
     SECRET_KEY = config_data.get("SECRET_KEY", "you-will-never-guess")
     SQLALCHEMY_DATABASE_URI = config_data.get("SQLALCHEMY_DATABASE_URI", 'postgresql://postgres:postgres@postgresdb:5432/postgres')
     SQLALCHEMY_TRACK_MODIFICATIONS = config_data.get("SQLALCHEMY_TRACK_MODIFICATIONS", False)
@@ -69,3 +70,8 @@ class Config(object):
     MQTT_CA_CERT = config_data.get("MQTT_CA_CERT", 'AmazonRootCA1.pem')
     MQTT_TIMEOUT = int(config_data.get("MQTT_TIMEOUT", 5))
     DOWNLOAD_DIR = config_data.get("DOWNLOAD_DIR", '/tmp/downloads')
+
+class EdgeConfig(Config):
+    # Extend the base configuration with Edge-specific settings
+    EDGE_SERVICE_TIMEOUT = 300
+    EDGE_HEALTH_CHECK_INTERVAL = 60

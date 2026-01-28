@@ -21,14 +21,12 @@ from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional
 
-# 配置日誌
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+# Replace local logging setup with common logging utility
+from src.common.logging_utils import setup_logging
 
+setup_logging()
 
+# Replace local ServiceType with the common ServiceType
 class ServiceType(Enum):
     """服務類型"""
     FLASK_API = "flask"

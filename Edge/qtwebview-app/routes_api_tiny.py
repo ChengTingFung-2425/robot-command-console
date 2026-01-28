@@ -8,6 +8,7 @@ import logging
 import os
 from datetime import datetime
 from pathlib import Path
+from config import Config
 
 # Create blueprint
 api_bp = Blueprint('api_tiny', __name__, url_prefix='/api')
@@ -48,7 +49,7 @@ def health_check():
         return jsonify(health_status), 200
         
     except Exception as e:
-        logger.error(f"Health check failed: {e}")
+        logger.error(f"Health check failed: {type(e).__name__} in robot component")
         return jsonify({
             'status': 'unhealthy',
             'error': '健康檢查失敗',
@@ -61,50 +62,45 @@ def health_check():
 def download_file(filename):
     """
     Download endpoint for files (logs, reports, firmware)
-    
+
     Args:
         filename: File path to download
     """
     try:
-        # Security: Sanitize filename to prevent directory traversal
-        # Use os.path.basename to get only the filename without path
+        # Resolve base download directory from configuration
+        download_dir = Path(Config.DOWNLOAD_DIR).resolve()
+        base_dir = Path(download_dir)
+
+        # Sanitize and validate the filename
         safe_filename = os.path.basename(filename)
-        
-        # Additional validation: ensure safe_filename contains no path separators
         if os.sep in safe_filename or (os.altsep and os.altsep in safe_filename):
-            logger.warning(f"Path traversal attempt detected (path separator found): {filename}")
-            return jsonify({'error': '檔案名稱無效'}), 403
-        
-        # Validate filename doesn't start with dot (hidden files)
+            logger.warning(f"Path traversal attempt detected: {filename}")
+            return jsonify({'error': 'Invalid file name'}), 403
+
         if safe_filename.startswith('.'):
             logger.warning(f"Attempt to access hidden file: {filename}")
-            return jsonify({'error': '檔案名稱無效'}), 403
-        
-        # Resolve base download directory
-        download_dir = os.getenv('DOWNLOAD_DIR', '/tmp/downloads')
-        base_dir = Path(download_dir).resolve()
-        
-        # Build path using validated filename only
-        requested_path = base_dir / safe_filename
-        
-        # Resolve and verify the path is within base_dir (defense in depth)
-        try:
-            resolved_path = requested_path.resolve()
-            resolved_path.relative_to(base_dir)
-        except (ValueError, RuntimeError) as e:
-            logger.warning(f"Path traversal attempt detected during resolution: {filename}")
-            return jsonify({'error': '檔案路徑無效'}), 403
+            return jsonify({'error': 'Invalid file name'}), 403
 
+        # Build and resolve the requested file path
+        requested_path = base_dir / safe_filename
+        try:
+            resolved_path = requested_path.resolve(strict=True)
+            resolved_path.relative_to(base_dir)
+        except (ValueError, RuntimeError, FileNotFoundError) as e:
+            logger.warning(f"Invalid file path resolution: {filename}")
+            return jsonify({'error': 'Invalid file path'}), 403
+
+        # Check if the resolved path is a file
         if not resolved_path.is_file():
             logger.warning(f"File not found: {safe_filename}")
-            return jsonify({'error': '檔案不存在'}), 404
+            return jsonify({'error': 'File not found'}), 404
 
-        logger.info(f"Downloading file: {safe_filename}")
+        logger.info(f"File download initiated: {safe_filename}")
         return send_file(str(resolved_path), as_attachment=True)
-        
+
     except Exception as e:
-        logger.error(f"Download failed: {e}")
-        return jsonify({'error': '下載失敗'}), 500
+        logger.error(f"Download failed: {type(e).__name__} - {e}")
+        return jsonify({'error': 'Download failed'}), 500
 
 
 @api_bp.route('/queue/channel', methods=['GET'])

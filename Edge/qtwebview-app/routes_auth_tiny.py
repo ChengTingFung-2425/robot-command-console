@@ -12,6 +12,7 @@ from WebUI.app.models import User, UserProfile
 from WebUI.app.forms import LoginForm, RegisterForm
 from WebUI.app.audit import log_login_attempt, log_logout, log_registration
 from WebUI.app.engagement import award_on_registration
+from flask import current_app
 
 bp_auth = Blueprint('auth', __name__, url_prefix='/auth')
 logger = logging.getLogger(__name__)
@@ -89,12 +90,14 @@ def login():
             # Accept only relative paths without scheme/netloc and starting with '/'
             if not parsed.scheme and not parsed.netloc and candidate.startswith('/'):
                 next_page = candidate
-        
-        if not next_page:
+            # Verify if the route exists in the Flask application
+            if next_page and next_page in [rule.rule for rule in current_app.url_map.iter_rules()]:
+                next_page = candidate
+        else:
             next_page = url_for('core.dashboard')
         
         flash(f'歡迎回來，{user.username}！', 'success')
-        return redirect(next_page)
+        return redirect(next_page or url_for('core.dashboard'))
     
     return render_template('login.html.j2', form=form)
 

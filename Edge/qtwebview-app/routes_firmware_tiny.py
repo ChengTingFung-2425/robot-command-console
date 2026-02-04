@@ -8,19 +8,119 @@ import logging
 from datetime import datetime
 import paramiko
 import os
+import sys
 import shlex
+import json
+import hashlib
+from pathlib import Path
+
+# Add parent directories to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+try:
+    from config import Config
+except ImportError:
+    # Fallback if config not available
+    class Config:
+        SECRET_KEY = 'dev-secret-key'
+        FIRMWARE_DIR = '/tmp/firmware'
+        ROBOT_VARS_DIR = '/tmp/robot_vars'
+
+try:
+    import jwt
+    JWT_AVAILABLE = True
+except ImportError:
+    JWT_AVAILABLE = False
 
 # Create blueprint
 firmware_bp = Blueprint('firmware_tiny', __name__, url_prefix='/firmware')
 logger = logging.getLogger(__name__)
 
+# Global task tracking (in production, use Redis or database)
+_deployment_tasks = {}
+
+# Ensure firmware and vars directories exist
+def _ensure_directories():
+    """Ensure firmware and robot vars directories exist"""
+    firmware_dir = getattr(Config, 'FIRMWARE_DIR', '/tmp/firmware')
+    vars_dir = getattr(Config, 'ROBOT_VARS_DIR', '/tmp/robot_vars')
+    
+    Path(firmware_dir).mkdir(parents=True, exist_ok=True)
+    Path(vars_dir).mkdir(parents=True, exist_ok=True)
+    
+    return firmware_dir, vars_dir
+
+def _get_firmware_metadata(firmware_path):
+    """Get metadata for a firmware file"""
+    try:
+        stat = firmware_path.stat()
+        
+        # Calculate file hash
+        hash_md5 = hashlib.md5()
+        with open(firmware_path, 'rb') as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                hash_md5.update(chunk)
+        
+        return {
+            'id': firmware_path.stem,
+            'filename': firmware_path.name,
+            'version': firmware_path.stem,  # Could parse from filename
+            'upload_date': datetime.fromtimestamp(stat.st_mtime).isoformat(),
+            'size': f"{stat.st_size / (1024*1024):.2f}MB",
+            'size_bytes': stat.st_size,
+            'checksum': hash_md5.hexdigest(),
+            'status': 'available'
+        }
+    except Exception as e:
+        logger.error(f"Failed to get metadata for {firmware_path}: {e}")
+        return None
+
 
 def admin_required(f):
-    """Admin permission decorator"""
+    """Admin permission decorator with role check"""
     @wraps(f)
     def decorated(*args, **kwargs):
-        # TODO: Implement actual admin check
-        return f(*args, **kwargs)
+        # Check for admin role in JWT token or session
+        auth_header = request.headers.get('Authorization')
+        
+        if not auth_header:
+            return jsonify({'error': 'No authorization token'}), 401
+        
+        parts = auth_header.split()
+        if len(parts) != 2 or parts[0].lower() != 'bearer':
+            return jsonify({'error': 'Invalid authorization header format'}), 401
+        
+        token = parts[1]
+        
+        if not JWT_AVAILABLE:
+            logger.warning("JWT not available, skipping admin check")
+            return f(*args, **kwargs)
+        
+        try:
+            # Decode and validate JWT token
+            payload = jwt.decode(
+                token,
+                Config.SECRET_KEY,
+                algorithms=['HS256']
+            )
+            
+            # Check for admin role
+            user_role = payload.get('role', 'user')
+            is_admin = payload.get('is_admin', False)
+            
+            if user_role != 'admin' and not is_admin:
+                return jsonify({'error': 'Admin permission required'}), 403
+            
+            # Store user info in request context
+            request.user_id = payload.get('user_id')
+            request.username = payload.get('username')
+            request.is_admin = True
+            
+            return f(*args, **kwargs)
+        except jwt.ExpiredSignatureError:
+            return jsonify({'error': 'Token has expired'}), 401
+        except jwt.InvalidTokenError as e:
+            logger.warning(f"Invalid token for admin check: {e}")
+            return jsonify({'error': 'Invalid token'}), 401
     return decorated
 
 
@@ -28,10 +128,34 @@ def jwt_required(f):
     """JWT authentication decorator"""
     @wraps(f)
     def decorated(*args, **kwargs):
-        token = request.headers.get('Authorization')
-        if not token:
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
             return jsonify({'error': 'No authorization token'}), 401
-        return f(*args, **kwargs)
+        
+        parts = auth_header.split()
+        if len(parts) != 2 or parts[0].lower() != 'bearer':
+            return jsonify({'error': 'Invalid authorization header format'}), 401
+        
+        token = parts[1]
+        
+        if not JWT_AVAILABLE:
+            logger.warning("JWT not available, skipping token validation")
+            return f(*args, **kwargs)
+        
+        try:
+            payload = jwt.decode(
+                token,
+                Config.SECRET_KEY,
+                algorithms=['HS256']
+            )
+            request.user_id = payload.get('user_id')
+            request.username = payload.get('username')
+            return f(*args, **kwargs)
+        except jwt.ExpiredSignatureError:
+            return jsonify({'error': 'Token has expired'}), 401
+        except jwt.InvalidTokenError as e:
+            logger.warning(f"Invalid token: {e}")
+            return jsonify({'error': 'Invalid token'}), 401
     return decorated
 
 
@@ -39,24 +163,34 @@ def jwt_required(f):
 @jwt_required
 def list_firmware():
     """
-    List available firmware versions
+    List available firmware versions from storage
     """
     try:
-        # TODO: Get actual firmware list from storage
-        firmware_list = {
-            'firmware': [
-                {
-                    'id': 'fw_001',
-                    'version': '1.0.0',
-                    'upload_date': '2025-01-01T00:00:00Z',
-                    'size': '10MB',
-                    'status': 'available'
-                }
-            ],
+        firmware_dir, _ = _ensure_directories()
+        firmware_path = Path(firmware_dir)
+        
+        # Scan directory for firmware files
+        firmware_list = []
+        for file_path in firmware_path.glob('*.bin'):
+            metadata = _get_firmware_metadata(file_path)
+            if metadata:
+                firmware_list.append(metadata)
+        
+        # Also check for .hex, .fw, .img files
+        for ext in ['*.hex', '*.fw', '*.img']:
+            for file_path in firmware_path.glob(ext):
+                metadata = _get_firmware_metadata(file_path)
+                if metadata:
+                    firmware_list.append(metadata)
+        
+        result = {
+            'firmware': firmware_list,
+            'count': len(firmware_list),
             'timestamp': datetime.utcnow().isoformat()
         }
         
-        return jsonify(firmware_list), 200
+        logger.info(f"Listed {len(firmware_list)} firmware files")
+        return jsonify(result), 200
         
     except Exception as e:
         logger.error(f"Failed to list firmware: {e}")
@@ -68,7 +202,7 @@ def list_firmware():
 @admin_required
 def upload_firmware():
     """
-    Upload new firmware file
+    Upload new firmware file with validation
     Admin only
     """
     try:
@@ -79,17 +213,47 @@ def upload_firmware():
         if file.filename == '':
             return jsonify({'error': 'Empty filename'}), 400
         
-        # TODO: Implement actual file upload and validation
-        firmware_id = f"fw_{datetime.utcnow().timestamp()}"
+        # Validate file extension
+        allowed_extensions = {'.bin', '.hex', '.fw', '.img'}
+        file_ext = Path(file.filename).suffix.lower()
+        if file_ext not in allowed_extensions:
+            return jsonify({'error': f'Invalid file type. Allowed: {", ".join(allowed_extensions)}'}), 400
+        
+        firmware_dir, _ = _ensure_directories()
+        
+        # Generate unique firmware ID
+        firmware_id = f"fw_{int(datetime.utcnow().timestamp())}"
+        safe_filename = f"{firmware_id}{file_ext}"
+        file_path = Path(firmware_dir) / safe_filename
+        
+        # Save file
+        file.save(str(file_path))
+        
+        # Validate file (check it's not empty and has reasonable size)
+        file_size = file_path.stat().st_size
+        if file_size == 0:
+            file_path.unlink()
+            return jsonify({'error': 'Empty file'}), 400
+        
+        # Calculate checksum
+        hash_md5 = hashlib.md5()
+        with open(file_path, 'rb') as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                hash_md5.update(chunk)
         
         result = {
             'firmware_id': firmware_id,
-            'filename': file.filename,
+            'filename': safe_filename,
+            'original_filename': file.filename,
+            'size': f"{file_size / (1024*1024):.2f}MB",
+            'size_bytes': file_size,
+            'checksum': hash_md5.hexdigest(),
             'status': 'uploaded',
+            'path': str(file_path),
             'timestamp': datetime.utcnow().isoformat()
         }
         
-        logger.info(f"Firmware uploaded: {firmware_id}")
+        logger.info(f"Firmware uploaded: {firmware_id} ({file.filename})")
         return jsonify(result), 201
         
     except Exception as e:
@@ -135,11 +299,27 @@ def deploy_via_sftp():
         
         sftp = paramiko.SFTPClient.from_transport(transport)
         
-        # TODO: Get actual firmware file path
+        # Get actual firmware file path from storage
+        firmware_dir, _ = _ensure_directories()
+        firmware_path = Path(firmware_dir)
+        
         # Sanitize firmware_id to prevent path traversal
         safe_firmware_id = os.path.basename(data['firmware_id'])
-        local_firmware_path = f"/tmp/firmware/{safe_firmware_id}.bin"
-        remote_firmware_path = os.path.join(data['remote_path'], f"{safe_firmware_id}.bin")
+        
+        # Find the firmware file (check multiple extensions)
+        local_firmware_path = None
+        for ext in ['.bin', '.hex', '.fw', '.img']:
+            candidate = firmware_path / f"{safe_firmware_id}{ext}"
+            if candidate.exists():
+                local_firmware_path = str(candidate)
+                break
+        
+        if not local_firmware_path:
+            sftp.close()
+            transport.close()
+            return jsonify({'error': f'Firmware file not found: {safe_firmware_id}'}), 404
+        
+        remote_firmware_path = os.path.join(data['remote_path'], os.path.basename(local_firmware_path))
         
         # Upload firmware
         sftp.put(local_firmware_path, remote_firmware_path)
@@ -147,7 +327,7 @@ def deploy_via_sftp():
         sftp.close()
         transport.close()
         
-        task_id = f"deploy_{datetime.utcnow().timestamp()}"
+        task_id = f"deploy_{int(datetime.utcnow().timestamp())}"
         
         result = {
             'task_id': task_id,
@@ -156,6 +336,17 @@ def deploy_via_sftp():
             'method': 'sftp',
             'status': 'uploaded',
             'remote_path': remote_firmware_path,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        
+        # Store task status for tracking
+        _deployment_tasks[task_id] = {
+            'task_id': task_id,
+            'status': 'completed',
+            'progress': 100,
+            'robot_id': data['robot_id'],
+            'firmware_id': data['firmware_id'],
+            'method': 'sftp',
             'timestamp': datetime.utcnow().isoformat()
         }
         
@@ -213,11 +404,27 @@ def deploy_and_execute_via_ssh():
         
         sftp = paramiko.SFTPClient.from_transport(transport)
         
-        # Upload firmware
+        # Get actual firmware file path from storage
+        firmware_dir, _ = _ensure_directories()
+        firmware_path = Path(firmware_dir)
+        
         # Sanitize firmware_id to prevent path traversal
         safe_firmware_id = os.path.basename(data['firmware_id'])
-        local_firmware_path = f"/tmp/firmware/{safe_firmware_id}.bin"
-        remote_firmware_path = os.path.join(data['remote_path'], f"{safe_firmware_id}.bin")
+        
+        # Find the firmware file (check multiple extensions)
+        local_firmware_path = None
+        for ext in ['.bin', '.hex', '.fw', '.img']:
+            candidate = firmware_path / f"{safe_firmware_id}{ext}"
+            if candidate.exists():
+                local_firmware_path = str(candidate)
+                break
+        
+        if not local_firmware_path:
+            sftp.close()
+            transport.close()
+            return jsonify({'error': f'Firmware file not found: {safe_firmware_id}'}), 404
+        
+        remote_firmware_path = os.path.join(data['remote_path'], os.path.basename(local_firmware_path))
         sftp.put(local_firmware_path, remote_firmware_path)
         
         sftp.close()
@@ -261,18 +468,32 @@ def deploy_and_execute_via_ssh():
         ssh_client.close()
         transport.close()
         
-        task_id = f"deploy_{datetime.utcnow().timestamp()}"
+        task_id = f"deploy_{int(datetime.utcnow().timestamp())}"
+        
+        task_status = 'completed' if exit_code == 0 else 'failed'
         
         result = {
             'task_id': task_id,
             'robot_id': data['robot_id'],
             'firmware_id': data['firmware_id'],
             'method': 'ssh_auto_exec',
-            'status': 'completed' if exit_code == 0 else 'failed',
+            'status': task_status,
             'exit_code': exit_code,
             'output': output,
             'error': error if error else None,
             'remote_path': remote_firmware_path,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        
+        # Store task status for tracking
+        _deployment_tasks[task_id] = {
+            'task_id': task_id,
+            'status': task_status,
+            'progress': 100,
+            'robot_id': data['robot_id'],
+            'firmware_id': data['firmware_id'],
+            'method': 'ssh_auto_exec',
+            'exit_code': exit_code,
             'timestamp': datetime.utcnow().isoformat()
         }
         
@@ -300,15 +521,20 @@ def get_deployment_status(task_id):
         task_id: Deployment task ID
     """
     try:
-        # TODO: Implement actual task status tracking
-        status = {
-            'task_id': task_id,
-            'status': 'completed',
-            'progress': 100,
-            'timestamp': datetime.utcnow().isoformat()
-        }
-        
-        return jsonify(status), 200
+        # Get actual task status from tracking dictionary
+        if task_id in _deployment_tasks:
+            status_data = _deployment_tasks[task_id]
+            logger.info(f"Retrieved status for task {task_id}")
+            return jsonify(status_data), 200
+        else:
+            # Task not found - might have completed and been cleaned up
+            status = {
+                'task_id': task_id,
+                'status': 'unknown',
+                'message': 'Task not found or expired',
+                'timestamp': datetime.utcnow().isoformat()
+            }
+            return jsonify(status), 404
         
     except Exception as e:
         logger.error(f"Failed to get deployment status: {e}")
@@ -322,25 +548,36 @@ def robot_variables(robot_id):
     Get or set environment variables for robot
     Used to cast configuration to robot before firmware deployment
     
-    GET: Retrieve current robot variables
-    POST: Set/update robot variables
+    GET: Retrieve current robot variables from storage
+    POST: Set/update robot variables to storage
     
     Args:
         robot_id: Target robot identifier
     """
     try:
+        _, vars_dir = _ensure_directories()
+        vars_file = Path(vars_dir) / f"{robot_id}.json"
+        
         if request.method == 'GET':
-            # TODO: Get actual robot variables from storage/cache
-            variables = {
-                'robot_id': robot_id,
-                'variables': {
-                    'FIRMWARE_VERSION': '1.0.0',
-                    'CONFIG_MODE': 'production',
-                    'LOG_LEVEL': 'INFO',
-                    'NETWORK_INTERFACE': 'eth0'
-                },
-                'timestamp': datetime.utcnow().isoformat()
-            }
+            # Get actual robot variables from storage
+            if vars_file.exists():
+                with open(vars_file, 'r') as f:
+                    stored_vars = json.load(f)
+                
+                variables = {
+                    'robot_id': robot_id,
+                    'variables': stored_vars.get('variables', {}),
+                    'last_updated': stored_vars.get('last_updated'),
+                    'timestamp': datetime.utcnow().isoformat()
+                }
+            else:
+                # Return empty variables if no file exists
+                variables = {
+                    'robot_id': robot_id,
+                    'variables': {},
+                    'last_updated': None,
+                    'timestamp': datetime.utcnow().isoformat()
+                }
             
             logger.info(f"Retrieved variables for robot {robot_id}")
             return jsonify(variables), 200
@@ -351,7 +588,16 @@ def robot_variables(robot_id):
             if not data or 'variables' not in data:
                 return jsonify({'error': 'No variables provided'}), 400
             
-            # TODO: Store variables for robot
+            # Store variables for robot in JSON file
+            storage_data = {
+                'robot_id': robot_id,
+                'variables': data['variables'],
+                'last_updated': datetime.utcnow().isoformat()
+            }
+            
+            with open(vars_file, 'w') as f:
+                json.dump(storage_data, f, indent=2)
+            
             result = {
                 'robot_id': robot_id,
                 'variables': data['variables'],

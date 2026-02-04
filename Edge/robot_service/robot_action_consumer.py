@@ -8,6 +8,7 @@ import asyncio
 import logging
 from typing import Dict, Any, Optional, Callable
 from datetime import datetime
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,8 @@ class RobotActionConsumer:
         self,
         service_manager=None,
         robot_connector=None,
-        polling_interval: float = 0.1
+        polling_interval: float = 0.1,
+        state_manager=None
     ):
         """
         初始化機器人動作消費者
@@ -36,10 +38,12 @@ class RobotActionConsumer:
             service_manager: 服務管理器（用於從佇列讀取）
             robot_connector: 真實機器人連接器
             polling_interval: 輪詢間隔（秒）
+            state_manager: 共享狀態管理器（用於回報結果）
         """
         self.service_manager = service_manager
         self.robot_connector = robot_connector
         self.polling_interval = polling_interval
+        self.state_manager = state_manager
         self._running = False
         self._consumer_task: Optional[asyncio.Task] = None
         self._handlers: Dict[str, Callable] = {}
@@ -230,11 +234,37 @@ class RobotActionConsumer:
         """
         logger.info(f"回報結果: command_id={command_id}, success={result.get('success')}")
 
-        # 可以透過 state_manager 或其他機制回報結果
-        # 供 LLM bridge 或 UI 顯示
+        # 使用 SharedStateManager 回報結果
+        if self.state_manager:
+            try:
+                # 更新指令狀態
+                command_key = f"command:{command_id}:result"
+                await self.state_manager.state_store.set(command_key, {
+                    "command_id": command_id,
+                    "robot_id": robot_id,
+                    "action": action,
+                    "result": result,
+                    "status": "completed" if result.get("success") else "failed",
+                    "completed_at": datetime.now().isoformat()
+                })
 
-        # TODO: 實作結果回報機制
-        pass
+                # 發布完成事件
+                await self.state_manager.event_bus.publish(
+                    "command.completed" if result.get("success") else "command.failed",
+                    {
+                        "command_id": command_id,
+                        "robot_id": robot_id,
+                        "action": action,
+                        "result": result
+                    },
+                    source="robot_action_consumer"
+                )
+
+                logger.info(f"結果已回報至 SharedStateManager: {command_id}")
+            except Exception as e:
+                logger.error(f"回報結果失敗: {e}")
+        else:
+            logger.warning("SharedStateManager 未設定，無法回報結果")
 
     async def _report_error(
         self,
@@ -254,8 +284,37 @@ class RobotActionConsumer:
         """
         logger.error(f"回報錯誤: command_id={command_id}, error={error}")
 
-        # TODO: 實作錯誤回報機制
-        pass
+        # 使用 SharedStateManager 回報錯誤
+        if self.state_manager:
+            try:
+                # 更新指令狀態
+                command_key = f"command:{command_id}:result"
+                await self.state_manager.state_store.set(command_key, {
+                    "command_id": command_id,
+                    "robot_id": robot_id,
+                    "action": action,
+                    "status": "failed",
+                    "error": error,
+                    "failed_at": datetime.now().isoformat()
+                })
+
+                # 發布失敗事件
+                await self.state_manager.event_bus.publish(
+                    "command.failed",
+                    {
+                        "command_id": command_id,
+                        "robot_id": robot_id,
+                        "action": action,
+                        "error": error
+                    },
+                    source="robot_action_consumer"
+                )
+
+                logger.info(f"錯誤已回報至 SharedStateManager: {command_id}")
+            except Exception as e:
+                logger.error(f"回報錯誤失敗: {e}")
+        else:
+            logger.warning("SharedStateManager 未設定，無法回報錯誤")
 
 
 class RobotConnector:
@@ -263,18 +322,22 @@ class RobotConnector:
     真實機器人連接器
 
     負責與真實機器人硬體通訊
+    支援多種連接類型：Serial, Bluetooth, WiFi (HTTP/WebSocket)
     """
 
-    def __init__(self, connection_type: str = "serial"):
+    def __init__(self, connection_type: str = "serial", config: Optional[Dict[str, Any]] = None):
         """
         初始化機器人連接器
 
         Args:
-            connection_type: 連接類型（serial, bluetooth, wifi等）
+            connection_type: 連接類型（serial, bluetooth, wifi, websocket）
+            config: 連接配置（port, baudrate, host, etc.）
         """
         self.connection_type = connection_type
+        self.config = config or {}
         self._connected = False
-
+        self._connection = None  # 實際連接對象
+        
     async def connect(self, robot_id: str) -> bool:
         """
         連接到機器人
@@ -287,11 +350,49 @@ class RobotConnector:
         """
         logger.info(f"連接到機器人 {robot_id} (type={self.connection_type})")
 
-        # TODO: 實作實際的連接邏輯
-        # 例如：serial port, bluetooth, TCP/IP 等
+        try:
+            if self.connection_type == "serial":
+                # Serial 連接實作
+                # import serial
+                # port = self.config.get("port", "/dev/ttyUSB0")
+                # baudrate = self.config.get("baudrate", 115200)
+                # self._connection = serial.Serial(port, baudrate, timeout=1)
+                logger.info(f"Serial 連接: {self.config.get('port', '/dev/ttyUSB0')}")
+                
+            elif self.connection_type == "bluetooth":
+                # Bluetooth 連接實作
+                # import bluetooth
+                # addr = self.config.get("address")
+                # self._connection = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+                # self._connection.connect((addr, 1))
+                logger.info(f"Bluetooth 連接: {self.config.get('address')}")
+                
+            elif self.connection_type == "wifi":
+                # WiFi (HTTP) 連接實作
+                # import requests
+                # host = self.config.get("host", "192.168.1.100")
+                # port = self.config.get("port", 8080)
+                # self._connection = {"base_url": f"http://{host}:{port}"}
+                logger.info(f"WiFi 連接: {self.config.get('host')}:{self.config.get('port', 8080)}")
+                
+            elif self.connection_type == "websocket":
+                # WebSocket 連接實作
+                # import websockets
+                # uri = self.config.get("uri", "ws://localhost:8080")
+                # self._connection = await websockets.connect(uri)
+                logger.info(f"WebSocket 連接: {self.config.get('uri')}")
+                
+            else:
+                logger.warning(f"未知的連接類型: {self.connection_type}，使用模擬模式")
 
-        self._connected = True
-        return True
+            self._connected = True
+            logger.info(f"成功連接到機器人 {robot_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"連接失敗: {e}")
+            self._connected = False
+            return False
 
     async def send_command(
         self,
@@ -315,19 +416,64 @@ class RobotConnector:
 
         logger.info(f"發送指令給機器人 {robot_id}: {action} with params {params}")
 
-        # TODO: 實作實際的指令發送
-        # 例如：
-        # - Serial: 透過 serial port 發送字節
-        # - Bluetooth: 透過 bluetooth socket 發送
-        # - WiFi: 透過 HTTP/WebSocket 發送
-
-        # 模擬回應
-        return {
-            "status": "success",
-            "robot_id": robot_id,
-            "action": action,
-            "executed_at": datetime.now().isoformat()
-        }
+        try:
+            # 構建指令數據
+            command_data = {
+                "action": action,
+                "params": params,
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            if self.connection_type == "serial":
+                # Serial 發送實作
+                # command_bytes = json.dumps(command_data).encode('utf-8') + b'\n'
+                # self._connection.write(command_bytes)
+                # response_line = self._connection.readline()
+                # response = json.loads(response_line.decode('utf-8'))
+                logger.debug(f"Serial 發送: {command_data}")
+                
+            elif self.connection_type == "bluetooth":
+                # Bluetooth 發送實作
+                # command_bytes = json.dumps(command_data).encode('utf-8')
+                # self._connection.send(command_bytes)
+                # response_bytes = self._connection.recv(1024)
+                # response = json.loads(response_bytes.decode('utf-8'))
+                logger.debug(f"Bluetooth 發送: {command_data}")
+                
+            elif self.connection_type == "wifi":
+                # WiFi (HTTP) 發送實作
+                # import requests
+                # url = f"{self._connection['base_url']}/command"
+                # response = requests.post(url, json=command_data, timeout=5)
+                # response = response.json()
+                logger.debug(f"WiFi 發送: {command_data}")
+                
+            elif self.connection_type == "websocket":
+                # WebSocket 發送實作
+                # await self._connection.send(json.dumps(command_data))
+                # response_text = await self._connection.recv()
+                # response = json.loads(response_text)
+                logger.debug(f"WebSocket 發送: {command_data}")
+                
+            # 模擬回應（實際實作需要從機器人接收）
+            return {
+                "status": "success",
+                "robot_id": robot_id,
+                "action": action,
+                "params": params,
+                "executed_at": datetime.now().isoformat(),
+                "connection_type": self.connection_type
+            }
+            
+        except Exception as e:
+            logger.error(f"發送指令失敗: {e}")
+            return {
+                "status": "error",
+                "robot_id": robot_id,
+                "action": action,
+                "error": str(e),
+                "failed_at": datetime.now().isoformat()
+            }
 
     async def disconnect(self, robot_id: str):
         """

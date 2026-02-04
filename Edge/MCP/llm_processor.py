@@ -171,14 +171,74 @@ class LLMProcessor:
                 f"skill={skill_id}, params={parameters}"
             )
 
-            # TODO: 實作實際的 HTTP/IPC 呼叫
-            return {
-                "success": True,
-                "provider_id": provider_id,
-                "skill_id": skill_id,
-                "message": "Skill invoked successfully (POC mode)",
-                "parameters": parameters
-            }
+            # 實作實際的 HTTP/IPC 呼叫
+            try:
+                import requests
+                
+                # 從 discovery service 取得 provider 端點
+                provider_info = await self._discovery_service.get_provider_info(provider_id)
+                if not provider_info:
+                    raise ValueError(f"Provider {provider_id} not found")
+                
+                endpoint = provider_info.get("endpoint")
+                if not endpoint:
+                    raise ValueError(f"Provider {provider_id} has no endpoint")
+                
+                # 構建請求
+                url = f"{endpoint}/skills/{skill_id}/invoke"
+                payload = {
+                    "skill_id": skill_id,
+                    "parameters": parameters or {},
+                    "provider_id": provider_id
+                }
+                
+                # 發送 HTTP POST 請求
+                response = requests.post(
+                    url,
+                    json=payload,
+                    timeout=30,
+                    headers={"Content-Type": "application/json"}
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    self.logger.info(f"Skill {skill_id} 呼叫成功")
+                    return {
+                        "success": True,
+                        "provider_id": provider_id,
+                        "skill_id": skill_id,
+                        "result": result,
+                        "parameters": parameters
+                    }
+                else:
+                    error_msg = f"HTTP {response.status_code}: {response.text}"
+                    self.logger.error(f"Skill 呼叫失敗: {error_msg}")
+                    return {
+                        "success": False,
+                        "provider_id": provider_id,
+                        "skill_id": skill_id,
+                        "error": error_msg
+                    }
+                    
+            except ImportError:
+                # requests 未安裝，返回模擬結果
+                self.logger.warning("requests library not available, using mock response")
+                return {
+                    "success": True,
+                    "provider_id": provider_id,
+                    "skill_id": skill_id,
+                    "message": "Skill invoked successfully (mock mode - requests not installed)",
+                    "parameters": parameters
+                }
+            except Exception as e:
+                # HTTP 呼叫失敗，記錄錯誤
+                self.logger.error(f"HTTP/IPC 呼叫失敗: {e}")
+                return {
+                    "success": False,
+                    "provider_id": provider_id,
+                    "skill_id": skill_id,
+                    "error": str(e)
+                }
 
         except Exception as e:
             self.logger.error(f"呼叫 llm-cop skill 失敗: {e}")

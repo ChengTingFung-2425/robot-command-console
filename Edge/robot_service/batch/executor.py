@@ -491,7 +491,40 @@ class BatchExecutor:
         Returns:
             執行結果資料
         """
-        # TODO: 實作真正的結果等待邏輯
-        # 目前先使用模擬延遲
-        await asyncio.sleep(0.1)
-        return {"status": "completed"}
+        # 實作真正的結果等待邏輯
+        # 從 SharedStateManager 輪詢指令狀態
+        max_wait_time = 30  # 最長等待 30 秒
+        poll_interval = 0.2  # 每 200ms 檢查一次
+        elapsed_time = 0
+        
+        logger.debug(f"開始等待指令結果: {command_id}")
+        
+        while elapsed_time < max_wait_time:
+            try:
+                # 從 state_manager 檢查指令狀態
+                if hasattr(self, 'state_manager') and self.state_manager:
+                    command_key = f"command:{command_id}:result"
+                    result = await self.state_manager.state_store.get(command_key)
+                    
+                    if result:
+                        status = result.get("status")
+                        if status in ["completed", "failed"]:
+                            logger.info(f"指令 {command_id} 已完成: {status}")
+                            return result
+                
+                # 未完成，繼續等待
+                await asyncio.sleep(poll_interval)
+                elapsed_time += poll_interval
+                
+            except Exception as e:
+                logger.error(f"檢查指令狀態失敗: {e}")
+                await asyncio.sleep(poll_interval)
+                elapsed_time += poll_interval
+        
+        # 逾時
+        logger.warning(f"指令 {command_id} 等待逾時 ({max_wait_time}s)")
+        return {
+            "status": "timeout",
+            "command_id": command_id,
+            "error": f"Command execution timeout after {max_wait_time}s"
+        }

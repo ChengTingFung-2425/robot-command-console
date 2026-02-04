@@ -1,8 +1,14 @@
-# Cloud Services - 雲端服務模組
+# Cloud
 
-> **分離日期**: 2025-12-10  
-> **狀態**: 已從 WebUI 分離，獨立為雲端服務  
-> **部署**: Cloud/Server Layer
+This folder contains modules and components related to cloud-based operations, such as user management, notifications, and firmware repositories.
+
+---
+
+## Recent Updates
+
+### 2026-01-28
+- **MCP Isolation**: MCP services have been moved to the Edge folder to align with edge-related responsibilities.
+- **Integration Completed**: Notification and firmware repository services remain in the Cloud folder and have been fully integrated.
 
 ---
 
@@ -30,32 +36,10 @@
 Cloud/
 ├── README.md                    # 本文件
 ├── engagement/                  # 社群互動功能
-│   ├── engagement.py           # 討論區、評論、點讚
-│   ├── leaderboard.html.j2     # 排行榜模板
-│   └── _post.html.j2           # 貼文模板
-│
 ├── user_management/            # 用戶管理（雲端）
-│   ├── user_service.py         # 用戶註冊、登入、授權
-│   ├── social_network.py       # Follow/Followers
-│   └── reputation.py           # 信譽系統
-│
 ├── firmware_repository/        # 固件倉庫
-│   ├── firmware_api.py         # 固件上傳/下載 API
-│   ├── version_control.py      # 版本管理
-│   └── storage/                # 固件檔案存儲
-│
 ├── notification/               # 通知服務
-│   ├── email.py                # 郵件通知
-│   ├── webhook.py              # Webhook 通知
-│   └── push_notification.py    # 推送通知
-│
-├── analytics/                  # 數據分析（未來）
-│   ├── usage_analytics.py      # 使用情況分析
-│   └── performance_metrics.py  # 效能指標
-│
-└── api/                        # Cloud API（未來）
-    ├── rest_api.py             # REST API 端點
-    └── graphql_api.py          # GraphQL API
+└── analytics/                  # 數據分析（未來）
 ```
 
 ---

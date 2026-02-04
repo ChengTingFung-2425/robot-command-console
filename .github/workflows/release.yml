@@ -11,6 +11,9 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: read
+
 env:
   PYTHON_VERSION: '3.12'
 
@@ -18,6 +21,8 @@ jobs:
   create-release:
     name: 建立 Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
       version: ${{ steps.get_version.outputs.version }}
@@ -124,6 +129,8 @@ jobs:
     name: 構建並上傳 - ${{ matrix.os }}
     needs: create-release
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:

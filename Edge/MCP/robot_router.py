@@ -5,7 +5,7 @@ MCP 機器人路由器
 
 import asyncio
 import logging
-from datetime import timedelta
+from datetime import timedelta, datetime
 from typing import Any, Dict, List, Optional
 
 from .config import MCPConfig
@@ -292,14 +292,109 @@ class RobotRouter:
         trace_id: str
     ) -> Dict[str, Any]:
         """透過 MQTT 下發指令"""
-        # TODO: 實作 MQTT 指令下發
-        logger.warning("MQTT 協定尚未實作")
-        return {
-            "error": {
-                "code": ErrorCode.ERR_PROTOCOL,
-                "message": "MQTT 協定尚未實作"
+        # 實作 MQTT 指令下發
+        try:
+            # MQTT 實作需要 paho-mqtt 套件
+            import paho.mqtt.client as mqtt
+            import json
+            from threading import Event
+            
+            logger.info(f"透過 MQTT 發送指令: endpoint={endpoint}, type={command_type}")
+            
+            # 解析 MQTT 端點 (format: mqtt://broker:port/topic)
+            if not endpoint.startswith("mqtt://"):
+                raise ValueError(f"Invalid MQTT endpoint: {endpoint}")
+            
+            # 簡易解析
+            parts = endpoint.replace("mqtt://", "").split("/")
+            broker_port = parts[0]
+            topic = "/".join(parts[1:]) if len(parts) > 1 else "robot/commands"
+            
+            if ":" in broker_port:
+                broker, port_str = broker_port.split(":")
+                port = int(port_str)
+            else:
+                broker = broker_port
+                port = 1883  # MQTT 預設 port
+            
+            # 建立 MQTT 客戶端
+            client = mqtt.Client()
+            connected = Event()
+            published = Event()
+            
+            def on_connect(client, userdata, flags, rc):
+                if rc == 0:
+                    connected.set()
+                else:
+                    logger.error(f"MQTT connection failed with code {rc}")
+            
+            def on_publish(client, userdata, mid):
+                published.set()
+            
+            client.on_connect = on_connect
+            client.on_publish = on_publish
+            
+            # 連接並發送
+            client.connect(broker, port, keepalive=60)
+            client.loop_start()
+            
+            # 等待連接
+            if not connected.wait(timeout=timeout_ms/1000):
+                client.loop_stop()
+                return {
+                    "error": {
+                        "code": ErrorCode.ERR_TIMEOUT,
+                        "message": "MQTT connection timeout"
+                    }
+                }
+            
+            # 發送指令
+            message = {
+                "command_type": command_type,
+                "params": params,
+                "trace_id": trace_id,
+                "timestamp": datetime.now().isoformat()
             }
-        }
+            
+            result = client.publish(topic, json.dumps(message), qos=1)
+            
+            # 等待發送完成
+            if not published.wait(timeout=timeout_ms/1000):
+                client.loop_stop()
+                return {
+                    "error": {
+                        "code": ErrorCode.ERR_TIMEOUT,
+                        "message": "MQTT publish timeout"
+                    }
+                }
+            
+            client.loop_stop()
+            client.disconnect()
+            
+            logger.info(f"MQTT 指令已發送: topic={topic}, mid={result.mid}")
+            return {
+                "success": True,
+                "protocol": "MQTT",
+                "topic": topic,
+                "message_id": result.mid
+            }
+            
+        except ImportError:
+            logger.warning("paho-mqtt library not installed, MQTT not available")
+            return {
+                "error": {
+                    "code": ErrorCode.ERR_PROTOCOL,
+                    "message": "MQTT 協定未安裝 (需要 paho-mqtt)"
+                }
+            }
+        except Exception as e:
+            logger.error(f"MQTT 指令發送失敗: {e}")
+            return {
+                "error": {
+                    "code": ErrorCode.ERR_PROTOCOL,
+                    "message": f"MQTT error: {str(e)}"
+                }
+            }
 
     async def _send_websocket_command(
         self,
@@ -310,14 +405,74 @@ class RobotRouter:
         trace_id: str
     ) -> Dict[str, Any]:
         """透過 WebSocket 下發指令"""
-        # TODO: 實作 WebSocket 指令下發
-        logger.warning("WebSocket 協定尚未實作")
-        return {
-            "error": {
-                "code": ErrorCode.ERR_PROTOCOL,
-                "message": "WebSocket 協定尚未實作"
+        # 實作 WebSocket 指令下發
+        try:
+            # WebSocket 實作需要 websockets 套件
+            import websockets
+            import json
+            
+            logger.info(f"透過 WebSocket 發送指令: endpoint={endpoint}, type={command_type}")
+            
+            # 建立 WebSocket 連接並發送指令
+            async with websockets.connect(endpoint, timeout=timeout_ms/1000) as websocket:
+                # 構建指令訊息
+                message = {
+                    "command_type": command_type,
+                    "params": params,
+                    "trace_id": trace_id,
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                # 發送指令
+                await websocket.send(json.dumps(message))
+                logger.info(f"WebSocket 指令已發送: {endpoint}")
+                
+                # 等待回應 (可選)
+                try:
+                    response_text = await asyncio.wait_for(
+                        websocket.recv(),
+                        timeout=timeout_ms/1000
+                    )
+                    response = json.loads(response_text)
+                    logger.info(f"WebSocket 收到回應: {response}")
+                    return {
+                        "success": True,
+                        "protocol": "WebSocket",
+                        "response": response
+                    }
+                except asyncio.TimeoutError:
+                    # 無回應但發送成功
+                    logger.warning("WebSocket 指令已發送但未收到回應")
+                    return {
+                        "success": True,
+                        "protocol": "WebSocket",
+                        "note": "Command sent but no response received"
+                    }
+            
+        except ImportError:
+            logger.warning("websockets library not installed, WebSocket not available")
+            return {
+                "error": {
+                    "code": ErrorCode.ERR_PROTOCOL,
+                    "message": "WebSocket 協定未安裝 (需要 websockets)"
+                }
             }
-        }
+        except asyncio.TimeoutError:
+            logger.error(f"WebSocket 連接逾時: {endpoint}")
+            return {
+                "error": {
+                    "code": ErrorCode.ERR_TIMEOUT,
+                    "message": f"WebSocket connection timeout to {endpoint}"
+                }
+            }
+        except Exception as e:
+            logger.error(f"WebSocket 指令發送失敗: {e}")
+            return {
+                "error": {
+                    "code": ErrorCode.ERR_PROTOCOL,
+                    "message": f"WebSocket error: {str(e)}"
+                }
+            }
 
     async def _cleanup_offline_robots(self):
         """定期清理離線機器人"""

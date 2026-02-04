@@ -512,24 +512,49 @@ class RobotConsoleTUI(App):
             action: on 或 off
 
         Note:
-            目前為模擬功能，僅顯示通知訊息。
-            完整實作需要與 OfflineQueueService 或 NetworkMonitor 整合。
+            與 OfflineQueueService 或 NetworkMonitor 整合實作。
         """
         if action not in ["on", "off"]:
             raise ValueError(f"Invalid cloud action: {action}. Use 'on' or 'off'")
 
         enabled = (action == "on")
 
-        # TODO: 與 OfflineQueueService 或 NetworkMonitor 整合
-        # 需要實作：
-        # 1. 取得 OfflineQueueService 實例
-        # 2. 呼叫其雲端路由控制方法
-        # 3. 驗證設定是否成功套用
-
-        if enabled:
-            self.notify("Cloud routing enabled (preview) - forcing internet routing", severity="information")
-        else:
-            self.notify("Cloud routing disabled (preview) - using local-only mode", severity="information")
+        # 與 OfflineQueueService 或 NetworkMonitor 整合
+        try:
+            if self.service_manager and hasattr(self.service_manager, 'queue_service'):
+                queue_service = self.service_manager.queue_service
+                
+                # 嘗試設定雲端路由
+                if hasattr(queue_service, 'set_cloud_routing'):
+                    success = await queue_service.set_cloud_routing(enabled)
+                    if success:
+                        mode = "internet routing" if enabled else "local-only mode"
+                        self.notify(f"Cloud routing {'enabled' if enabled else 'disabled'} - using {mode}", severity="information")
+                    else:
+                        self.notify("Failed to update cloud routing settings", severity="error")
+                else:
+                    # 後備：更新狀態管理器
+                    if self.state_manager:
+                        await self.state_manager.state_store.set("network:cloud_routing", {
+                            "enabled": enabled,
+                            "updated_at": datetime.now().isoformat()
+                        })
+                        mode = "internet routing" if enabled else "local-only mode"
+                        self.notify(f"Cloud routing {'enabled' if enabled else 'disabled'} - using {mode}", severity="information")
+            else:
+                # 無 service_manager，使用 state_manager
+                if self.state_manager:
+                    await self.state_manager.state_store.set("network:cloud_routing", {
+                        "enabled": enabled,
+                        "updated_at": datetime.now().isoformat()
+                    })
+                    mode = "internet routing" if enabled else "local-only mode"
+                    self.notify(f"Cloud routing {'enabled' if enabled else 'disabled'} (state only) - using {mode}", severity="information")
+                else:
+                    self.notify("Cloud routing service not available", severity="warning")
+                    
+        except Exception as e:
+            self.notify(f"Error setting cloud routing: {e}", severity="error")
 
     async def _handle_llm_provider(self, provider_name: str) -> None:
         """
@@ -539,16 +564,9 @@ class RobotConsoleTUI(App):
             provider_name: 提供商名稱 (例如: ollama, lmstudio)
 
         Note:
-            目前為模擬功能，僅驗證提供商名稱和顯示通知。
-            完整實作需要與 LLMProviderManager 整合。
+            與 LLMProviderManager 整合實作。
         """
-        # TODO: 與 LLMProviderManager 整合
-        # 需要實作：
-        # 1. 取得 LLMProviderManager 實例
-        # 2. 呼叫 select_provider 方法
-        # 3. 驗證提供商是否可用
-        # 4. 更新系統設定
-
+        # 與 LLMProviderManager 整合
         valid_providers = ["ollama", "lmstudio", "openai", "anthropic"]
         if provider_name.lower() not in valid_providers:
             self.notify(
@@ -557,7 +575,46 @@ class RobotConsoleTUI(App):
             )
             return
 
-        self.notify(f"LLM provider set to: {provider_name} (preview)", severity="information")
+        try:
+            # 嘗試從 llm_processor 取得 provider_manager
+            if self.llm_processor and hasattr(self.llm_processor, 'provider_manager'):
+                provider_manager = self.llm_processor.provider_manager
+                
+                # 選擇提供商
+                if hasattr(provider_manager, 'select_provider'):
+                    success = await provider_manager.select_provider(provider_name.lower())
+                    if success:
+                        self.notify(f"LLM provider set to: {provider_name}", severity="information")
+                        
+                        # 更新狀態管理器
+                        if self.state_manager:
+                            await self.state_manager.state_store.set("llm:provider", {
+                                "provider": provider_name.lower(),
+                                "updated_at": datetime.now().isoformat()
+                            })
+                    else:
+                        self.notify(f"Provider '{provider_name}' not available or failed to select", severity="error")
+                else:
+                    # 後備：直接更新狀態
+                    if self.state_manager:
+                        await self.state_manager.state_store.set("llm:provider", {
+                            "provider": provider_name.lower(),
+                            "updated_at": datetime.now().isoformat()
+                        })
+                        self.notify(f"LLM provider set to: {provider_name} (state only)", severity="information")
+            else:
+                # 無 llm_processor，只更新狀態
+                if self.state_manager:
+                    await self.state_manager.state_store.set("llm:provider", {
+                        "provider": provider_name.lower(),
+                        "updated_at": datetime.now().isoformat()
+                    })
+                    self.notify(f"LLM provider set to: {provider_name} (state only)", severity="information")
+                else:
+                    self.notify("LLM provider manager not available", severity="warning")
+                    
+        except Exception as e:
+            self.notify(f"Error setting LLM provider: {e}", severity="error")
 
     async def _service_single_action(self, service_name: str, action: str) -> None:
         """
@@ -785,30 +842,40 @@ class RobotConsoleTUI(App):
         刷新機器人狀態
 
         Note:
-            目前顯示範例資料。完整實作需要：
-            1. 從 SharedStateManager 取得實際機器人清單
-            2. 查詢每個機器人的即時狀態
-            3. 更新顯示
+            從 SharedStateManager 取得實際機器人清單並更新顯示。
         """
         if not self.state_manager:
             return
 
         robot_widget = self.query_one("#robots", RobotStatusWidget)
 
-        # TODO: 從共享狀態取得實際機器人清單
-        # 目前使用範例資料
-        # 完整實作：
-        # robots = await self.state_manager.get_all_robots()
-        # for robot_id in robots:
-        #     status = await self.state_manager.get(StateKeys.ROBOT_STATUS.format(robot_id=robot_id))
-        #     robot_widget.update_robot_status(robot_id, status)
-
-        # 暫時使用範例資料
-        robot_widget.update_robot_status("robot-001", {
-            "connected": True,
-            "battery_level": 85,
-            "mode": "Standby"
-        })
+        # 從共享狀態取得實際機器人清單
+        try:
+            # 使用 get_all_robots_status 取得所有機器人
+            robots_status = await self.state_manager.get_all_robots_status()
+            
+            if robots_status:
+                # 更新每個機器人的狀態
+                for robot_id, status in robots_status.items():
+                    robot_widget.update_robot_status(robot_id, status.to_dict())
+            else:
+                # 無機器人數據，顯示範例資料
+                robot_widget.update_robot_status("robot-001", {
+                    "connected": False,
+                    "battery_level": None,
+                    "mode": "Offline",
+                    "status": "No robots registered"
+                })
+                
+        except Exception as e:
+            self.log(f"Error refreshing robot status: {e}")
+            # 錯誤時顯示範例資料
+            robot_widget.update_robot_status("robot-001", {
+                "connected": False,
+                "battery_level": None,
+                "mode": "Error",
+                "status": f"Failed to load: {e}"
+            })
 
     async def _on_robot_status_updated(self, event: Dict[str, Any]) -> None:
         """處理機器人狀態更新事件"""

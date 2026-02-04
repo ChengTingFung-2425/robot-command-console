@@ -190,6 +190,25 @@ class CommandSender:
         Returns:
             機器人 ID 列表
         """
-        # TODO: 實作從 SharedStateManager 取得機器人列表
-        # 目前返回預設列表
-        return ["robot-001", "robot-002", "robot-003"]
+        # 從 SharedStateManager 取得機器人列表
+        try:
+            if self.state_manager:
+                # 使用 get_all_robots_status 取得所有機器人
+                robots_status = await self.state_manager.get_all_robots_status()
+                
+                if robots_status:
+                    # 返回機器人 ID 列表
+                    robot_ids = list(robots_status.keys())
+                    logger.info(f"從 SharedStateManager 取得 {len(robot_ids)} 個機器人")
+                    return robot_ids
+                else:
+                    logger.warning("SharedStateManager 中無機器人數據，使用預設列表")
+                    return ["robot-001", "robot-002", "robot-003"]
+            else:
+                logger.warning("SharedStateManager 未設定，使用預設列表")
+                return ["robot-001", "robot-002", "robot-003"]
+                
+        except Exception as e:
+            logger.error(f"從 SharedStateManager 取得機器人列表失敗: {e}")
+            # 錯誤時返回預設列表
+            return ["robot-001", "robot-002", "robot-003"]

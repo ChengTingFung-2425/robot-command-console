@@ -88,6 +88,19 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     }
   } catch (e) {}
+
+  // 恢復 JSON 預覽面板的可見性狀態
+  try {
+    var jsonPanelVisible = (localStorage.getItem && localStorage.getItem('jsonPanelVisible') === '1');
+    var panel = document.getElementById('json-preview-panel');
+    var btn = document.getElementById('json-toggle');
+    if (panel && !jsonPanelVisible) {
+      panel.style.display = 'none';
+    }
+    if (btn) {
+      btn.textContent = jsonPanelVisible ? '🔽 隱藏 JSON' : '🔼 顯示 JSON';
+    }
+  } catch (e) {}
 });
 
 // 切換驗證面板摺疊
@@ -105,11 +118,57 @@ function toggleVerifyPanel() {
   }
 }
 
+// 切換 JSON 預覽面板
+function toggleJsonPanel() {
+  var panel = document.getElementById('json-preview-panel');
+  var btn = document.getElementById('json-toggle');
+  if (!panel) return;
+  var isHidden = panel.style.display === 'none';
+  panel.style.display = isHidden ? 'block' : 'none';
+  if (btn) btn.textContent = isHidden ? '🔽 隱藏 JSON' : '🔼 顯示 JSON';
+  try { localStorage.setItem('jsonPanelVisible', isHidden ? '1' : '0'); } catch (e) {}
+  // 如果顯示時，更新 JSON 內容
+  if (isHidden) {
+    updateCodePreview();
+  }
+}
+
+// 複製 JSON 到剪貼簿
+function copyJsonToClipboard() {
+  var jsonContent = document.getElementById('json-preview-content');
+  if (!jsonContent) return;
+  var text = jsonContent.textContent;
+  navigator.clipboard.writeText(text).then(function() {
+    var btn = document.getElementById('copy-json-btn');
+    var originalText = btn.textContent;
+    btn.textContent = '✅ 已複製！';
+    btn.classList.add('btn-success');
+    btn.classList.remove('btn-outline-secondary');
+    setTimeout(function() {
+      btn.textContent = originalText;
+      btn.classList.remove('btn-success');
+      btn.classList.add('btn-outline-secondary');
+    }, 2000);
+  }).catch(function(err) {
+    alert('複製失敗：' + err);
+  });
+}
+
 // 更新程式碼預覽
 function updateCodePreview() {
   var json = generateCommandJSON(workspace);
   document.getElementById('base_commands').value = json;
   // 右側改為驗證面板，不直接顯示 JSON
+  // 更新 JSON 預覽面板（如果可見）
+  var jsonPreview = document.getElementById('json-preview-content');
+  if (jsonPreview) {
+    try {
+      var parsed = JSON.parse(json);
+      jsonPreview.textContent = JSON.stringify(parsed, null, 2);
+    } catch (e) {
+      jsonPreview.textContent = json;
+    }
+  }
   // 計算預估執行時間
   updateEstimatedTime(json);
 }
@@ -469,6 +528,19 @@ function frontendVerifyDurations(parsedCommands) {
           </div>
         </div>
         
+        <!-- JSON 預覽面板（可切換顯示/隱藏） -->
+        <div class="card mt-3" id="json-preview-panel" style="display: none;">
+          <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">📄 JSON 預覽</h6>
+            <button type="button" id="copy-json-btn" class="btn btn-sm btn-outline-light" onclick="copyJsonToClipboard()">
+              📋 複製
+            </button>
+          </div>
+          <div class="card-body p-2">
+            <pre id="json-preview-content" style="max-height: 400px; overflow-y: auto; background-color: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 0.85rem; margin: 0;">[]</pre>
+          </div>
+        </div>
+        
         <div class="alert alert-warning mt-3">
           <strong>💡 提示：</strong>
           <ul class="mb-0">
@@ -476,7 +548,15 @@ function frontendVerifyDurations(parsedCommands) {
             <li>積木可自由組合、排序與刪除</li>
             <li>使用「重複」積木可循環執行動作</li>
             <li>使用「等待」積木可在動作間暫停</li>
+            <li>點擊下方按鈕可查看產生的 JSON 指令</li>
           </ul>
+        </div>
+        
+        <!-- 顯示/隱藏 JSON 按鈕 -->
+        <div class="d-grid gap-2 mt-2">
+          <button type="button" id="json-toggle" class="btn btn-outline-info" onclick="toggleJsonPanel()">
+            🔼 顯示 JSON
+          </button>
         </div>
       </div>
 

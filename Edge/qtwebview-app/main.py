@@ -30,9 +30,74 @@ logger = logging.getLogger(__name__)
 
 
 def show_splash_screen(app):
-    """顯示啟動畫面（可選）"""
-    # TODO: 可以加入實際的啟動畫面圖片
-    return None
+    """顯示啟動畫面
+    
+    創建並顯示專業的啟動畫面，包含：
+    - 應用程式標誌和名稱
+    - 版本資訊
+    - 載入進度指示
+    """
+    from PyQt6.QtWidgets import QSplashScreen
+    from PyQt6.QtGui import QPixmap, QPainter, QFont, QColor
+    from PyQt6.QtCore import Qt, QTimer
+    
+    try:
+        # 創建 640x400 的啟動畫面
+        pixmap = QPixmap(640, 400)
+        pixmap.fill(QColor(42, 45, 50))  # 深色背景
+        
+        # 在 pixmap 上繪製內容
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        # 繪製標題
+        title_font = QFont("Arial", 28, QFont.Weight.Bold)
+        painter.setFont(title_font)
+        painter.setPen(QColor(255, 255, 255))
+        painter.drawText(0, 0, 640, 200, Qt.AlignmentFlag.AlignCenter, "🤖 Robot Command Console")
+        
+        # 繪製副標題
+        subtitle_font = QFont("Arial", 14)
+        painter.setFont(subtitle_font)
+        painter.setPen(QColor(200, 200, 200))
+        painter.drawText(0, 200, 640, 50, Qt.AlignmentFlag.AlignCenter, "Tiny Edge Application")
+        
+        # 繪製版本資訊
+        version_font = QFont("Arial", 12)
+        painter.setFont(version_font)
+        painter.setPen(QColor(150, 150, 150))
+        version_text = f"Version {QCoreApplication.applicationVersion()}"
+        painter.drawText(0, 250, 640, 50, Qt.AlignmentFlag.AlignCenter, version_text)
+        
+        # 繪製載入提示
+        loading_font = QFont("Arial", 10)
+        painter.setFont(loading_font)
+        painter.setPen(QColor(100, 150, 255))
+        painter.drawText(0, 350, 640, 50, Qt.AlignmentFlag.AlignCenter, "正在啟動服務...")
+        
+        painter.end()
+        
+        # 創建啟動畫面
+        splash = QSplashScreen(pixmap, Qt.WindowType.WindowStaysOnTopHint)
+        splash.setWindowFlags(
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.SplashScreen
+        )
+        
+        # 顯示訊息
+        splash.showMessage(
+            "正在初始化...",
+            Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter,
+            QColor(255, 255, 255)
+        )
+        
+        logger.info("Splash screen created successfully")
+        return splash
+        
+    except Exception as e:
+        logger.warning(f"無法創建啟動畫面: {e}")
+        return None
 
 
 def main():

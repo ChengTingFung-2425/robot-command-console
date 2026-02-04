@@ -1237,14 +1237,56 @@ class HybridMainWindow(QMainWindow):
         toolbar.setMovable(False)
         self.addToolBar(toolbar)
         
-        # 添加動作
+        # 添加重新整理動作
         refresh_action = QAction("🔄 重新整理", self)
+        refresh_action.setShortcut("F5")
+        refresh_action.setToolTip("重新整理當前頁面 (F5)")
         refresh_action.triggered.connect(self._refresh_current_page)
         toolbar.addAction(refresh_action)
         
         toolbar.addSeparator()
         
-        # TODO: 添加更多工具欄動作
+        # 添加全狀態重新整理動作
+        refresh_all_action = QAction("🔃 全部重新整理", self)
+        refresh_all_action.setShortcut("Ctrl+R")
+        refresh_all_action.setToolTip("重新整理所有 Widgets (Ctrl+R)")
+        refresh_all_action.triggered.connect(self._refresh_all_widgets)
+        toolbar.addAction(refresh_all_action)
+        
+        toolbar.addSeparator()
+        
+        # 添加設定動作
+        settings_action = QAction("⚙️ 設定", self)
+        settings_action.setShortcut("Ctrl+,")
+        settings_action.setToolTip("開啟設定 (Ctrl+,)")
+        settings_action.triggered.connect(self._show_settings)
+        toolbar.addAction(settings_action)
+        
+        toolbar.addSeparator()
+        
+        # 添加全螢幕切換動作
+        fullscreen_action = QAction("🖥️ 全螢幕", self)
+        fullscreen_action.setShortcut("F11")
+        fullscreen_action.setToolTip("切換全螢幕模式 (F11)")
+        fullscreen_action.setCheckable(True)
+        fullscreen_action.triggered.connect(self._toggle_fullscreen)
+        toolbar.addAction(fullscreen_action)
+        self._fullscreen_action = fullscreen_action  # 保存引用以便更新狀態
+        
+        toolbar.addSeparator()
+        
+        # 添加說明動作
+        help_action = QAction("❓ 說明", self)
+        help_action.setShortcut("F1")
+        help_action.setToolTip("顯示說明 (F1)")
+        help_action.triggered.connect(self._show_help)
+        toolbar.addAction(help_action)
+        
+        # 添加關於動作
+        about_action = QAction("ℹ️ 關於", self)
+        about_action.setToolTip("關於本應用程式")
+        about_action.triggered.connect(self._show_about)
+        toolbar.addAction(about_action)
     
     def _create_statusbar(self):
         """建立狀態欄"""

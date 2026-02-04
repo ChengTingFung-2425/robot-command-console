@@ -1,6 +1,6 @@
 # Core Flask framework
 Flask==2.2.5
-Werkzeug<3.0
+Werkzeug>=3.0.1
 
 # Flask extensions
 Flask-Babel==2.0.0
@@ -32,6 +32,7 @@ djlint==1.19.7
 
 # JSON Schema validation for contract tests
 jsonschema==4.21.1
+toml==0.10.2
 
 # Observability and monitoring
 prometheus_client>=0.19.0

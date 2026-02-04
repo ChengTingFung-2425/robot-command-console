@@ -1,0 +1,22 @@
+SECRET_KEY = "you-will-never-guess"
+SQLALCHEMY_DATABASE_URI = "postgresql://postgres:postgres@postgresdb:5432/postgres"
+SQLALCHEMY_TRACK_MODIFICATIONS = false
+MAIL_SERVER = "mailhog"
+MAIL_PORT = 1025
+MAIL_USE_TLS = false
+MAIL_USERNAME = ""
+MAIL_PASSWORD = ""
+ADMINS = ["cywong@example.com"]
+POSTS_PER_PAGE = 3
+LANGUAGES = ["en", "es", "zh"]
+
+[MQTT]
+MQTT_ENABLED = false
+MQTT_BROKER = "a1qlex7vqi1791-ats.iot.us-east-1.amazonaws.com"
+MQTT_PORT = 8883
+MQTT_USE_TLS = true
+MQTT_CERT_PATH = "certificates"
+MQTT_CA_CERT = "AmazonRootCA1.pem"
+MQTT_TIMEOUT = 5
+
+DOWNLOAD_DIR = "/tmp/downloads"

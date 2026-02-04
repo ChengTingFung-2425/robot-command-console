@@ -14,3 +14,5 @@ Cloud Services Module
 
 __version__ = "1.0.0"
 __author__ = "Robot Command Console Team"
+
+# This package contains modules for cloud-based operations.

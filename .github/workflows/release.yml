@@ -1,0 +1,199 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v3.2.0)'
+        required: true
+        type: string
+
+env:
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  create-release:
+    name: 建立 Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.version }}
+    
+    steps:
+      - name: Checkout 程式碼
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: 取得版本號
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+      
+      - name: 設定 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: 取得版本資訊
+        id: version_info
+        run: |
+          python src/common/version.py > version_info.json
+          cat version_info.json
+      
+      - name: 生成 Release Notes
+        id: release_notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          ## Robot Command Console ${{ steps.get_version.outputs.version }}
+          
+          ### 🎉 新功能
+          
+          - ✅ Tiny Edge App - PyQt6 輕量級桌面應用
+          - ✅ 完整的固件更新管理（非同步處理）
+          - ✅ 專業的啟動畫面與 UI 優化
+          - ✅ 完整的工具列功能（全螢幕、幫助、關於）
+          - ✅ 統一的後端服務管理
+          
+          ### 📦 下載
+          
+          請從下方選擇適合您作業系統的版本：
+          - **Linux**: RobotConsole-linux.tar.gz
+          - **Windows**: RobotConsole-windows.zip  
+          - **macOS**: RobotConsole-macos.tar.gz
+          
+          ### 📋 系統需求
+          
+          - **作業系統**: Windows 10+, macOS 12+, Ubuntu 22.04+
+          - **記憶體**: 最小 4GB RAM
+          - **儲存空間**: 最小 200MB
+          
+          ### 🚀 快速開始
+          
+          1. 下載對應平台的壓縮檔
+          2. 解壓縮
+          3. 執行 `RobotConsole` 主程式
+          
+          詳細安裝說明請參閱 [README.md](https://github.com/ChengTingFung-2425/robot-command-console/blob/main/README.md)
+          
+          ### 🔧 技術堆疊
+          
+          - **前端**: PyQt6 + QtWebEngine
+          - **後端**: Flask + Robot Service
+          - **通訊**: QWebChannel Bridge
+          - **打包**: PyInstaller
+          
+          ### 📝 完整變更記錄
+          
+          請參閱 [CHANGELOG.md](https://github.com/ChengTingFung-2425/robot-command-console/blob/main/CHANGELOG.md)
+          
+          ### 🐛 已知問題
+          
+          - macOS 版本需要在安全性設定中允許執行（首次啟動）
+          - Windows Defender 可能會標記為未知應用程式（正常現象）
+          
+          ### 💬 回饋與支援
+          
+          如遇到問題，請到 [Issues](https://github.com/ChengTingFung-2425/robot-command-console/issues) 回報。
+          EOF
+          
+          cat release_notes.md
+      
+      - name: 建立 GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          release_name: Release ${{ steps.get_version.outputs.version }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ contains(steps.get_version.outputs.version, 'beta') || contains(steps.get_version.outputs.version, 'alpha') }}
+  
+  build-and-upload:
+    name: 構建並上傳 - ${{ matrix.os }}
+    needs: create-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            artifact_name: RobotConsole-linux
+            asset_name: RobotConsole-linux.tar.gz
+            asset_content_type: application/gzip
+          - os: windows-latest
+            platform: windows
+            artifact_name: RobotConsole-windows
+            asset_name: RobotConsole-windows.zip
+            asset_content_type: application/zip
+          - os: macos-latest
+            platform: macos
+            artifact_name: RobotConsole-macos
+            asset_name: RobotConsole-macos.tar.gz
+            asset_content_type: application/gzip
+    
+    steps:
+      - name: Checkout 程式碼
+        uses: actions/checkout@v4
+      
+      - name: 設定 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: 安裝系統依賴 (Ubuntu)
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libxcb-xinerama0 libxcb-cursor0 libxkbcommon-x11-0 \
+            libgl1-mesa-glx libdbus-1-3 libegl1
+      
+      - name: 安裝 Python 依賴
+        run: |
+          pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+          pip install pyinstaller pillow
+      
+      - name: 建立啟動畫面
+        run: |
+          python Edge/qtwebview-app/resources/images/create_splash_image.py
+      
+      - name: 打包應用程式
+        run: |
+          pyinstaller Edge/qtwebview-app/build.spec
+      
+      - name: 建立發佈壓縮檔
+        shell: bash
+        run: |
+          cd dist
+          if [ "${{ matrix.platform }}" == "windows" ]; then
+            7z a -tzip ${{ matrix.asset_name }} RobotConsole/
+          else
+            tar -czf ${{ matrix.asset_name }} RobotConsole/
+          fi
+          ls -lh ${{ matrix.asset_name }}
+      
+      - name: 上傳 Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./dist/${{ matrix.asset_name }}
+          asset_name: ${{ matrix.asset_name }}
+          asset_content_type: ${{ matrix.asset_content_type }}

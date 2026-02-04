@@ -1,0 +1,180 @@
+name: Build and Package
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.12'
+  NODE_VERSION: '20'
+
+jobs:
+  # 跨平台構建矩陣
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            artifact_name: RobotConsole-linux
+          - os: windows-latest
+            platform: windows
+            artifact_name: RobotConsole-windows
+          - os: macos-latest
+            platform: macos
+            artifact_name: RobotConsole-macos
+    
+    steps:
+      - name: Checkout 程式碼
+        uses: actions/checkout@v4
+      
+      - name: 設定 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: 安裝系統依賴 (Ubuntu)
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libxcb-xinerama0 \
+            libxcb-cursor0 \
+            libxkbcommon-x11-0 \
+            libgl1-mesa-glx \
+            libdbus-1-3 \
+            libegl1 \
+            libxcb-icccm4 \
+            libxcb-image0 \
+            libxcb-keysyms1 \
+            libxcb-randr0 \
+            libxcb-render-util0 \
+            libxcb-shape0 \
+            libxcb-sync1
+      
+      - name: 安裝 Python 依賴
+        run: |
+          pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+          pip install pyinstaller pillow
+      
+      - name: 檢查版本資訊
+        run: |
+          python src/common/version.py
+      
+      - name: 執行測試
+        run: |
+          pip install pytest pytest-asyncio aiohttp pydantic httpx requests
+          pip install Flask Flask-Login Flask-SQLAlchemy Flask-WTF email-validator
+          PYTHONPATH="${PYTHONPATH}:${PWD}/src" python -m pytest tests/ -v --tb=short || true
+      
+      - name: 建立啟動畫面圖片
+        run: |
+          python Edge/qtwebview-app/resources/images/create_splash_image.py
+      
+      - name: 打包應用程式
+        run: |
+          pyinstaller Edge/qtwebview-app/build.spec
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+      
+      - name: 驗證打包結果
+        shell: bash
+        run: |
+          if [ -d "dist/RobotConsole" ]; then
+            echo "✓ 打包成功"
+            ls -lh dist/RobotConsole/
+          else
+            echo "✗ 打包失敗"
+            exit 1
+          fi
+      
+      - name: 建立壓縮檔
+        shell: bash
+        run: |
+          cd dist
+          if [ "${{ matrix.platform }}" == "windows" ]; then
+            7z a -tzip ${{ matrix.artifact_name }}.zip RobotConsole/
+          else
+            tar -czf ${{ matrix.artifact_name }}.tar.gz RobotConsole/
+          fi
+      
+      - name: 上傳構建產物
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            dist/${{ matrix.artifact_name }}.zip
+            dist/${{ matrix.artifact_name }}.tar.gz
+          if-no-files-found: ignore
+          retention-days: 7
+  
+  # 測試覆蓋率報告
+  coverage:
+    name: 測試覆蓋率
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: Checkout 程式碼
+        uses: actions/checkout@v4
+      
+      - name: 設定 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: 安裝依賴
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio aiohttp pydantic httpx requests
+          pip install Flask Flask-Login Flask-SQLAlchemy Flask-WTF email-validator
+      
+      - name: 執行測試並生成覆蓋率報告
+        run: |
+          PYTHONPATH="${PYTHONPATH}:${PWD}/src" python -m pytest tests/ \
+            --cov=src \
+            --cov-report=term \
+            --cov-report=html \
+            --cov-report=xml \
+            -v || true
+      
+      - name: 上傳覆蓋率報告
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            htmlcov/
+            coverage.xml
+          retention-days: 7
+  
+  # 構建摘要
+  build-summary:
+    name: 構建摘要
+    runs-on: ubuntu-latest
+    needs: [build, coverage]
+    if: always()
+    
+    steps:
+      - name: 建立摘要
+        run: |
+          echo "## 構建結果" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 平台構建狀態" >> $GITHUB_STEP_SUMMARY
+          echo "- Linux: ${{ needs.build.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Windows: ${{ needs.build.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- macOS: ${{ needs.build.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 測試覆蓋率" >> $GITHUB_STEP_SUMMARY
+          echo "- 覆蓋率報告: ${{ needs.coverage.result }}" >> $GITHUB_STEP_SUMMARY

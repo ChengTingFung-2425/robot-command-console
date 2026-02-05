@@ -79,7 +79,15 @@ jobs:
         run: |
           pip install pytest pytest-asyncio aiohttp pydantic httpx requests
           pip install Flask Flask-Login Flask-SQLAlchemy Flask-WTF email-validator
-          PYTHONPATH="${PYTHONPATH}:${PWD}/src" python -m pytest tests/ -v --tb=short || true
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+      
+      - name: 運行 pytest
+        run: |
+          python -m pytest tests/ -v --tb=short
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+        continue-on-error: true
       
       - name: 建立啟動畫面圖片
         run: |
@@ -102,15 +110,19 @@ jobs:
             exit 1
           fi
       
-      - name: 建立壓縮檔
+      - name: 建立壓縮檔 (Linux/macOS)
+        if: matrix.platform != 'windows'
         shell: bash
         run: |
           cd dist
-          if [ "${{ matrix.platform }}" == "windows" ]; then
-            7z a -tzip ${{ matrix.artifact_name }}.zip RobotConsole/
-          else
-            tar -czf ${{ matrix.artifact_name }}.tar.gz RobotConsole/
-          fi
+          tar -czf ${{ matrix.artifact_name }}.tar.gz RobotConsole/
+      
+      - name: 建立壓縮檔 (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          cd dist
+          Compress-Archive -Path 'RobotConsole' -DestinationPath '${{ matrix.artifact_name }}.zip' -Force
       
       - name: 上傳構建產物
         uses: actions/upload-artifact@v4
@@ -146,14 +158,18 @@ jobs:
       
       - name: 執行測試並生成覆蓋率報告
         run: |
-          PYTHONPATH="${PYTHONPATH}:${PWD}/src" python -m pytest tests/ \
+          python -m pytest tests/ \
             --cov=src \
             --cov-report=term \
             --cov-report=html \
             --cov-report=xml \
-            -v || true
+            -v
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+        continue-on-error: true
       
       - name: 上傳覆蓋率報告
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report

@@ -115,12 +115,12 @@ jobs:
       
       - name: 建立 GitHub Release
         id: create_release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.get_version.outputs.version }}
-          release_name: Release ${{ steps.get_version.outputs.version }}
+          name: Release ${{ steps.get_version.outputs.version }}
           body_path: release_notes.md
           draft: false
           prerelease: ${{ contains(steps.get_version.outputs.version, 'beta') || contains(steps.get_version.outputs.version, 'alpha') }}
@@ -184,23 +184,26 @@ jobs:
         run: |
           pyinstaller Edge/qtwebview-app/build.spec
       
-      - name: 建立發佈壓縮檔
+      - name: 建立發佈壓縮檔 (Linux/macOS)
+        if: matrix.platform != 'windows'
         shell: bash
         run: |
           cd dist
-          if [ "${{ matrix.platform }}" == "windows" ]; then
-            7z a -tzip ${{ matrix.asset_name }} RobotConsole/
-          else
-            tar -czf ${{ matrix.asset_name }} RobotConsole/
-          fi
+          tar -czf ${{ matrix.asset_name }} RobotConsole/
           ls -lh ${{ matrix.asset_name }}
       
+      - name: 建立發佈壓縮檔 (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          cd dist
+          Compress-Archive -Path 'RobotConsole' -DestinationPath '${{ matrix.asset_name }}' -Force
+          Get-ChildItem ${{ matrix.asset_name }}
+      
       - name: 上傳 Release Asset
-        uses: actions/upload-release-asset@v1
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./dist/${{ matrix.asset_name }}
-          asset_name: ${{ matrix.asset_name }}
-          asset_content_type: ${{ matrix.asset_content_type }}
+          tag_name: ${{ needs.create-release.outputs.version }}
+          files: ./dist/${{ matrix.asset_name }}

@@ -58,7 +58,7 @@ excludes = [
     'pandas',
     'tensorflow',
     'torch',
-    'PIL.ImageQt',  # 如果不需要 Qt 圖片支援
+    'PIL.ImageQt',  # 僅排除 Pillow 的 Qt 整合模組，不影響一般 PIL 影像處理
     'tkinter',
     'wx',
     'PySide6',

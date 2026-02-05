@@ -52,7 +52,7 @@ def show_splash_screen(app):
             logger.info(f"載入啟動畫面圖片：{splash_image_path}")
         else:
             # 如果圖片不存在，使用純色背景作為後備
-            logger.warning(f"找不到啟動畫面圖片：{splash_image_path}，使用預設背景")
+            logger.error(f"找不到啟動畫面圖片：{splash_image_path}，使用預設背景")
             pixmap = QPixmap(640, 400)
             pixmap.fill(QColor(42, 45, 50))
         

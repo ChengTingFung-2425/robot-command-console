@@ -605,3 +605,76 @@ class TestFlaskAPIEndpoints:
         assert data['robot_id'] == robot_id
         assert len(data['capabilities']) > 0
         assert 'go_forward' in data['capabilities']
+
+    def test_sync_status_api(self, client):
+        """測試雲端同步狀態 API"""
+        response = client.get('/api/edge/sync/status')
+        assert response.status_code == 200
+
+        data = response.get_json()
+        
+        # 檢查必要欄位存在
+        assert 'network' in data
+        assert 'services' in data
+        assert 'buffers' in data
+        assert 'sync_enabled' in data
+        assert 'last_checked' in data
+        
+        # 檢查 network 結構
+        assert 'online' in data['network']
+        assert 'status' in data['network']
+        assert data['network']['status'] in ['online', 'offline']
+        assert isinstance(data['network']['online'], bool)
+        
+        # 檢查 services 結構
+        assert 'mcp' in data['services']
+        assert 'queue' in data['services']
+        assert 'available' in data['services']['mcp']
+        assert 'status' in data['services']['mcp']
+        assert 'available' in data['services']['queue']
+        assert 'status' in data['services']['queue']
+        
+        # 檢查 buffers 結構（目前應該都是 0）
+        assert 'command' in data['buffers']
+        assert 'sync' in data['buffers']
+        assert data['buffers']['command']['pending'] == 0
+        assert data['buffers']['command']['failed'] == 0
+        assert data['buffers']['command']['total_buffered'] == 0
+        assert data['buffers']['command']['total_sent'] == 0
+        assert data['buffers']['sync']['pending'] == 0
+        assert data['buffers']['sync']['failed'] == 0
+        
+        # 檢查 sync_enabled
+        assert isinstance(data['sync_enabled'], bool)
+        
+        # 檢查 last_checked 格式（應該是 ISO 8601）
+        assert isinstance(data['last_checked'], str)
+        assert 'T' in data['last_checked']  # ISO 8601 格式
+        
+    def test_sync_status_api_caching(self, client):
+        """測試雲端同步狀態 API 的快取機制"""
+        import time
+        
+        # 第一次請求
+        response1 = client.get('/api/edge/sync/status')
+        data1 = response1.get_json()
+        last_checked1 = data1['last_checked']
+        
+        # 立即第二次請求（應該使用快取）
+        response2 = client.get('/api/edge/sync/status')
+        data2 = response2.get_json()
+        last_checked2 = data2['last_checked']
+        
+        # 快取期內，last_checked 應該相同（表示使用了快取）
+        assert last_checked1 == last_checked2
+        
+        # 等待快取過期（5秒+餘裕）
+        time.sleep(6)
+        
+        # 第三次請求（快取應該已過期）
+        response3 = client.get('/api/edge/sync/status')
+        data3 = response3.get_json()
+        last_checked3 = data3['last_checked']
+        
+        # 快取過期後，last_checked 應該不同
+        assert last_checked3 != last_checked1

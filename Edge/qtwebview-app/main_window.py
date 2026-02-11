@@ -1258,6 +1258,34 @@ class HybridMainWindow(QMainWindow):
         # 添加設定動作
         settings_action = QAction("⚙️ 設定", self)
         settings_action.setShortcut("Ctrl+,")
+        settings_action.setToolTip("開啟設定對話框 (Ctrl+,)")
+        settings_action.triggered.connect(self._show_settings_dialog)
+        toolbar.addAction(settings_action)
+        
+        toolbar.addSeparator()
+        
+        # 添加全螢幕切換動作
+        fullscreen_action = QAction("🖵 全螢幕", self)
+        fullscreen_action.setShortcut("F11")
+        fullscreen_action.setToolTip("切換全螢幕模式 (F11)")
+        fullscreen_action.setCheckable(True)
+        fullscreen_action.triggered.connect(self._toggle_fullscreen)
+        toolbar.addAction(fullscreen_action)
+        self._fullscreen_action = fullscreen_action  # 保存引用以便更新狀態
+        
+        toolbar.addSeparator()
+        
+        # 添加幫助/關於動作
+        help_action = QAction("❓ 幫助", self)
+        help_action.setShortcut("F1")
+        help_action.setToolTip("顯示幫助文件 (F1)")
+        help_action.triggered.connect(self._show_help_dialog)
+        toolbar.addAction(help_action)
+        
+        about_action = QAction("ℹ️ 關於", self)
+        about_action.setToolTip("關於本應用程式")
+        about_action.triggered.connect(self._show_about_dialog)
+        toolbar.addAction(about_action)
         settings_action.setToolTip("開啟設定 (Ctrl+,)")
         settings_action.triggered.connect(self._show_settings)
         toolbar.addAction(settings_action)
@@ -1370,3 +1398,144 @@ class HybridMainWindow(QMainWindow):
             event.accept()
         else:
             event.ignore()
+    
+    def _toggle_fullscreen(self, checked: bool):
+        """切換全螢幕模式"""
+        if checked:
+            self.showFullScreen()
+            self.statusBar().showMessage("已進入全螢幕模式（按 F11 或 ESC 退出）", 3000)
+        else:
+            self.showNormal()
+            self.statusBar().showMessage("已退出全螢幕模式", 3000)
+    
+    def _show_settings_dialog(self):
+        """顯示設定對話框"""
+        self._show_settings()
+    
+    def _show_settings(self):
+        """顯示設定頁面"""
+        # 導航到設定頁面（如果存在）
+        if self.navigation:
+            for i in range(self.navigation.nav_list.count()):
+                item = self.navigation.nav_list.item(i)
+                if item and '設定' in item.text():
+                    self.navigation.nav_list.setCurrentRow(i)
+                    return
+        
+        # 如果沒有設定頁面，顯示簡單對話框
+        QMessageBox.information(
+            self,
+            "設定",
+            "設定功能將在下一個版本中提供。\n"
+            "目前您可以透過 WebUI 介面進行設定。"
+        )
+    
+    def _show_help_dialog(self):
+        """顯示幫助對話框"""
+        self._show_help()
+    
+    def _show_help(self):
+        """顯示幫助文件"""
+        help_text = """
+        <h2>Robot Command Console - Tiny Edge App</h2>
+        <p><b>版本:</b> 3.2.0-beta</p>
+        
+        <h3>快捷鍵:</h3>
+        <ul>
+            <li><b>F5</b> - 重新整理當前頁面</li>
+            <li><b>Ctrl+R</b> - 重新整理所有 Widgets</li>
+            <li><b>Ctrl+,</b> - 開啟設定</li>
+            <li><b>F11</b> - 切換全螢幕模式</li>
+            <li><b>F1</b> - 顯示此幫助</li>
+            <li><b>ESC</b> - 退出全螢幕模式</li>
+        </ul>
+        
+        <h3>功能:</h3>
+        <ul>
+            <li>儀表板 - 查看系統總覽</li>
+            <li>指令控制 - 管理機器人指令</li>
+            <li>機器人管理 - 註冊與監控機器人</li>
+            <li>進階指令 - 建立與分享複雜指令序列</li>
+            <li>設定 - 個人化設定</li>
+        </ul>
+        
+        <h3>更多資訊:</h3>
+        <p>請參閱專案文件：<a href="https://github.com/ChengTingFung-2425/robot-command-console">GitHub</a></p>
+        """
+        
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("幫助")
+        msg_box.setTextFormat(Qt.TextFormat.RichText)
+        msg_box.setText(help_text)
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg_box.exec()
+    
+    def _show_about_dialog(self):
+        """顯示關於對話框"""
+        self._show_about()
+    
+    def _show_about(self):
+        """顯示關於資訊"""
+        from PyQt6.QtCore import QCoreApplication
+        
+        about_text = """
+        <h2>🤖 Robot Command Console</h2>
+        <h3>Tiny Edge Application</h3>
+        
+        <p><b>版本:</b> {version}</p>
+        <p><b>建置日期:</b> 2026-02-04</p>
+        
+        <h4>系統架構:</h4>
+        <ul>
+            <li><b>前端:</b> PyQt6 + QtWebEngine</li>
+            <li><b>後端:</b> Flask + Robot Service</li>
+            <li><b>通訊:</b> QWebChannel Bridge</li>
+        </ul>
+        
+        <h4>專案特色:</h4>
+        <ul>
+            <li>✅ 統一的 ALL-in-One Edge App</li>
+            <li>✅ 離線模式支援</li>
+            <li>✅ 本地 LLM 整合</li>
+            <li>✅ 固件更新管理</li>
+            <li>✅ 完整的審計日誌</li>
+        </ul>
+        
+        <p><b>作者:</b> Robot Command Console Team</p>
+        <p><b>授權:</b> MIT License</p>
+        <p><b>專案網址:</b> <a href="https://github.com/ChengTingFung-2425/robot-command-console">GitHub Repository</a></p>
+        
+        <hr>
+        <p><small>© 2025-2026 Robot Command Console Project. All rights reserved.</small></p>
+        """.format(version=QCoreApplication.applicationVersion())
+        
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("關於 Robot Command Console")
+        msg_box.setTextFormat(Qt.TextFormat.RichText)
+        msg_box.setText(about_text)
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg_box.exec()
+    
+    def _refresh_all_widgets(self):
+        """重新整理所有 widgets"""
+        # 重新載入所有 WebViews
+        for i in range(self.content_stack.count()):
+            widget = self.content_stack.widget(i)
+            if isinstance(widget, SettingsWidget) and widget.webview:
+                widget.webview.reload()
+            elif hasattr(widget, 'refresh') and callable(widget.refresh):
+                widget.refresh()
+        
+        self.statusBar().showMessage("所有頁面已重新載入", 3000)
+    
+    def keyPressEvent(self, event):
+        """鍵盤事件處理"""
+        # ESC 鍵退出全螢幕
+        if event.key() == Qt.Key.Key_Escape and self.isFullScreen():
+            if hasattr(self, '_fullscreen_action'):
+                self._fullscreen_action.setChecked(False)
+            self.showNormal()
+            self.statusBar().showMessage("已退出全螢幕模式", 3000)
+        else:
+            super().keyPressEvent(event)
+

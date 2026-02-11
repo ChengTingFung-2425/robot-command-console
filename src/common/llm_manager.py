@@ -5,6 +5,7 @@ This module consolidates shared functionality between MCP and llm_discovery.
 """
 
 import logging
+import os
 from typing import Dict, List, Optional, Type
 from pathlib import Path
 import platform
@@ -14,6 +15,7 @@ from Edge.llm_discovery.models import ProviderManifest, ProviderHealth, Skill
 from Edge.MCP.llm_provider_base import LLMProviderBase
 
 logger = logging.getLogger(__name__)
+
 
 class LLMManager:
     """

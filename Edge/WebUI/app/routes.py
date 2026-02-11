@@ -1543,10 +1543,8 @@ def _async_firmware_update_worker(update_id: int):
     執行完整的固件更新流程，包括進度追蹤和錯誤處理。
     """
     from WebUI.app.models import FirmwareUpdate
+    from WebUI.app import app
     import time
-    import hashlib
-    import requests
-    import tempfile
     
     def update_status(status, progress, message=''):
         """更新資料庫中的固件更新狀態"""
@@ -1581,7 +1579,7 @@ def _async_firmware_update_worker(update_id: int):
             
             # 模擬下載固件檔案（實際環境中從 firmware.file_path 下載）
             # 在生產環境中，這裡會使用 requests.get() 下載實際檔案
-            temp_file_path = f"/tmp/firmware_{firmware.id}_{firmware.version}.bin"
+            # Note: temp_file_path would be used in production for actual file handling
             
             # 模擬下載進度
             for progress in range(20, 50, 10):

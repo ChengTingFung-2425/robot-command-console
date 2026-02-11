@@ -8,8 +8,8 @@ import os
 import pytest
 from datetime import datetime, timezone
 
-from src.robot_service.queue.interface import Message, MessagePriority
-from src.robot_service.queue.rabbitmq_queue import RabbitMQQueue
+from robot_service.queue.interface import Message, MessagePriority
+from robot_service.queue.rabbitmq_queue import RabbitMQQueue
 
 
 # 測試用的 RabbitMQ URL（可透過環境變數覆蓋）

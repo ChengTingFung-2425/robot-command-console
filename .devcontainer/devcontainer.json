@@ -6,7 +6,8 @@
     "cpus": 2
   },
   "waitFor": "onCreateCommand",
-  "postCreateCommand": "cd WebUI && flask --debug run --host=0.0.0.0 --port=5000 & ",
+  "workspaceFolder": "/workspace",
+  "postCreateCommand": "cd /workspace/WebUI && flask --debug run --host=0.0.0.0 --port=5000 & ",
   "portsAttributes": {
     "5000": {
       "label": "Flask Apps",
@@ -55,8 +56,8 @@
   },
   "forwardPorts": [
     5000,
-    5050,
-    8025
+    8025,
+    15672
   ],
   "features": {
     "ghcr.io/devcontainers/features/docker-from-docker:1": {}

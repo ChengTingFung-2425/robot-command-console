@@ -339,7 +339,7 @@ class RobotRouter:
             client.loop_start()
             
             # 等待連接
-            if not connected.wait(timeout=timeout_ms/1000):
+            if not connected.wait(timeout=timeout_ms / 1000):
                 client.loop_stop()
                 return {
                     "error": {
@@ -359,7 +359,7 @@ class RobotRouter:
             result = client.publish(topic, json.dumps(message), qos=1)
             
             # 等待發送完成
-            if not published.wait(timeout=timeout_ms/1000):
+            if not published.wait(timeout=timeout_ms / 1000):
                 client.loop_stop()
                 return {
                     "error": {
@@ -414,7 +414,7 @@ class RobotRouter:
             logger.info(f"透過 WebSocket 發送指令: endpoint={endpoint}, type={command_type}")
             
             # 建立 WebSocket 連接並發送指令
-            async with websockets.connect(endpoint, timeout=timeout_ms/1000) as websocket:
+            async with websockets.connect(endpoint, timeout=timeout_ms / 1000) as websocket:
                 # 構建指令訊息
                 message = {
                     "command_type": command_type,
@@ -431,7 +431,7 @@ class RobotRouter:
                 try:
                     response_text = await asyncio.wait_for(
                         websocket.recv(),
-                        timeout=timeout_ms/1000
+                        timeout=timeout_ms / 1000
                     )
                     response = json.loads(response_text)
                     logger.info(f"WebSocket 收到回應: {response}")

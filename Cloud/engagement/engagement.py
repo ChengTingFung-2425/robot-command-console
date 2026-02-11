@@ -21,7 +21,7 @@ Handles point awards, achievement tracking, and level management.
 目前此檔案中的函式因缺少依賴而無法運作。
 """
 
-from typing import Optional, List
+from typing import Optional
 
 # TODO: 此檔案需要在 Cloud 服務中重構
 # 需要建立獨立的 Cloud/models.py 和資料庫配置

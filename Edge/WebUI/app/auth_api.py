@@ -8,7 +8,6 @@ from typing import Optional
 import jwt
 from flask import Blueprint, jsonify, request
 
-from WebUI.app import db
 from WebUI.app.models import User
 from WebUI.app.audit import log_audit_event
 
@@ -142,7 +141,7 @@ def login():
     if not username or not password:
         log_audit_event(
             action='login_failure',
-            message=f'登入失敗：缺少使用者名稱或密碼',
+            message='登入失敗：缺少使用者名稱或密碼',
             severity='warning',
             category='authentication'
         )
@@ -238,7 +237,7 @@ def refresh():
     # 記錄審計日誌
     log_audit_event(
         action='token_refresh_success',
-        message=f'使用者成功更新 access token',
+        message='使用者成功更新 access token',
         user_id=user.id,
         severity='info',
         category='authentication',
@@ -306,7 +305,7 @@ def revoke():
     # 記錄審計日誌
     log_audit_event(
         action='api_logout',
-        message=f'使用者透過 API 登出',
+        message='使用者透過 API 登出',
         user_id=user.id,
         severity='info',
         category='authentication'

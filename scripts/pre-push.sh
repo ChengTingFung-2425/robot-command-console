@@ -56,9 +56,8 @@ parse_args() {
                 exit 0
                 ;;
             *)
-                echo -e "${RED}未知選項: $1${NC}"
-                show_help
-                exit 1
+                CHECK_MODE="quick"
+                shift
                 ;;
         esac
     done

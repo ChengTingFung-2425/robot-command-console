@@ -45,6 +45,16 @@ class EndpointProbe:
             req = urllib.request.Request(url, method="GET")
             req.add_header("User-Agent", "LLM-Discovery-Probe/1.0")
 
+            # Validate URL scheme to prevent file:// access
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            if parsed.scheme not in ('http', 'https'):
+                logger.warning(f"Unsafe URL scheme: {parsed.scheme}")
+                return {
+                    "status": "error",
+                    "error_message": f"Unsupported URL scheme: {parsed.scheme}"
+                }
+
             with urllib.request.urlopen(req, timeout=timeout_s) as response:
                 status_code = response.getcode()
                 is_available = 200 <= status_code < 300

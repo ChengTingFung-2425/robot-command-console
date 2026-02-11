@@ -408,19 +408,14 @@ def register_device():
         if existing_device.user_id == user.id:
             reactivated = False
             # If previously unbound/inactive, reactivate and refresh binding info
-            if hasattr(existing_device, 'is_active') and existing_device.is_active is False:
+            if existing_device.is_active is False:
                 existing_device.is_active = True
-                if hasattr(existing_device, 'bound_at'):
-                    existing_device.bound_at = db.func.now()
-                # Refresh basic metadata on re-bind if these fields exist
-                if hasattr(existing_device, 'device_type'):
-                    existing_device.device_type = device_type
-                if hasattr(existing_device, 'platform'):
-                    existing_device.platform = platform
-                if hasattr(existing_device, 'hostname'):
-                    existing_device.hostname = hostname
-                if hasattr(existing_device, 'ip_address'):
-                    existing_device.ip_address = ip_address or request.remote_addr
+                existing_device.bound_at = db.func.now()
+                # Refresh basic metadata on re-bind
+                existing_device.device_type = device_type
+                existing_device.platform = platform
+                existing_device.hostname = hostname
+                existing_device.ip_address = ip_address or request.remote_addr
                 reactivated = True
 
             # Update last_seen
@@ -597,7 +592,10 @@ def update_device(device_id):
     data = request.get_json() or {}
     
     if 'device_name' in data:
-        device.device_name = data['device_name'].strip()
+        device_name_stripped = data['device_name'].strip()
+        if not device_name_stripped:
+            return jsonify({'error': 'device_name cannot be empty'}), 400
+        device.device_name = device_name_stripped
     
     if 'is_trusted' in data:
         raw_is_trusted = data['is_trusted']

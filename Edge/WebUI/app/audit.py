@@ -29,6 +29,7 @@ class AuditCategory:
     AUDIT = "audit"
     ROBOT = "robot"
     PROTOCOL = "protocol"
+    DEVICE = "device"
 
 
 # Action types for audit logging

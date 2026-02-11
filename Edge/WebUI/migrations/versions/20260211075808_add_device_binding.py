@@ -1,7 +1,7 @@
 """add device binding
 
 Revision ID: 20260211075808
-Revises: f1r2m3w4a5r6
+Revises: a1u2d3i4t5l6
 Create Date: 2026-02-11 07:58:08
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '20260211075808'
-down_revision = 'f1r2m3w4a5r6'
+down_revision = 'a1u2d3i4t5l6'
 branch_labels = None
 depends_on = None
 

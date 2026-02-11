@@ -65,7 +65,7 @@ class EdgeTokenCache:
 
     def _init_keychain(self):
         """Initialize keychain/platform storage (stub for backward compatibility).
-        
+
         Returns:
             bool: True if keychain is available, False otherwise
         """
@@ -263,7 +263,7 @@ class EdgeTokenCache:
 
     def _load_tokens(self):
         """從儲存中載入 Tokens
-        
+
         Returns:
             Dict with token data or empty dict if not available
         """
@@ -307,17 +307,17 @@ class EdgeTokenCache:
 
     def _save_to_file(self, data: Dict) -> bool:
         """儲存資料至檔案（用於測試和回退機制）
-        
+
         Args:
             data: 資料字典
-            
+
         Returns:
             True if successful, False otherwise
         """
         try:
             data_json = json.dumps(data)
             encrypted_str = self._encryption.encrypt(data_json)
-            
+
             with open(self._token_file, 'w', encoding='utf-8') as f:
                 f.write(encrypted_str)
 

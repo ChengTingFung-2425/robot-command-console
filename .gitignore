@@ -272,3 +272,4 @@ dmypy.json
 
 # Secret debug mode marker (dev only)
 .robot_debug
+test_edge_ui_sync.py

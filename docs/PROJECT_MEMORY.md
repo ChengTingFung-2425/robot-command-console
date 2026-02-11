@@ -1004,3 +1004,121 @@ def get_robot_status():
 - [src/robot_service/config_injection.py](../src/robot_service/config_injection.py)
 
 ---
+
+## 雲端同步 UI/狀態提示實作（2026-02-11）
+
+**目標**：為 Edge UI 添加雲端同步狀態的即時監控與提示功能。
+
+**實作內容**：
+
+1. **API 端點**
+   - 新增 `GET /api/edge/sync/status` API
+   - 返回網路狀態、佇列服務狀態、緩衝區統計
+   - 基於現有的 `check_internet_connection()` 和 `check_mcp_connection()` 函式
+
+2. **UI 元件**
+   - 在首頁新增「☁️ 雲端同步狀態」面板
+   - 顯示 4 個狀態卡片：網路連線、佇列服務、緩衝區、最後同步
+   - 使用顏色區分狀態（綠色=正常、黃色=警告、紅色=錯誤）
+
+3. **即時更新**
+   - 頁面載入時立即檢查狀態
+   - 每 30 秒更新完整狀態
+   - 每 10 秒更新雲端同步狀態
+   - 使用 `setInterval` 實現自動更新
+
+**技術細節**：
+
+1. **API 設計**
+   ```python
+   @edge_ui.route('/api/edge/sync/status', methods=['GET'])
+   def api_sync_status():
+       # 返回結構化的狀態資料
+       return jsonify({
+           'network': {'online': bool, 'status': str},
+           'services': {'mcp': {...}, 'queue': {...}},
+           'buffers': {'command': {...}, 'sync': {...}},
+           'sync_enabled': bool,
+           'last_sync': ISO8601
+       })
+   ```
+
+2. **前端狀態更新**
+   ```javascript
+   async function updateSyncStatus() {
+       const data = await fetch('/api/edge/sync/status').then(r => r.json());
+       // 更新 4 個狀態卡片的內容和樣式
+       updateStatusCard('#sync-network-status', data.network);
+       updateStatusCard('#sync-queue-status', data.services.queue);
+       // ...
+   }
+   ```
+
+3. **狀態指示**
+   - `status-success`：綠色，表示正常
+   - `status-warning`：黃色，表示部分可用或離線
+   - `status-error`：紅色，表示錯誤或不可用
+
+**未來改進方向**：
+
+1. **完整 OfflineQueueService 整合**
+   - 目前 API 返回的緩衝區統計為模擬資料（全為 0）
+   - 需要在 Edge UI 中整合 OfflineQueueService 實例
+   - 可參考 TUI 和 qtwebview-app 的實作方式
+
+2. **WebSocket 即時推送**
+   - 目前使用輪詢機制，有延遲
+   - 可改用 WebSocket 實現狀態變更的即時推送
+   - 減少伺服器負載和網路流量
+
+3. **狀態變更通知**
+   - 網路狀態變更時顯示 Toast 通知
+   - 緩衝區累積過多時發出警告
+   - 同步失敗時提示用戶
+
+4. **詳細統計頁面**
+   - 建立專門的同步統計頁面
+   - 顯示歷史同步記錄
+   - 提供手動清空緩衝區功能
+
+**經驗教訓**：
+
+1. **模組化 API 設計**
+   - 將狀態檢查邏輯封裝為獨立函式（如 `check_internet_connection()`）
+   - 便於在多個 API 端點重用
+   - 易於測試和維護
+
+2. **漸進式功能實作**
+   - 先實作基礎版本（網路狀態檢查）
+   - 在程式碼註解中標記未來改進方向
+   - 保留擴展介面，便於後續整合完整功能
+
+3. **UI 自動更新策略**
+   - 區分不同更新頻率（完整狀態 30 秒、同步狀態 10 秒）
+   - 避免過度頻繁的 API 呼叫
+   - 在錯誤時顯示友善的錯誤狀態
+
+4. **文件同步更新**
+   - 新增功能時立即更新使用者文件
+   - 在 FEATURES_REFERENCE.md 中詳細說明
+   - 提供完整的 API 回應範例和使用情境
+
+**測試方法**：
+```bash
+# 啟動 Edge 服務（參考專案說明文件）
+# 例如：cd Edge/robot_service && python -m electron.flask_adapter
+
+# 以 curl 測試同步狀態 API（僅檢視回應內容）
+curl http://localhost:5050/api/edge/sync/status
+
+# 驗證回應格式與 HTTP 狀態碼
+curl -i http://localhost:5050/api/edge/sync/status
+```
+
+**相關文件**：
+- [Edge/robot_service/electron/edge_ui.py](../Edge/robot_service/electron/edge_ui.py) - API 實作
+- [Edge/robot_service/electron/templates/edge/home.html](../Edge/robot_service/electron/templates/edge/home.html) - UI 實作
+- [docs/user_guide/FEATURES_REFERENCE.md](user_guide/FEATURES_REFERENCE.md#雲端同步狀態) - 使用者文件
+
+---
+

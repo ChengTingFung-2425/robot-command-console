@@ -168,7 +168,7 @@ check_python_lint() {
     # 確保 flake8 已安裝
     if ! python3 -c "import flake8" 2>/dev/null; then
         echo "  安裝 flake8..."
-        pip install flake8 >/dev/null 2>&1 || {
+        /usr/local/bin/pip install flake8 >/dev/null 2>&1 || {
             record_failure "無法安裝 flake8"
             return 1
         }

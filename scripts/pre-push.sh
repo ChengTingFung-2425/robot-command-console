@@ -168,10 +168,16 @@ check_python_lint() {
     # 確保 flake8 已安裝
     if ! python3 -c "import flake8" 2>/dev/null; then
         echo "  安裝 flake8..."
-        /usr/local/bin/pip install flake8 >/dev/null 2>&1 || {
-            record_failure "無法安裝 flake8"
+        # 嘗試使用 --user 安裝（推薦方式）
+        if python3 -m pip install --user flake8 >/dev/null 2>&1; then
+            echo "  flake8 已安裝（使用 --user）"
+        # 如果 --user 失敗，嘗試 --break-system-packages（Python 3.11+）
+        elif python3 -m pip install --break-system-packages flake8 >/dev/null 2>&1; then
+            echo "  flake8 已安裝（使用 --break-system-packages）"
+        else
+            record_failure "無法安裝 flake8，請手動安裝：python3 -m pip install --user flake8"
             return 1
-        }
+        fi
     fi
     
     # 執行 flake8 檢查（與 ci.yml 完全一致）
@@ -269,10 +275,16 @@ check_openapi() {
     # 安裝驗證工具
     if ! python3 -c "import openapi_spec_validator" 2>/dev/null; then
         echo "  安裝 openapi-spec-validator..."
-        pip install openapi-spec-validator pyyaml >/dev/null 2>&1 || {
-            record_failure "無法安裝 openapi-spec-validator"
+        # 嘗試使用 --user 安裝（推薦方式）
+        if python3 -m pip install --user openapi-spec-validator pyyaml >/dev/null 2>&1; then
+            echo "  openapi-spec-validator 已安裝（使用 --user）"
+        # 如果 --user 失敗，嘗試 --break-system-packages（Python 3.11+）
+        elif python3 -m pip install --break-system-packages openapi-spec-validator pyyaml >/dev/null 2>&1; then
+            echo "  openapi-spec-validator 已安裝（使用 --break-system-packages）"
+        else
+            record_failure "無法安裝 openapi-spec-validator，請手動安裝：python3 -m pip install --user openapi-spec-validator pyyaml"
             return 1
-        }
+        fi
     fi
     
     # 驗證語法

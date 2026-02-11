@@ -5,12 +5,10 @@ This module provides functionality to bind Edge devices to cloud user accounts.
 It integrates with DeviceIDGenerator and communicates with the cloud authentication API.
 """
 
-import os
 import platform
 import socket
 import requests
 from typing import Optional, Dict
-from pathlib import Path
 
 from src.edge_app.auth.device_id import DeviceIDGenerator
 

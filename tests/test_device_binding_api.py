@@ -4,13 +4,12 @@ import sys
 import os
 import unittest
 import json
-from datetime import datetime
 
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from Edge.WebUI.app import create_app, db
-from Edge.WebUI.app.models import User, Device
+from WebUI.app import create_app, db
+from WebUI.app.models import User
 
 
 class TestDeviceBindingAPI(unittest.TestCase):

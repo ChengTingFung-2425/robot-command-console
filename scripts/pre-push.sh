@@ -153,6 +153,48 @@ check_node() {
     return 0
 }
 
+# 檢查並安裝 Python 工具
+# 參數：$1 = 工具名稱（如 flake8）, $2 = Python 模組名稱（如 flake8）
+check_and_install_python_tool() {
+    local tool_name="$1"
+    local module_name="${2:-$1}"  # 如果沒提供模組名，使用工具名
+    
+    # 檢查 1: Python 模組是否可導入
+    if python3 -c "import ${module_name}" 2>/dev/null; then
+        # 檢查 2: 命令是否可執行
+        if python3 -m ${module_name} --version >/dev/null 2>&1; then
+            local version=$(python3 -m ${module_name} --version 2>&1 | head -1)
+            echo "  ✓ ${tool_name} 已安裝：${version}"
+            return 0
+        fi
+    fi
+    
+    # 工具不存在或不可用，需要安裝
+    echo "  ⚠ ${tool_name} 未安裝，正在安裝..."
+    
+    # 嘗試使用 --user 安裝（推薦方式）
+    if python3 -m pip install --user ${tool_name} >/dev/null 2>&1; then
+        echo "  ✓ ${tool_name} 已安裝（使用 --user）"
+    # 如果 --user 失敗，嘗試 --break-system-packages（Python 3.11+）
+    elif python3 -m pip install --break-system-packages ${tool_name} >/dev/null 2>&1; then
+        echo "  ✓ ${tool_name} 已安裝（使用 --break-system-packages）"
+    else
+        echo "  ✗ 無法安裝 ${tool_name}"
+        echo "  請手動安裝：python3 -m pip install --user ${tool_name}"
+        return 1
+    fi
+    
+    # 安裝後驗證
+    if python3 -m ${module_name} --version >/dev/null 2>&1; then
+        local version=$(python3 -m ${module_name} --version 2>&1 | head -1)
+        echo "  ✓ ${tool_name} 驗證成功：${version}"
+        return 0
+    else
+        echo "  ✗ ${tool_name} 安裝後驗證失敗"
+        return 1
+    fi
+}
+
 #############################################
 # Level 1: 快速檢查（來自 ci.yml）
 #############################################
@@ -165,19 +207,10 @@ check_python_lint() {
         return 1
     fi
     
-    # 確保 flake8 已安裝
-    if ! python3 -c "import flake8" 2>/dev/null; then
-        echo "  安裝 flake8..."
-        # 嘗試使用 --user 安裝（推薦方式）
-        if python3 -m pip install --user flake8 >/dev/null 2>&1; then
-            echo "  flake8 已安裝（使用 --user）"
-        # 如果 --user 失敗，嘗試 --break-system-packages（Python 3.11+）
-        elif python3 -m pip install --break-system-packages flake8 >/dev/null 2>&1; then
-            echo "  flake8 已安裝（使用 --break-system-packages）"
-        else
-            record_failure "無法安裝 flake8，請手動安裝：python3 -m pip install --user flake8"
-            return 1
-        fi
+    # 確保 flake8 已安裝（使用統一的檢查和安裝函數）
+    if ! check_and_install_python_tool "flake8" "flake8"; then
+        record_failure "flake8 未安裝且無法自動安裝"
+        return 1
     fi
     
     # 執行 flake8 檢查（與 ci.yml 完全一致）
@@ -272,18 +305,36 @@ check_openapi() {
         return 0
     fi
     
-    # 安裝驗證工具
+    # 安裝驗證工具（使用統一的檢查和安裝函數）
+    # 注意：openapi-spec-validator 需要 pyyaml
     if ! python3 -c "import openapi_spec_validator" 2>/dev/null; then
-        echo "  安裝 openapi-spec-validator..."
+        echo "  ⚠ openapi-spec-validator 未安裝，正在安裝..."
         # 嘗試使用 --user 安裝（推薦方式）
         if python3 -m pip install --user openapi-spec-validator pyyaml >/dev/null 2>&1; then
-            echo "  openapi-spec-validator 已安裝（使用 --user）"
+            echo "  ✓ openapi-spec-validator 已安裝（使用 --user）"
         # 如果 --user 失敗，嘗試 --break-system-packages（Python 3.11+）
         elif python3 -m pip install --break-system-packages openapi-spec-validator pyyaml >/dev/null 2>&1; then
-            echo "  openapi-spec-validator 已安裝（使用 --break-system-packages）"
+            echo "  ✓ openapi-spec-validator 已安裝（使用 --break-system-packages）"
         else
             record_failure "無法安裝 openapi-spec-validator，請手動安裝：python3 -m pip install --user openapi-spec-validator pyyaml"
             return 1
+        fi
+        
+        # 安裝後驗證
+        if command -v openapi-spec-validator >/dev/null 2>&1; then
+            local version=$(openapi-spec-validator --version 2>&1 | head -1)
+            echo "  ✓ openapi-spec-validator 驗證成功：${version}"
+        else
+            echo "  ✗ openapi-spec-validator 安裝後驗證失敗"
+            return 1
+        fi
+    else
+        # 已安裝，顯示版本資訊
+        if command -v openapi-spec-validator >/dev/null 2>&1; then
+            local version=$(openapi-spec-validator --version 2>&1 | head -1)
+            echo "  ✓ openapi-spec-validator 已安裝：${version}"
+        else
+            echo "  ✓ openapi-spec-validator 模組已安裝"
         fi
     fi
     

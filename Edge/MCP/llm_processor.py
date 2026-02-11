@@ -174,16 +174,16 @@ class LLMProcessor:
             # 實作實際的 HTTP/IPC 呼叫
             try:
                 import requests
-                
+
                 # 從 discovery service 取得 provider 端點
                 provider_info = await self._discovery_service.get_provider_info(provider_id)
                 if not provider_info:
                     raise ValueError(f"Provider {provider_id} not found")
-                
+
                 endpoint = provider_info.get("endpoint")
                 if not endpoint:
                     raise ValueError(f"Provider {provider_id} has no endpoint")
-                
+
                 # 構建請求
                 url = f"{endpoint}/skills/{skill_id}/invoke"
                 payload = {
@@ -191,7 +191,7 @@ class LLMProcessor:
                     "parameters": parameters or {},
                     "provider_id": provider_id
                 }
-                
+
                 # 發送 HTTP POST 請求
                 response = requests.post(
                     url,
@@ -199,7 +199,7 @@ class LLMProcessor:
                     timeout=30,
                     headers={"Content-Type": "application/json"}
                 )
-                
+
                 if response.status_code == 200:
                     result = response.json()
                     self.logger.info(f"Skill {skill_id} 呼叫成功")
@@ -219,7 +219,7 @@ class LLMProcessor:
                         "skill_id": skill_id,
                         "error": error_msg
                     }
-                    
+
             except ImportError:
                 # requests 未安裝，返回模擬結果
                 self.logger.warning("requests library not available, using mock response")

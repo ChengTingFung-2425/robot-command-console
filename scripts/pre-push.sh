@@ -238,17 +238,29 @@ check_python_lint() {
         return 1
     fi
     
-    echo "  檢查 MCP/ 目錄..."
-    if python3 -m flake8 MCP/ \
-        --max-line-length=120 \
-        --ignore=W503,E203 \
-        --exclude=MCP/__pycache__ \
-        --statistics > /tmp/flake8_mcp.log 2>&1; then
-        record_success "MCP/ 目錄檢查通過"
+    # 檢查 MCP/ 目錄（支持根目錄和 Edge/ 子目錄）
+    local mcp_dir=""
+    if [ -d "MCP" ]; then
+        mcp_dir="MCP"
+    elif [ -d "Edge/MCP" ]; then
+        mcp_dir="Edge/MCP"
+    fi
+    
+    if [ -n "$mcp_dir" ]; then
+        echo "  檢查 ${mcp_dir}/ 目錄..."
+        if python3 -m flake8 ${mcp_dir}/ \
+            --max-line-length=120 \
+            --ignore=W503,E203 \
+            --exclude=${mcp_dir}/__pycache__ \
+            --statistics > /tmp/flake8_mcp.log 2>&1; then
+            record_success "${mcp_dir}/ 目錄檢查通過"
+        else
+            record_failure "${mcp_dir}/ 目錄有 linting 錯誤"
+            cat /tmp/flake8_mcp.log
+            return 1
+        fi
     else
-        record_failure "MCP/ 目錄有 linting 錯誤"
-        cat /tmp/flake8_mcp.log
-        return 1
+        record_skip "MCP/ 目錄不存在"
     fi
     
     record_success "Python Flake8 Linting 完成"
@@ -263,21 +275,27 @@ check_node_syntax() {
         return 0  # 跳過但不視為失敗
     fi
     
-    if [ ! -d "electron-app" ]; then
+    # 檢查 electron-app 目錄位置（支持根目錄和 Edge/ 子目錄）
+    local electron_dir=""
+    if [ -d "electron-app" ]; then
+        electron_dir="electron-app"
+    elif [ -d "Edge/electron-app" ]; then
+        electron_dir="Edge/electron-app"
+    else
         record_skip "electron-app 目錄不存在"
         return 0
     fi
     
-    echo "  檢查 electron-app/main.js..."
-    if node --check electron-app/main.js 2>&1; then
+    echo "  檢查 ${electron_dir}/main.js..."
+    if node --check ${electron_dir}/main.js 2>&1; then
         record_success "main.js 語法正確"
     else
         record_failure "main.js 語法錯誤"
         return 1
     fi
     
-    echo "  檢查 electron-app/preload.js..."
-    if node --check electron-app/preload.js 2>&1; then
+    echo "  檢查 ${electron_dir}/preload.js..."
+    if node --check ${electron_dir}/preload.js 2>&1; then
         record_success "preload.js 語法正確"
     else
         record_failure "preload.js 語法錯誤"

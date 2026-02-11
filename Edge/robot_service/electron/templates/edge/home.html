@@ -65,6 +65,32 @@
 </div>
 
 <div class="section">
+    <h2>☁️ 雲端同步狀態</h2>
+    <div class="status-grid" id="sync-status">
+        <div class="status-card" id="sync-network-status">
+            <span class="status-icon">🌐</span>
+            <span class="status-label">網路連線</span>
+            <span class="status-value status-checking">檢查中...</span>
+        </div>
+        <div class="status-card" id="sync-queue-status">
+            <span class="status-icon">📮</span>
+            <span class="status-label">佇列服務</span>
+            <span class="status-value status-checking">檢查中...</span>
+        </div>
+        <div class="status-card" id="sync-buffer-status">
+            <span class="status-icon">💾</span>
+            <span class="status-label">緩衝區</span>
+            <span class="status-value status-checking">檢查中...</span>
+        </div>
+        <div class="status-card" id="sync-last-sync">
+            <span class="status-icon">🔄</span>
+            <span class="status-label">最後同步</span>
+            <span class="status-value">--</span>
+        </div>
+    </div>
+</div>
+
+<div class="section">
     <h2>🚀 快速操作</h2>
     <div class="action-buttons">
         <button class="btn btn-lg btn-primary" onclick="registerDemoRobot()">
@@ -82,6 +108,14 @@
 // 頁面載入時檢查狀態
 document.addEventListener('DOMContentLoaded', function() {
     refreshStatus();
+    // 立即更新同步狀態（即使 refreshStatus 失敗也能顯示）
+    updateSyncStatus();
+
+    // 定期更新狀態（每 30 秒）
+    setInterval(refreshStatus, 30000);
+
+    // 定期更新雲端同步狀態（每 10 秒）
+    setInterval(updateSyncStatus, 10000);
 });
 
 // 重新整理狀態
@@ -90,7 +124,7 @@ async function refreshStatus() {
         // 檢查 LLM 狀態
         const llmRes = await fetch('/api/edge/llm/status');
         const llmData = await llmRes.json();
-        
+
         const llmStatus = document.querySelector('#llm-status .status-value');
         if (llmData.local_llm_available) {
             llmStatus.textContent = '可用';
@@ -99,7 +133,7 @@ async function refreshStatus() {
             llmStatus.textContent = '不可用';
             llmStatus.className = 'status-value status-error';
         }
-        
+
         const internetStatus = document.querySelector('#internet-status .status-value');
         if (llmData.internet_available) {
             internetStatus.textContent = '已連線';
@@ -108,19 +142,92 @@ async function refreshStatus() {
             internetStatus.textContent = '離線';
             internetStatus.className = 'status-value status-warning';
         }
-        
+
         // 檢查機器人數量
         const robotsRes = await fetch('/api/edge/robots');
         const robotsData = await robotsRes.json();
-        
+
         const robotsStatus = document.querySelector('#robots-status .status-value');
         robotsStatus.textContent = robotsData.count;
-        
-        // 更新導航列狀態
-        updateConnectionStatus(llmData);
-        
+
+        // 更新雲端同步狀態
+        await updateSyncStatus();
+
+        // 更新導航列狀態（呼叫 EdgeUI 共用函式）
+        if (window.EdgeUI && typeof window.EdgeUI.updateConnectionStatus === 'function') {
+            window.EdgeUI.updateConnectionStatus();
+        }
+
     } catch (error) {
         console.error('Failed to refresh status:', error);
+    }
+}
+
+// 更新雲端同步狀態
+async function updateSyncStatus() {
+    try {
+        const res = await fetch('/api/edge/sync/status');
+        const data = await res.json();
+
+        // 更新網路狀態
+        const networkStatus = document.querySelector('#sync-network-status .status-value');
+        if (data.network.online) {
+            networkStatus.textContent = '在線';
+            networkStatus.className = 'status-value status-success';
+        } else {
+            networkStatus.textContent = '離線';
+            networkStatus.className = 'status-value status-warning';
+        }
+
+        // 更新佇列服務狀態
+        const queueStatus = document.querySelector('#sync-queue-status .status-value');
+        if (data.services.queue.available) {
+            queueStatus.textContent = '可用';
+            queueStatus.className = 'status-value status-success';
+        } else {
+            queueStatus.textContent = '不可用';
+            // 離線導致不可用 → warning；在線但服務故障 → error
+            if (data.network && data.network.online === false) {
+                queueStatus.className = 'status-value status-warning';
+            } else {
+                queueStatus.className = 'status-value status-error';
+            }
+        }
+
+        // 更新緩衝區狀態
+        const bufferStatus = document.querySelector('#sync-buffer-status .status-value');
+        const totalPending = data.buffers.command.pending + data.buffers.sync.pending;
+        if (totalPending === 0) {
+            bufferStatus.textContent = '空閒';
+            bufferStatus.className = 'status-value status-success';
+        } else {
+            bufferStatus.textContent = `${totalPending} 項待同步`;
+            bufferStatus.className = 'status-value status-warning';
+        }
+
+        // 更新最後檢查時間
+        const lastSyncStatus = document.querySelector('#sync-last-sync .status-value');
+        if (data.last_checked) {
+            const lastCheckedTime = new Date(data.last_checked);
+            lastSyncStatus.textContent = window.EdgeUI.formatTime(lastCheckedTime);
+        } else {
+            lastSyncStatus.textContent = '--';
+        }
+
+    } catch (error) {
+        console.error('Failed to update sync status:', error);
+        // 顯示錯誤狀態
+        const networkStatus = document.querySelector('#sync-network-status .status-value');
+        networkStatus.textContent = '錯誤';
+        networkStatus.className = 'status-value status-error';
+
+        const queueStatus = document.querySelector('#sync-queue-status .status-value');
+        queueStatus.textContent = '錯誤';
+        queueStatus.className = 'status-value status-error';
+
+        const bufferStatus = document.querySelector('#sync-buffer-status .status-value');
+        bufferStatus.textContent = '錯誤';
+        bufferStatus.className = 'status-value status-error';
     }
 }
 

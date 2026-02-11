@@ -298,46 +298,46 @@ class RobotRouter:
             import paho.mqtt.client as mqtt
             import json
             from threading import Event
-            
+
             logger.info(f"透過 MQTT 發送指令: endpoint={endpoint}, type={command_type}")
-            
+
             # 解析 MQTT 端點 (format: mqtt://broker:port/topic)
             if not endpoint.startswith("mqtt://"):
                 raise ValueError(f"Invalid MQTT endpoint: {endpoint}")
-            
+
             # 簡易解析
             parts = endpoint.replace("mqtt://", "").split("/")
             broker_port = parts[0]
             topic = "/".join(parts[1:]) if len(parts) > 1 else "robot/commands"
-            
+
             if ":" in broker_port:
                 broker, port_str = broker_port.split(":")
                 port = int(port_str)
             else:
                 broker = broker_port
                 port = 1883  # MQTT 預設 port
-            
+
             # 建立 MQTT 客戶端
             client = mqtt.Client()
             connected = Event()
             published = Event()
-            
+
             def on_connect(client, userdata, flags, rc):
                 if rc == 0:
                     connected.set()
                 else:
                     logger.error(f"MQTT connection failed with code {rc}")
-            
+
             def on_publish(client, userdata, mid):
                 published.set()
-            
+
             client.on_connect = on_connect
             client.on_publish = on_publish
-            
+
             # 連接並發送
             client.connect(broker, port, keepalive=60)
             client.loop_start()
-            
+
             # 等待連接
             if not connected.wait(timeout=timeout_ms / 1000):
                 client.loop_stop()
@@ -347,7 +347,7 @@ class RobotRouter:
                         "message": "MQTT connection timeout"
                     }
                 }
-            
+
             # 發送指令
             message = {
                 "command_type": command_type,
@@ -355,9 +355,9 @@ class RobotRouter:
                 "trace_id": trace_id,
                 "timestamp": datetime.now().isoformat()
             }
-            
+
             result = client.publish(topic, json.dumps(message), qos=1)
-            
+
             # 等待發送完成
             if not published.wait(timeout=timeout_ms / 1000):
                 client.loop_stop()
@@ -367,10 +367,10 @@ class RobotRouter:
                         "message": "MQTT publish timeout"
                     }
                 }
-            
+
             client.loop_stop()
             client.disconnect()
-            
+
             logger.info(f"MQTT 指令已發送: topic={topic}, mid={result.mid}")
             return {
                 "success": True,
@@ -378,7 +378,7 @@ class RobotRouter:
                 "topic": topic,
                 "message_id": result.mid
             }
-            
+
         except ImportError:
             logger.warning("paho-mqtt library not installed, MQTT not available")
             return {
@@ -410,9 +410,9 @@ class RobotRouter:
             # WebSocket 實作需要 websockets 套件
             import websockets
             import json
-            
+
             logger.info(f"透過 WebSocket 發送指令: endpoint={endpoint}, type={command_type}")
-            
+
             # 建立 WebSocket 連接並發送指令
             async with websockets.connect(endpoint, timeout=timeout_ms / 1000) as websocket:
                 # 構建指令訊息
@@ -422,11 +422,11 @@ class RobotRouter:
                     "trace_id": trace_id,
                     "timestamp": datetime.now().isoformat()
                 }
-                
+
                 # 發送指令
                 await websocket.send(json.dumps(message))
                 logger.info(f"WebSocket 指令已發送: {endpoint}")
-                
+
                 # 等待回應 (可選)
                 try:
                     response_text = await asyncio.wait_for(
@@ -448,7 +448,7 @@ class RobotRouter:
                         "protocol": "WebSocket",
                         "note": "Command sent but no response received"
                     }
-            
+
         except ImportError:
             logger.warning("websockets library not installed, WebSocket not available")
             return {

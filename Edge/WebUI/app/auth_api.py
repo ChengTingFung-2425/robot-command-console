@@ -395,22 +395,51 @@ def register_device():
     if not device_id or len(device_id) != 64:
         return jsonify({'error': 'Invalid device_id format (must be 64 chars SHA-256)'}), 400
     
+    # Validate device_id is hexadecimal
+    try:
+        int(device_id, 16)
+    except ValueError:
+        return jsonify({'error': 'Invalid device_id format (must be hexadecimal)'}), 400
+    
     # Check if device already exists
     existing_device = Device.query.filter_by(device_id=device_id).first()
     if existing_device:
         # Device already bound to this user
         if existing_device.user_id == user.id:
+            reactivated = False
+            # If previously unbound/inactive, reactivate and refresh binding info
+            if hasattr(existing_device, 'is_active') and existing_device.is_active is False:
+                existing_device.is_active = True
+                if hasattr(existing_device, 'bound_at'):
+                    existing_device.bound_at = db.func.now()
+                # Refresh basic metadata on re-bind if these fields exist
+                if hasattr(existing_device, 'device_type'):
+                    existing_device.device_type = device_type
+                if hasattr(existing_device, 'platform'):
+                    existing_device.platform = platform
+                if hasattr(existing_device, 'hostname'):
+                    existing_device.hostname = hostname
+                if hasattr(existing_device, 'ip_address'):
+                    existing_device.ip_address = ip_address or request.remote_addr
+                reactivated = True
+
             # Update last_seen
             existing_device.last_seen_at = db.func.now()
             db.session.commit()
             
             log_audit_event(
                 action='device_register_existing',
-                message=f'裝置已存在，更新最後連線時間 (device_id={device_id[:8]}...)',
+                message=(
+                    f'裝置已存在，{"重新啟用並" if reactivated else ""}更新最後連線時間 '
+                    f'(device_id={device_id[:8]}...)'
+                ),
                 user_id=user.id,
                 severity='info',
                 category='device',
-                context={'device_id': device_id}
+                context={
+                    'device_id': device_id,
+                    'reactivated': reactivated,
+                }
             )
             
             return jsonify({
@@ -571,7 +600,26 @@ def update_device(device_id):
         device.device_name = data['device_name'].strip()
     
     if 'is_trusted' in data:
-        device.is_trusted = bool(data['is_trusted'])
+        raw_is_trusted = data['is_trusted']
+
+        if isinstance(raw_is_trusted, bool):
+            parsed_is_trusted = raw_is_trusted
+        elif isinstance(raw_is_trusted, str):
+            value = raw_is_trusted.strip().lower()
+            if value in ('true', '1'):
+                parsed_is_trusted = True
+            elif value in ('false', '0'):
+                parsed_is_trusted = False
+            else:
+                return jsonify({
+                    'error': 'Invalid value for is_trusted; must be boolean'
+                }), 400
+        else:
+            return jsonify({
+                'error': 'Invalid type for is_trusted; must be boolean'
+            }), 400
+
+        device.is_trusted = parsed_is_trusted
         log_audit_event(
             action='device_trust_changed',
             message=f'裝置信任狀態變更: {device.is_trusted}',

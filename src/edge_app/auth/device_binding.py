@@ -268,5 +268,5 @@ class DeviceBindingClient:
 
         # Register device
         result = self.register_device(access_token, device_name)
-        result['already_bound'] = False
+        result.setdefault('already_bound', False)
         return result

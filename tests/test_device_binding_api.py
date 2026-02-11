@@ -17,11 +17,8 @@ class TestDeviceBindingAPI(unittest.TestCase):
 
     def setUp(self):
         """設置測試環境"""
-        self.app = create_app()
+        self.app = create_app('testing')
         self.app.config['TESTING'] = True
-        self.app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
-        self.app.config['WTF_CSRF_ENABLED'] = False
-        self.app.config['SECRET_KEY'] = 'test-secret-key'
         
         self.client = self.app.test_client()
         

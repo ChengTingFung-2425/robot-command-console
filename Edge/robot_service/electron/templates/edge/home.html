@@ -108,6 +108,8 @@
 // 頁面載入時檢查狀態
 document.addEventListener('DOMContentLoaded', function() {
     refreshStatus();
+    // 立即更新同步狀態（即使 refreshStatus 失敗也能顯示）
+    updateSyncStatus();
 
     // 定期更新狀態（每 30 秒）
     setInterval(refreshStatus, 30000);
@@ -208,9 +210,17 @@ async function updateSyncStatus() {
     } catch (error) {
         console.error('Failed to update sync status:', error);
         // 顯示錯誤狀態
-        document.querySelector('#sync-network-status .status-value').textContent = '錯誤';
-        document.querySelector('#sync-queue-status .status-value').textContent = '錯誤';
-        document.querySelector('#sync-buffer-status .status-value').textContent = '錯誤';
+        const networkStatus = document.querySelector('#sync-network-status .status-value');
+        networkStatus.textContent = '錯誤';
+        networkStatus.className = 'status-value status-error';
+
+        const queueStatus = document.querySelector('#sync-queue-status .status-value');
+        queueStatus.textContent = '錯誤';
+        queueStatus.className = 'status-value status-error';
+
+        const bufferStatus = document.querySelector('#sync-buffer-status .status-value');
+        bufferStatus.textContent = '錯誤';
+        bufferStatus.className = 'status-value status-error';
     }
 }
 

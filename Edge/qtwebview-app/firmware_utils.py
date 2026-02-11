@@ -247,8 +247,10 @@ class SSHClient:
     def execute_command(self, command: str) -> Tuple[bool, str, str]:
         """
         執行遠端指令 - 使用 paramiko
+        警告：確保 command 參數已經過適當的驗證和清理
         """
         try:
+            # Note: caller should sanitize command input
             stdin, stdout, stderr = self.client.exec_command(command, timeout=60)
             exit_status = stdout.channel.recv_exit_status()
             

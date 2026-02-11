@@ -54,8 +54,8 @@ def _get_firmware_metadata(firmware_path):
     try:
         stat = firmware_path.stat()
         
-        # Calculate file hash
-        hash_md5 = hashlib.md5()
+        # Calculate file hash (MD5 for file integrity check, not security)
+        hash_md5 = hashlib.md5(usedforsecurity=False)
         with open(firmware_path, 'rb') as f:
             for chunk in iter(lambda: f.read(4096), b""):
                 hash_md5.update(chunk)
@@ -235,8 +235,8 @@ def upload_firmware():
             file_path.unlink()
             return jsonify({'error': 'Empty file'}), 400
         
-        # Calculate checksum
-        hash_md5 = hashlib.md5()
+        # Calculate checksum (MD5 for file integrity, not security)
+        hash_md5 = hashlib.md5(usedforsecurity=False)
         with open(file_path, 'rb') as f:
             for chunk in iter(lambda: f.read(4096), b""):
                 hash_md5.update(chunk)

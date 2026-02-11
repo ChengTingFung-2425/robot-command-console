@@ -12,6 +12,7 @@ Edge 功能包括：
 import json
 import logging
 import os
+import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -49,6 +50,13 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
     'theme': 'light',
     'llm_provider': None,
     'llm_model': None,
+}
+
+# 雲端同步狀態快取（避免頻繁檢查造成阻塞）
+_sync_status_cache: Dict[str, Any] = {
+    'data': None,
+    'timestamp': 0,
+    'cache_duration': 5,  # 快取 5 秒
 }
 
 
@@ -638,16 +646,29 @@ def api_sync_status():
     """
     取得雲端同步狀態
 
-    返回：
-    - network_status: 網路連線狀態
-    - queue_service_status: 佇列服務狀態
-    - command_buffer: 指令緩衝區統計
-    - sync_buffer: 雲端同步緩衝區統計
-    - last_sync: 最後同步時間
+    返回 JSON 結構：
+    - network: 網路連線狀態（online/offline）
+    - services.mcp: MCP 服務狀態（available/unavailable）
+    - services.queue: 佇列服務狀態（available/unavailable）
+    - buffers.command: 指令緩衝區統計（pending, failed, total_buffered, total_sent）
+    - buffers.sync: 雲端同步緩衝區統計（pending, failed, total_buffered, total_sent）
+    - sync_enabled: 是否啟用雲端同步
+    - last_checked: 最後一次檢查時間（ISO 8601，UTC）
+    - request_id: 請求追蹤 ID（如有）
 
-    注意：目前為基礎實作，僅檢查網路連線狀態。
-    未來將整合 OfflineQueueService 以提供完整的離線緩衝統計。
+    注意：目前為基礎實作，僅檢查網路與 MCP 連線狀態。
+    buffers 統計目前固定回傳 0，未來將整合 OfflineQueueService 提供完整統計。
+    使用 5 秒快取避免頻繁檢查造成阻塞。
     """
+    # 檢查快取是否有效
+    current_time = time.time()
+    if (_sync_status_cache['data'] is not None and
+        current_time - _sync_status_cache['timestamp'] < _sync_status_cache['cache_duration']):
+        # 使用快取資料，但更新 request_id
+        cached_data = _sync_status_cache['data'].copy()
+        cached_data['request_id'] = getattr(g, 'request_id', None)
+        return jsonify(cached_data)
+
     # 檢查網路連線
     network_online = check_internet_connection()
 
@@ -685,8 +706,12 @@ def api_sync_status():
             },
         },
         'sync_enabled': True,
-        'last_sync': datetime.now(timezone.utc).isoformat(),
+        'last_checked': datetime.now(timezone.utc).isoformat(),
         'request_id': getattr(g, 'request_id', None),
     }
+
+    # 更新快取
+    _sync_status_cache['data'] = {k: v for k, v in status_data.items() if k != 'request_id'}
+    _sync_status_cache['timestamp'] = current_time
 
     return jsonify(status_data)

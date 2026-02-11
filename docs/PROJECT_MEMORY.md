@@ -1105,11 +1105,14 @@ def get_robot_status():
 
 **測試方法**：
 ```bash
-# 啟動 Flask 應用並測試 API
-python3 test_edge_ui_sync.py
+# 啟動 Edge 服務（參考專案說明文件）
+# 例如：cd Edge/robot_service && python -m electron.flask_adapter
 
-# 驗證回應格式和狀態碼
+# 以 curl 測試同步狀態 API（僅檢視回應內容）
 curl http://localhost:5050/api/edge/sync/status
+
+# 驗證回應格式與 HTTP 狀態碼
+curl -i http://localhost:5050/api/edge/sync/status
 ```
 
 **相關文件**：

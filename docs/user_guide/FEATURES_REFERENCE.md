@@ -93,8 +93,10 @@ curl http://localhost:8000/health
 **顯示資訊**：
 - **網路連線**：顯示當前網路連線狀態（在線/離線）
 - **佇列服務**：顯示雲端佇列服務可用性狀態
-- **緩衝區**：顯示離線緩衝區中待同步的項目數量
-- **最後同步**：顯示最後一次成功同步的時間
+- **緩衝區**：顯示離線緩衝區相關統計資訊（目前為基礎版本，`pending`/`failed` 數值固定為 0，`total_buffered`/`total_sent` 用於未來整合時的累積計數）
+- **最後同步**：顯示最近一次同步狀態檢查時間（目前版本為 API 查詢時間戳，未來整合後將改為實際同步時間）
+
+> 💡 **注意**：在 v1.0 基礎版本中，`buffers.*.pending`、`buffers.*.failed`、`buffers.*.total_buffered`、`buffers.*.total_sent` 目前一律回傳 `0`，`last_sync` 代表最近一次狀態檢查時間。後續版本將整合 OfflineQueueService 提供完整的離線緩衝統計與實際同步時間。
 
 **狀態指示**：
 - 🟢 綠色（在線/可用）：系統正常運作，可即時同步
@@ -122,20 +124,22 @@ curl http://localhost:8000/health
     "command": {
       "pending": 0,
       "failed": 0,
-      "total_buffered": 125,
-      "total_sent": 123
+      "total_buffered": 0,
+      "total_sent": 0
     },
     "sync": {
       "pending": 0,
       "failed": 0,
-      "total_buffered": 45,
-      "total_sent": 45
+      "total_buffered": 0,
+      "total_sent": 0
     }
   },
   "sync_enabled": true,
-  "last_sync": "2026-02-11T08:00:00Z"
+  "last_checked": "2026-02-11T08:00:00Z"
 }
 ```
+
+> **注意**：目前為基礎實作版本，buffers 欄位回傳的數值皆為 0。`last_checked` 為狀態檢查時間，非實際同步時間。完整離線緩衝統計將在未來版本整合 OfflineQueueService 後提供。
 
 **使用情境**：
 - **離線工作**：網路斷線時，系統自動將指令緩衝至本地 SQLite

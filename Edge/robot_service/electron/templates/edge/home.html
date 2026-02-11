@@ -153,8 +153,10 @@ async function refreshStatus() {
         // 更新雲端同步狀態
         await updateSyncStatus();
 
-        // 更新導航列狀態
-        updateConnectionStatus(llmData);
+        // 更新導航列狀態（呼叫 EdgeUI 共用函式）
+        if (window.EdgeUI && typeof window.EdgeUI.updateConnectionStatus === 'function') {
+            window.EdgeUI.updateConnectionStatus();
+        }
 
     } catch (error) {
         console.error('Failed to refresh status:', error);
@@ -174,7 +176,7 @@ async function updateSyncStatus() {
             networkStatus.className = 'status-value status-success';
         } else {
             networkStatus.textContent = '離線';
-            networkStatus.className = 'status-value status-error';
+            networkStatus.className = 'status-value status-warning';
         }
 
         // 更新佇列服務狀態
@@ -184,7 +186,12 @@ async function updateSyncStatus() {
             queueStatus.className = 'status-value status-success';
         } else {
             queueStatus.textContent = '不可用';
-            queueStatus.className = 'status-value status-warning';
+            // 離線導致不可用 → warning；在線但服務故障 → error
+            if (data.network && data.network.online === false) {
+                queueStatus.className = 'status-value status-warning';
+            } else {
+                queueStatus.className = 'status-value status-error';
+            }
         }
 
         // 更新緩衝區狀態
@@ -198,11 +205,11 @@ async function updateSyncStatus() {
             bufferStatus.className = 'status-value status-warning';
         }
 
-        // 更新最後同步時間
+        // 更新最後檢查時間
         const lastSyncStatus = document.querySelector('#sync-last-sync .status-value');
-        if (data.last_sync) {
-            const lastSyncTime = new Date(data.last_sync);
-            lastSyncStatus.textContent = window.EdgeUI.formatTime(lastSyncTime);
+        if (data.last_checked) {
+            const lastCheckedTime = new Date(data.last_checked);
+            lastSyncStatus.textContent = window.EdgeUI.formatTime(lastCheckedTime);
         } else {
             lastSyncStatus.textContent = '--';
         }

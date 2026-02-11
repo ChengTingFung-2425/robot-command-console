@@ -627,3 +627,66 @@ def api_update_settings():
         'settings': _user_settings,
         'request_id': getattr(g, 'request_id', None),
     })
+
+
+# ============================================================
+# 雲端同步狀態 API
+# ============================================================
+
+@edge_ui.route('/api/edge/sync/status', methods=['GET'])
+def api_sync_status():
+    """
+    取得雲端同步狀態
+
+    返回：
+    - network_status: 網路連線狀態
+    - queue_service_status: 佇列服務狀態
+    - command_buffer: 指令緩衝區統計
+    - sync_buffer: 雲端同步緩衝區統計
+    - last_sync: 最後同步時間
+
+    注意：目前為基礎實作，僅檢查網路連線狀態。
+    未來將整合 OfflineQueueService 以提供完整的離線緩衝統計。
+    """
+    # 檢查網路連線
+    network_online = check_internet_connection()
+
+    # 檢查 MCP 服務連線
+    mcp_available = check_mcp_connection()
+
+    # 基礎狀態（未來可從 OfflineQueueService 獲取真實資料）
+    status_data = {
+        'network': {
+            'online': network_online,
+            'status': 'online' if network_online else 'offline',
+        },
+        'services': {
+            'mcp': {
+                'available': mcp_available,
+                'status': 'available' if mcp_available else 'unavailable',
+            },
+            'queue': {
+                'available': network_online and mcp_available,
+                'status': 'available' if (network_online and mcp_available) else 'unavailable',
+            },
+        },
+        'buffers': {
+            'command': {
+                'pending': 0,
+                'failed': 0,
+                'total_buffered': 0,
+                'total_sent': 0,
+            },
+            'sync': {
+                'pending': 0,
+                'failed': 0,
+                'total_buffered': 0,
+                'total_sent': 0,
+            },
+        },
+        'sync_enabled': True,
+        'last_sync': datetime.now(timezone.utc).isoformat(),
+        'request_id': getattr(g, 'request_id', None),
+    }
+
+    return jsonify(status_data)

@@ -7,9 +7,9 @@ import asyncio
 import os
 import pytest
 
-from src.robot_service.service_manager import ServiceManager
-from src.robot_service.edge_queue_config import EdgeQueueConfig, create_service_manager_from_env
-from src.robot_service.queue import MessagePriority
+from robot_service.service_manager import ServiceManager
+from robot_service.edge_queue_config import EdgeQueueConfig, create_service_manager_from_env
+from robot_service.queue import MessagePriority
 
 
 RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")

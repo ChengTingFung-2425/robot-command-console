@@ -13,6 +13,7 @@ import shlex
 import json
 import hashlib
 from pathlib import Path
+from typing import Optional
 
 # Add parent directories to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -39,31 +40,32 @@ logger = logging.getLogger(__name__)
 _deployment_tasks = {}
 
 
-def _validate_safe_identifier(identifier: str) -> bool:
+def _validate_and_sanitize_identifier(identifier: str) -> Optional[str]:
     """
-    Validate that identifier is safe for use in file paths.
+    Validate and sanitize identifier for safe use in file paths.
     Prevents path traversal attacks by rejecting dangerous characters.
     
     Args:
         identifier: String to validate (e.g., robot_id)
     
     Returns:
-        True if safe, False otherwise
+        Sanitized identifier if safe, None otherwise
     """
     if not identifier:
-        return False
+        return None
     
     # Only allow alphanumeric, dash, underscore
     import re
     if not re.match(r'^[a-zA-Z0-9_-]+$', identifier):
-        return False
+        return None
     
     # Reject path traversal attempts
     dangerous_patterns = ['..', '/', '\\', '\0']
     if any(pattern in identifier for pattern in dangerous_patterns):
-        return False
+        return None
     
-    return True
+    # Return sanitized identifier (already validated to be safe)
+    return identifier
 
 
 # Ensure firmware and vars directories exist
@@ -582,14 +584,16 @@ def robot_variables(robot_id):
     Args:
         robot_id: Target robot identifier
     """
-    # Validate robot_id to prevent path traversal
-    if not _validate_safe_identifier(robot_id):
+    # Validate and sanitize robot_id to prevent path traversal
+    safe_robot_id = _validate_and_sanitize_identifier(robot_id)
+    if not safe_robot_id:
         logger.warning(f"Invalid robot_id attempted: {robot_id}")
         return jsonify({'error': 'Invalid robot_id format'}), 400
     
     try:
         _, vars_dir = _ensure_directories()
-        vars_file = Path(vars_dir) / f"{robot_id}.json"
+        # Use sanitized identifier for path construction
+        vars_file = Path(vars_dir) / f"{safe_robot_id}.json"
         
         # Additional safety check: ensure resolved path is within vars_dir
         try:
@@ -609,7 +613,7 @@ def robot_variables(robot_id):
                     stored_vars = json.load(f)
                 
                 variables = {
-                    'robot_id': robot_id,
+                    'robot_id': safe_robot_id,
                     'variables': stored_vars.get('variables', {}),
                     'last_updated': stored_vars.get('last_updated'),
                     'timestamp': datetime.utcnow().isoformat()
@@ -617,13 +621,13 @@ def robot_variables(robot_id):
             else:
                 # Return empty variables if no file exists
                 variables = {
-                    'robot_id': robot_id,
+                    'robot_id': safe_robot_id,
                     'variables': {},
                     'last_updated': None,
                     'timestamp': datetime.utcnow().isoformat()
                 }
             
-            logger.info(f"Retrieved variables for robot {robot_id}")
+            logger.info(f"Retrieved variables for robot {safe_robot_id}")
             return jsonify(variables), 200
             
         elif request.method == 'POST':
@@ -634,7 +638,7 @@ def robot_variables(robot_id):
             
             # Store variables for robot in JSON file
             storage_data = {
-                'robot_id': robot_id,
+                'robot_id': safe_robot_id,
                 'variables': data['variables'],
                 'last_updated': datetime.utcnow().isoformat()
             }
@@ -643,17 +647,17 @@ def robot_variables(robot_id):
                 json.dump(storage_data, f, indent=2)
             
             result = {
-                'robot_id': robot_id,
+                'robot_id': safe_robot_id,
                 'variables': data['variables'],
                 'status': 'updated',
                 'timestamp': datetime.utcnow().isoformat()
             }
             
-            logger.info(f"Updated variables for robot {robot_id}")
+            logger.info(f"Updated variables for robot {safe_robot_id}")
             return jsonify(result), 200
             
     except Exception as e:
-        logger.error(f"Failed to manage variables for robot {robot_id}: {e}")
+        logger.error(f"Failed to manage variables for robot {safe_robot_id}: {e}")
         return jsonify({'error': 'Failed to manage robot variables'}), 500
 
 
@@ -679,8 +683,9 @@ def cast_variables_to_robot(robot_id):
         "reload_service": "robot.service"  # Optional: service to reload after update
     }
     """
-    # Validate robot_id to prevent path traversal
-    if not _validate_safe_identifier(robot_id):
+    # Validate and sanitize robot_id to prevent path traversal
+    safe_robot_id = _validate_and_sanitize_identifier(robot_id)
+    if not safe_robot_id:
         logger.warning(f"Invalid robot_id attempted in cast: {robot_id}")
         return jsonify({'error': 'Invalid robot_id format'}), 400
     

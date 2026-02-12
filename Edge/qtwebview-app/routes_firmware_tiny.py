@@ -38,6 +38,34 @@ logger = logging.getLogger(__name__)
 # Global task tracking (in production, use Redis or database)
 _deployment_tasks = {}
 
+
+def _validate_safe_identifier(identifier: str) -> bool:
+    """
+    Validate that identifier is safe for use in file paths.
+    Prevents path traversal attacks by rejecting dangerous characters.
+    
+    Args:
+        identifier: String to validate (e.g., robot_id)
+    
+    Returns:
+        True if safe, False otherwise
+    """
+    if not identifier:
+        return False
+    
+    # Only allow alphanumeric, dash, underscore
+    import re
+    if not re.match(r'^[a-zA-Z0-9_-]+$', identifier):
+        return False
+    
+    # Reject path traversal attempts
+    dangerous_patterns = ['..', '/', '\\', '\0']
+    if any(pattern in identifier for pattern in dangerous_patterns):
+        return False
+    
+    return True
+
+
 # Ensure firmware and vars directories exist
 def _ensure_directories():
     """Ensure firmware and robot vars directories exist"""
@@ -554,9 +582,25 @@ def robot_variables(robot_id):
     Args:
         robot_id: Target robot identifier
     """
+    # Validate robot_id to prevent path traversal
+    if not _validate_safe_identifier(robot_id):
+        logger.warning(f"Invalid robot_id attempted: {robot_id}")
+        return jsonify({'error': 'Invalid robot_id format'}), 400
+    
     try:
         _, vars_dir = _ensure_directories()
         vars_file = Path(vars_dir) / f"{robot_id}.json"
+        
+        # Additional safety check: ensure resolved path is within vars_dir
+        try:
+            vars_file_resolved = vars_file.resolve()
+            vars_dir_resolved = Path(vars_dir).resolve()
+            if not str(vars_file_resolved).startswith(str(vars_dir_resolved)):
+                logger.error(f"Path traversal attempt detected: {robot_id}")
+                return jsonify({'error': 'Invalid robot_id'}), 400
+        except (OSError, RuntimeError) as e:
+            logger.error(f"Path resolution error for robot_id {robot_id}: {e}")
+            return jsonify({'error': 'Invalid robot_id'}), 400
         
         if request.method == 'GET':
             # Get actual robot variables from storage
@@ -635,6 +679,11 @@ def cast_variables_to_robot(robot_id):
         "reload_service": "robot.service"  # Optional: service to reload after update
     }
     """
+    # Validate robot_id to prevent path traversal
+    if not _validate_safe_identifier(robot_id):
+        logger.warning(f"Invalid robot_id attempted in cast: {robot_id}")
+        return jsonify({'error': 'Invalid robot_id format'}), 400
+    
     try:
         data = request.get_json()
         

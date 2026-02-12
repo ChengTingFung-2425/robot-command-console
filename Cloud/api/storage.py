@@ -7,7 +7,9 @@
 
 import hashlib
 import logging
+import os
 import re
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, BinaryIO
@@ -17,6 +19,9 @@ logger = logging.getLogger(__name__)
 
 # 允許的 category 和 user_id 字元（防止路徑穿越）
 SAFE_PATH_PATTERN = re.compile(r'^[A-Za-z0-9._-]+$')
+
+# 分塊大小（8KB）
+CHUNK_SIZE = 8192
 
 
 class CloudStorageService:
@@ -51,7 +56,7 @@ class CloudStorageService:
         metadata: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        上傳檔案
+        上傳檔案（使用串流方式避免記憶體尖峰）
 
         Args:
             file_data: 檔案資料流
@@ -67,18 +72,7 @@ class CloudStorageService:
         self._validate_path_component(category, "category")
         self._validate_path_component(user_id, "user_id")
 
-        # 讀取檔案內容
-        content = file_data.read()
-        file_size = len(content)
-
-        # 檢查檔案大小
-        if file_size > self.max_file_size:
-            raise ValueError(f"File size {file_size} exceeds maximum {self.max_file_size}")
-
-        # 計算檔案雜湊
-        file_hash = hashlib.sha256(content).hexdigest()
-
-        # 生成儲存路徑（使用雜湊避免重複）
+        # 生成儲存路徑
         category_path = self.storage_path / category / user_id
         category_path.mkdir(parents=True, exist_ok=True)
 
@@ -87,19 +81,50 @@ class CloudStorageService:
         if not str(resolved_category_path).startswith(str(self.storage_path.resolve())):
             raise ValueError("Path traversal detected")
 
-        # 使用雜湊作為檔名，避免衝突
-        ext = Path(filename).suffix
-        storage_filename = f"{file_hash}{ext}"
-        file_path = category_path / storage_filename
+        # 建立臨時檔案並串流寫入，同時計算雜湊
+        hash_obj = hashlib.sha256()
+        file_size = 0
 
-        # 如果檔案已存在（相同雜湊），直接返回
-        if file_path.exists():
-            logger.info(f"File already exists: {file_path}")
-        else:
-            # 寫入檔案
-            with open(file_path, "wb") as f:
-                f.write(content)
-            logger.info(f"File uploaded: {file_path}")
+        # 使用臨時檔案避免部分寫入
+        temp_fd, temp_path = tempfile.mkstemp(dir=category_path, prefix='.upload_')
+        try:
+            with os.fdopen(temp_fd, 'wb') as temp_file:
+                while True:
+                    chunk = file_data.read(CHUNK_SIZE)
+                    if not chunk:
+                        break
+
+                    file_size += len(chunk)
+
+                    # 檢查檔案大小
+                    if file_size > self.max_file_size:
+                        raise ValueError(f"File size exceeds maximum {self.max_file_size}")
+
+                    hash_obj.update(chunk)
+                    temp_file.write(chunk)
+
+            # 計算最終雜湊
+            file_hash = hash_obj.hexdigest()
+
+            # 使用雜湊作為檔名，避免衝突
+            ext = Path(filename).suffix
+            storage_filename = f"{file_hash}{ext}"
+            file_path = category_path / storage_filename
+
+            # 如果檔案已存在（相同雜湊），刪除臨時檔案
+            if file_path.exists():
+                os.unlink(temp_path)
+                logger.info(f"File already exists: {file_path}")
+            else:
+                # 原子性搬移到目標路徑
+                os.rename(temp_path, file_path)
+                logger.info(f"File uploaded: {file_path}")
+
+        except Exception:
+            # 清理臨時檔案
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+            raise
 
         # 返回檔案資訊
         return {

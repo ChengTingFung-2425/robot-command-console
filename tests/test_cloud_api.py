@@ -27,7 +27,7 @@ class TestCloudAuthService(unittest.TestCase):
             role="user"
         )
         self.assertIsInstance(token, str)
-        self.assertTrue(len(token) > 0)
+        self.assertGreater(len(token), 0)
 
     def test_verify_token_valid(self):
         """測試驗證有效 Token"""

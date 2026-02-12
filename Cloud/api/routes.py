@@ -5,6 +5,7 @@ Cloud API Flask 路由
 """
 
 import logging
+from functools import wraps
 from io import BytesIO
 from typing import Optional
 
@@ -40,7 +41,15 @@ def init_cloud_services(jwt_secret: str, storage_path: str):
 
 def require_auth(f):
     """認證裝飾器"""
+    @wraps(f)
     def decorated_function(*args, **kwargs):
+        # 檢查服務是否已初始化
+        if auth_service is None:
+            return jsonify({
+                "error": "Service Unavailable",
+                "message": "Cloud services not initialized. Please call init_cloud_services first."
+            }), 503
+
         # 取得 Token
         auth_header = request.headers.get('Authorization')
         if not auth_header or not auth_header.startswith('Bearer '):
@@ -59,7 +68,6 @@ def require_auth(f):
         request.role = payload.get("role")
 
         return f(*args, **kwargs)
-    decorated_function.__name__ = f.__name__
     return decorated_function
 
 
@@ -67,6 +75,8 @@ def require_auth(f):
 def generate_token():
     """
     生成 JWT Token
+
+    注意：此端點為示範用途，生產環境應整合實際的認證系統（帳密驗證、OAuth2 等）
 
     Request Body:
         {
@@ -82,25 +92,38 @@ def generate_token():
         }
     """
     try:
-        data = request.get_json()
+        # 檢查服務是否已初始化
+        if auth_service is None:
+            return jsonify({
+                "error": "Service Unavailable",
+                "message": "Cloud services not initialized"
+            }), 503
+
+        data = request.get_json(silent=True)
 
         # 驗證請求資料
+        if not data or not isinstance(data, dict):
+            return jsonify({"error": "Bad Request", "message": "Invalid JSON body"}), 400
+
         required_fields = ["user_id", "username"]
         for field in required_fields:
             if field not in data:
                 return jsonify({"error": "Bad Request", "message": f"Missing field: {field}"}), 400
+
+        # 限制 expires_in 範圍（最多 7 天）
+        expires_in = min(data.get("expires_in", 86400), 7 * 24 * 3600)
 
         # 生成 Token
         token = auth_service.generate_token(
             user_id=data["user_id"],
             username=data["username"],
             role=data.get("role", "user"),
-            expires_in=data.get("expires_in", 86400)
+            expires_in=expires_in
         )
 
         return jsonify({
             "token": token,
-            "expires_in": data.get("expires_in", 86400)
+            "expires_in": expires_in
         }), 200
 
     except Exception as e:

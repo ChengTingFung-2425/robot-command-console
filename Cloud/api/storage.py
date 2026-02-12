@@ -2,17 +2,21 @@
 雲服務儲存 API
 
 提供檔案上傳、下載、管理等功能
-支援本地檔案系統和 S3 相容的物件儲存
+目前支援本地檔案系統儲存（可擴充整合 S3 相容的物件儲存）
 """
 
 import hashlib
 import logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, BinaryIO
 
 
 logger = logging.getLogger(__name__)
+
+# 允許的 category 和 user_id 字元（防止路徑穿越）
+SAFE_PATH_PATTERN = re.compile(r'^[A-Za-z0-9._-]+$')
 
 
 class CloudStorageService:
@@ -32,6 +36,11 @@ class CloudStorageService:
         # 確保儲存目錄存在
         self.storage_path.mkdir(parents=True, exist_ok=True)
         logger.info(f"Initialized storage service at: {self.storage_path}")
+
+    def _validate_path_component(self, component: str, name: str):
+        """驗證路徑組件是否安全"""
+        if not SAFE_PATH_PATTERN.match(component):
+            raise ValueError(f"Invalid {name}: contains unsafe characters")
 
     def upload_file(
         self,
@@ -54,6 +63,10 @@ class CloudStorageService:
         Returns:
             上傳結果資訊
         """
+        # 驗證路徑組件安全性
+        self._validate_path_component(category, "category")
+        self._validate_path_component(user_id, "user_id")
+
         # 讀取檔案內容
         content = file_data.read()
         file_size = len(content)
@@ -68,6 +81,11 @@ class CloudStorageService:
         # 生成儲存路徑（使用雜湊避免重複）
         category_path = self.storage_path / category / user_id
         category_path.mkdir(parents=True, exist_ok=True)
+
+        # 驗證路徑仍在 storage_path 下
+        resolved_category_path = category_path.resolve()
+        if not str(resolved_category_path).startswith(str(self.storage_path.resolve())):
+            raise ValueError("Path traversal detected")
 
         # 使用雜湊作為檔名，避免衝突
         ext = Path(filename).suffix
@@ -106,29 +124,49 @@ class CloudStorageService:
         下載檔案
 
         Args:
-            file_id: 檔案 ID（雜湊）
+            file_id: 檔案 ID（完整 SHA-256 雜湊，64 hex）
             user_id: 下載者 ID
             category: 檔案類別
 
         Returns:
             檔案內容或 None（檔案不存在）
         """
+        # 驗證路徑組件安全性
+        self._validate_path_component(category, "category")
+        self._validate_path_component(user_id, "user_id")
+
+        # 驗證 file_id 格式（完整 SHA-256：64 hex）
+        if len(file_id) != 64 or not all(c in "0123456789abcdefABCDEF" for c in file_id):
+            logger.warning(f"Invalid file_id format for download_file: {file_id}")
+            return None
+
         # 查找檔案
         category_path = self.storage_path / category / user_id
         if not category_path.exists():
             logger.warning(f"Category path not found: {category_path}")
             return None
 
-        # 尋找匹配的檔案
-        for file_path in category_path.glob(f"{file_id}*"):
-            if file_path.is_file():
-                with open(file_path, "rb") as f:
-                    content = f.read()
-                logger.info(f"File downloaded: {file_path}")
-                return content
+        # 尋找匹配的檔案（精確匹配前綴）
+        matches = [
+            file_path
+            for file_path in category_path.glob(f"{file_id}*")
+            if file_path.is_file()
+        ]
 
-        logger.warning(f"File not found: {file_id}")
-        return None
+        if not matches:
+            logger.warning(f"File not found: {file_id}")
+            return None
+
+        if len(matches) > 1:
+            logger.error(f"Multiple files matched for file_id={file_id}: {matches}")
+            return None
+
+        # 讀取唯一匹配的檔案
+        file_path = matches[0]
+        with open(file_path, "rb") as f:
+            content = f.read()
+        logger.info(f"File downloaded: {file_path}")
+        return content
 
     def delete_file(
         self,
@@ -140,28 +178,51 @@ class CloudStorageService:
         刪除檔案
 
         Args:
-            file_id: 檔案 ID（雜湊）
+            file_id: 檔案 ID（完整 SHA-256 雜湊，64 hex）
             user_id: 擁有者 ID
             category: 檔案類別
 
         Returns:
             是否刪除成功
         """
+        # 驗證路徑組件安全性
+        self._validate_path_component(category, "category")
+        self._validate_path_component(user_id, "user_id")
+
+        # 驗證 file_id 格式（完整 SHA-256：64 hex）
+        if len(file_id) != 64 or not all(c in "0123456789abcdefABCDEF" for c in file_id):
+            logger.warning(f"Invalid file_id format for delete_file: {file_id}")
+            return False
+
         # 查找檔案
         category_path = self.storage_path / category / user_id
         if not category_path.exists():
             logger.warning(f"Category path not found: {category_path}")
             return False
 
-        # 尋找並刪除匹配的檔案
-        deleted = False
-        for file_path in category_path.glob(f"{file_id}*"):
-            if file_path.is_file():
-                file_path.unlink()
-                logger.info(f"File deleted: {file_path}")
-                deleted = True
+        # 尋找匹配的檔案
+        matches = [
+            file_path
+            for file_path in category_path.glob(f"{file_id}*")
+            if file_path.is_file()
+        ]
 
-        return deleted
+        if not matches:
+            logger.info(f"No file found to delete for file_id={file_id} in {category_path}")
+            return False
+
+        if len(matches) > 1:
+            # 安全起見：若同一 file_id 對應多個檔案則不執行刪除
+            logger.error(
+                f"Multiple files matched for file_id={file_id} in {category_path}: {matches}"
+            )
+            return False
+
+        # 僅刪除唯一匹配的檔案
+        file_path = matches[0]
+        file_path.unlink()
+        logger.info(f"File deleted: {file_path}")
+        return True
 
     def list_files(
         self,
@@ -178,6 +239,11 @@ class CloudStorageService:
         Returns:
             檔案清單
         """
+        # 驗證路徑組件安全性
+        self._validate_path_component(user_id, "user_id")
+        if category:
+            self._validate_path_component(category, "category")
+
         files = []
 
         # 決定搜尋路徑
@@ -194,9 +260,11 @@ class CloudStorageService:
             for file_path in path.glob("*"):
                 if file_path.is_file():
                     stat = file_path.stat()
+                    # 返回 storage_filename（實際檔名）和 file_id（雜湊）
                     files.append({
                         "file_id": file_path.stem,
-                        "filename": file_path.name,
+                        "storage_filename": file_path.name,
+                        "filename": file_path.name,  # 保持相容性
                         "size": stat.st_size,
                         "category": path.parent.name,
                         "modified_at": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()

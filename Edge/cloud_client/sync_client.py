@@ -256,6 +256,11 @@ class CloudSyncClient:
         Returns:
             同步結果統計
         """
+        # 驗證 direction 參數
+        valid_directions = ["upload", "download", "both"]
+        if direction not in valid_directions:
+            raise ValueError(f"Invalid direction: {direction}. Must be one of {valid_directions}")
+
         result = {
             "uploaded": 0,
             "downloaded": 0,
@@ -281,7 +286,18 @@ class CloudSyncClient:
             if direction in ["upload", "both"]:
                 for file_path in local_path.glob("*"):
                     if file_path.is_file():
-                        # 簡單的檔案名稱匹配（實際應使用雜湊）
+                        # 計算本地檔案雜湊以檢查是否需要上傳
+                        import hashlib
+                        with open(file_path, 'rb') as f:
+                            file_hash = hashlib.sha256(f.read()).hexdigest()
+
+                        # 檢查雲端是否已存在相同檔案
+                        if file_hash in cloud_files:
+                            logger.debug(f"File already exists in cloud: {file_path.name}")
+                            result["skipped"] += 1
+                            continue
+
+                        # 上傳檔案
                         uploaded = self.upload_file(str(file_path), category=category)
                         if uploaded:
                             result["uploaded"] += 1
@@ -291,7 +307,9 @@ class CloudSyncClient:
             # 下載雲端檔案（如果需要）
             if direction in ["download", "both"]:
                 for file_id, file_info in cloud_files.items():
-                    save_path = local_path / file_info["filename"]
+                    # 使用 storage_filename 如果存在，否則使用 filename
+                    filename = file_info.get("storage_filename", file_info.get("filename"))
+                    save_path = local_path / filename
                     if not save_path.exists():
                         downloaded = self.download_file(
                             file_id=file_id,

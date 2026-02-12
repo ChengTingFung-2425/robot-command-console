@@ -82,13 +82,7 @@ class CloudAuthService:
                 self.jwt_secret,
                 algorithms=[self.jwt_algorithm]
             )
-
-            # 檢查過期時間
-            exp = payload.get("exp")
-            if exp and datetime.fromtimestamp(exp, tz=timezone.utc) < datetime.now(timezone.utc):
-                logger.warning("Token expired")
-                return None
-
+            # PyJWT 已自動驗證 exp，無需手動檢查
             return payload
 
         except jwt.InvalidTokenError as e:

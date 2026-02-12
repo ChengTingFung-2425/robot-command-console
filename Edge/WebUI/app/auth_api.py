@@ -8,7 +8,8 @@ from typing import Optional
 import jwt
 from flask import Blueprint, jsonify, request
 
-from WebUI.app.models import User
+from WebUI.app.models import User, Device
+from WebUI.app import db
 from WebUI.app.audit import log_audit_event
 
 # Blueprint
@@ -350,4 +351,371 @@ def get_current_user():
                 'verify_collapsed': user.ui_verify_collapsed
             }
         }
+    }), 200
+
+
+# Device Management Routes
+@auth_api_bp.route('/device/register', methods=['POST'])
+@token_required()
+def register_device():
+    """
+    註冊新裝置並綁定到當前使用者
+    
+    Headers:
+        Authorization: Bearer <access_token>
+    
+    請求：
+    {
+        "device_id": "string (64 chars SHA-256)",
+        "device_name": "string (optional)",
+        "device_type": "string (desktop/laptop/mobile/edge_device)",
+        "platform": "string (Windows/Linux/macOS)",
+        "hostname": "string (optional)",
+        "ip_address": "string (optional)"
+    }
+    
+    回應：
+    {
+        "success": true,
+        "device": {...},
+        "message": "Device registered and bound successfully"
+    }
+    """
+    user = request.current_user
+    data = request.get_json() or {}
+    
+    device_id = data.get('device_id', '').strip()
+    device_name = data.get('device_name', '').strip()
+    device_type = data.get('device_type', 'unknown').strip()
+    platform = data.get('platform', '').strip()
+    hostname = data.get('hostname', '').strip()
+    ip_address = data.get('ip_address', '').strip()
+    
+    # Validation
+    if not device_id or len(device_id) != 64:
+        return jsonify({'error': 'Invalid device_id format (must be 64 chars SHA-256)'}), 400
+    
+    # Validate device_id is hexadecimal
+    try:
+        int(device_id, 16)
+    except ValueError:
+        return jsonify({'error': 'Invalid device_id format (must be hexadecimal)'}), 400
+    
+    # Check if device already exists
+    existing_device = Device.query.filter_by(device_id=device_id).first()
+    if existing_device:
+        # Device already bound to this user
+        if existing_device.user_id == user.id:
+            reactivated = False
+            # If previously unbound/inactive, reactivate and refresh binding info
+            if existing_device.is_active is False:
+                existing_device.is_active = True
+                existing_device.bound_at = db.func.now()
+                # Refresh basic metadata on re-bind
+                existing_device.device_type = device_type
+                existing_device.platform = platform
+                existing_device.hostname = hostname
+                existing_device.ip_address = ip_address or request.remote_addr
+                reactivated = True
+
+            # Update last_seen
+            existing_device.last_seen_at = db.func.now()
+            db.session.commit()
+            
+            log_audit_event(
+                action='device_register_existing',
+                message=(
+                    f'裝置已存在，{"重新啟用並" if reactivated else ""}更新最後連線時間 '
+                    f'(device_id={device_id[:8]}...)'
+                ),
+                user_id=user.id,
+                severity='info',
+                category='device',
+                context={
+                    'device_id': device_id,
+                    'reactivated': reactivated,
+                }
+            )
+            
+            return jsonify({
+                'success': True,
+                'device': existing_device.to_dict(),
+                'message': 'Device already registered to this user'
+            }), 200
+        else:
+            # Device bound to different user
+            log_audit_event(
+                action='device_register_conflict',
+                message=f'裝置已綁定到其他使用者 (device_id={device_id[:8]}...)',
+                user_id=user.id,
+                severity='warning',
+                category='device',
+                context={'device_id': device_id, 'existing_user_id': existing_device.user_id}
+            )
+            return jsonify({'error': 'Device already registered to another user'}), 409
+    
+    # Check device limit (max 10 devices per user)
+    device_count = Device.query.filter_by(user_id=user.id, is_active=True).count()
+    if device_count >= 10:
+        log_audit_event(
+            action='device_register_limit_exceeded',
+            message=f'使用者裝置數量已達上限 (current={device_count})',
+            user_id=user.id,
+            severity='warning',
+            category='device'
+        )
+        return jsonify({'error': 'Device limit exceeded (max 10 devices per user)'}), 429
+    
+    # Create new device
+    new_device = Device(
+        device_id=device_id,
+        device_name=device_name or f'{platform} Device',
+        device_type=device_type,
+        user_id=user.id,
+        platform=platform,
+        hostname=hostname,
+        ip_address=ip_address or request.remote_addr,
+        user_agent=request.headers.get('User-Agent', '')[:512],
+        is_active=True,
+        is_trusted=False
+    )
+    
+    db.session.add(new_device)
+    db.session.commit()
+    
+    # Log audit event
+    log_audit_event(
+        action='device_register_success',
+        message=f'新裝置註冊成功 (device_id={device_id[:8]}...)',
+        user_id=user.id,
+        severity='info',
+        category='device',
+        context={
+            'device_id': device_id,
+            'device_name': device_name,
+            'platform': platform
+        }
+    )
+    
+    return jsonify({
+        'success': True,
+        'device': new_device.to_dict(),
+        'message': 'Device registered and bound successfully'
+    }), 201
+
+
+@auth_api_bp.route('/devices', methods=['GET'])
+@token_required()
+def list_devices():
+    """
+    列出當前使用者的所有裝置
+    
+    Headers:
+        Authorization: Bearer <access_token>
+    
+    Query Parameters:
+        active_only: boolean (default: false) - 僅顯示活躍裝置
+    
+    回應：
+    {
+        "devices": [...],
+        "total": int
+    }
+    """
+    user = request.current_user
+    active_only = request.args.get('active_only', 'false').lower() == 'true'
+    
+    query = Device.query.filter_by(user_id=user.id)
+    if active_only:
+        query = query.filter_by(is_active=True)
+    
+    devices = query.order_by(Device.last_seen_at.desc()).all()
+    
+    return jsonify({
+        'devices': [device.to_dict() for device in devices],
+        'total': len(devices)
+    }), 200
+
+
+@auth_api_bp.route('/device/<int:device_id>', methods=['GET'])
+@token_required()
+def get_device(device_id):
+    """
+    取得特定裝置資訊
+    
+    Headers:
+        Authorization: Bearer <access_token>
+    
+    回應：
+    {
+        "device": {...}
+    }
+    """
+    user = request.current_user
+    device = Device.query.filter_by(id=device_id, user_id=user.id).first()
+    
+    if not device:
+        return jsonify({'error': 'Device not found'}), 404
+    
+    return jsonify({
+        'device': device.to_dict()
+    }), 200
+
+
+@auth_api_bp.route('/device/<int:device_id>', methods=['PUT'])
+@token_required()
+def update_device(device_id):
+    """
+    更新裝置資訊
+    
+    Headers:
+        Authorization: Bearer <access_token>
+    
+    請求：
+    {
+        "device_name": "string (optional)",
+        "is_trusted": boolean (optional)
+    }
+    
+    回應：
+    {
+        "success": true,
+        "device": {...}
+    }
+    """
+    user = request.current_user
+    device = Device.query.filter_by(id=device_id, user_id=user.id).first()
+    
+    if not device:
+        return jsonify({'error': 'Device not found'}), 404
+    
+    data = request.get_json() or {}
+    
+    if 'device_name' in data:
+        device_name_stripped = data['device_name'].strip()
+        if not device_name_stripped:
+            return jsonify({'error': 'device_name cannot be empty'}), 400
+        device.device_name = device_name_stripped
+    
+    if 'is_trusted' in data:
+        raw_is_trusted = data['is_trusted']
+
+        if isinstance(raw_is_trusted, bool):
+            parsed_is_trusted = raw_is_trusted
+        elif isinstance(raw_is_trusted, str):
+            value = raw_is_trusted.strip().lower()
+            if value in ('true', '1'):
+                parsed_is_trusted = True
+            elif value in ('false', '0'):
+                parsed_is_trusted = False
+            else:
+                return jsonify({
+                    'error': 'Invalid value for is_trusted; must be boolean'
+                }), 400
+        else:
+            return jsonify({
+                'error': 'Invalid type for is_trusted; must be boolean'
+            }), 400
+
+        device.is_trusted = parsed_is_trusted
+        log_audit_event(
+            action='device_trust_changed',
+            message=f'裝置信任狀態變更: {device.is_trusted}',
+            user_id=user.id,
+            severity='info',
+            category='device',
+            context={'device_id': device.device_id, 'is_trusted': device.is_trusted}
+        )
+    
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'device': device.to_dict()
+    }), 200
+
+
+@auth_api_bp.route('/device/<int:device_id>/unbind', methods=['POST'])
+@token_required()
+def unbind_device(device_id):
+    """
+    解除裝置綁定（停用裝置）
+    
+    Headers:
+        Authorization: Bearer <access_token>
+    
+    回應：
+    {
+        "success": true,
+        "message": "Device unbound successfully"
+    }
+    """
+    user = request.current_user
+    device = Device.query.filter_by(id=device_id, user_id=user.id).first()
+    
+    if not device:
+        return jsonify({'error': 'Device not found'}), 404
+    
+    # Deactivate device instead of deleting
+    device.is_active = False
+    db.session.commit()
+    
+    # Log audit event
+    log_audit_event(
+        action='device_unbind',
+        message=f'裝置解除綁定 (device_id={device.device_id[:8]}...)',
+        user_id=user.id,
+        severity='info',
+        category='device',
+        context={'device_id': device.device_id}
+    )
+    
+    return jsonify({
+        'success': True,
+        'message': 'Device unbound successfully'
+    }), 200
+
+
+@auth_api_bp.route('/device/<int:device_id>', methods=['DELETE'])
+@token_required()
+def delete_device(device_id):
+    """
+    刪除裝置（僅 Admin）
+    
+    Headers:
+        Authorization: Bearer <access_token>
+    
+    回應：
+    {
+        "success": true,
+        "message": "Device deleted successfully"
+    }
+    """
+    user = request.current_user
+    
+    # Only admin can delete devices
+    if user.role != 'admin':
+        return jsonify({'error': 'Admin permission required'}), 403
+    
+    device = Device.query.filter_by(id=device_id).first()
+    
+    if not device:
+        return jsonify({'error': 'Device not found'}), 404
+    
+    db.session.delete(device)
+    db.session.commit()
+    
+    # Log audit event
+    log_audit_event(
+        action='device_delete',
+        message=f'裝置刪除 (device_id={device.device_id[:8]}...)',
+        user_id=user.id,
+        severity='warning',
+        category='device',
+        context={'device_id': device.device_id, 'target_user_id': device.user_id}
+    )
+    
+    return jsonify({
+        'success': True,
+        'message': 'Device deleted successfully'
     }), 200

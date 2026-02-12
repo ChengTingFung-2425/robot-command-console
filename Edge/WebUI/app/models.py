@@ -497,6 +497,64 @@ class FirmwareUpdate(db.Model):
         return f'<FirmwareUpdate robot={self.robot_id} version={self.firmware_version_id} status={self.status}>'
 
 
+class Device(db.Model):
+    """Device registration and binding model.
+
+    Tracks devices that are bound to user accounts for Edge App access.
+    Each device is identified by a unique device_id and can be bound to a user.
+    """
+    __tablename__ = 'device'
+    id = db.Column(db.Integer, primary_key=True)
+
+    # Device identification
+    device_id = db.Column(db.String(64), nullable=False, unique=True, index=True)  # SHA-256 hash
+    device_name = db.Column(db.String(128))  # User-friendly name (e.g., "My Laptop")
+    device_type = db.Column(db.String(32), default='unknown')  # desktop, laptop, mobile, edge_device
+
+    # Device binding
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    bound_at = db.Column(db.DateTime, nullable=False, default=db.func.now())
+    last_seen_at = db.Column(db.DateTime, default=db.func.now())
+
+    # Device status
+    is_active = db.Column(db.Boolean, default=True, index=True)  # Can be deactivated by user
+    is_trusted = db.Column(db.Boolean, default=False)  # Trusted devices skip 2FA
+
+    # Device metadata
+    platform = db.Column(db.String(32))  # Windows, Linux, macOS
+    hostname = db.Column(db.String(128))
+    ip_address = db.Column(db.String(64))  # Last known IP
+    user_agent = db.Column(db.String(512))
+
+    # Timestamps
+    created_at = db.Column(db.DateTime, index=True, default=db.func.now())
+    updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
+
+    # Relationships
+    user = db.relationship('User', backref=db.backref('devices', lazy='dynamic'))
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for API responses."""
+        return {
+            'id': self.id,
+            'device_id': self.device_id,
+            'device_name': self.device_name or f'{self.platform} Device',
+            'device_type': self.device_type,
+            'user_id': self.user_id,
+            'username': self.user.username if self.user else None,
+            'bound_at': self.bound_at.isoformat() if self.bound_at else None,
+            'last_seen_at': self.last_seen_at.isoformat() if self.last_seen_at else None,
+            'is_active': self.is_active,
+            'is_trusted': self.is_trusted,
+            'platform': self.platform,
+            'hostname': self.hostname,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+    def __repr__(self) -> str:
+        return f'<Device {self.device_id[:8]}... user={self.user_id}>'
+
+
 class AuditLog(db.Model):
     """Audit log for security and compliance tracking.
 

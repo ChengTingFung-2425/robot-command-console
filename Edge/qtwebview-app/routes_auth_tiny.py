@@ -82,22 +82,22 @@ def login():
         
         # 重定向到原本要訪問的頁面（只允許站內相對路徑）
         raw_next = request.args.get('next', '')
-        next_page = None
+        next_page = url_for('core.dashboard')  # Default fallback
+        
         if raw_next:
             # Normalize and parse the user-provided next parameter
             candidate = raw_next.replace('\\', '').strip()
             parsed = urlparse(candidate)
+            
             # Accept only relative paths without scheme/netloc and starting with '/'
             if not parsed.scheme and not parsed.netloc and candidate.startswith('/'):
-                next_page = candidate
-            # Verify if the route exists in the Flask application
-            if next_page and next_page in [rule.rule for rule in current_app.url_map.iter_rules()]:
-                next_page = candidate
-        else:
-            next_page = url_for('core.dashboard')
+                # Verify the normalized candidate is a valid Flask route
+                valid_routes = [rule.rule for rule in current_app.url_map.iter_rules()]
+                if candidate in valid_routes:
+                    next_page = candidate
         
         flash(f'歡迎回來，{user.username}！', 'success')
-        return redirect(next_page or url_for('core.dashboard'))
+        return redirect(next_page)
     
     return render_template('login.html.j2', form=form)
 

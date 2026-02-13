@@ -321,7 +321,7 @@ def command_comments(command_id: int):
 
     except ValueError as e:
         logger.error(f"Command comments error: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 400
+        return jsonify({'success': False, 'error': '請求參數錯誤'}), 400
     except Exception as e:
         logger.error(f"Command comments error: {e}", exc_info=True)
         return jsonify({'success': False, 'error': '伺服器錯誤'}), 500

@@ -128,7 +128,7 @@ def generate_token():
 
     except Exception as e:
         logger.error(f"Token generation error: {e}")
-        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+        return jsonify({"error": "Internal Server Error", "message": "Token generation failed"}), 500
 
 
 @cloud_bp.route('/storage/upload', methods=['POST'])

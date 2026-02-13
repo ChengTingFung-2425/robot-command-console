@@ -27,6 +27,40 @@ except ImportError:
 api_bp = Blueprint('api_tiny', __name__, url_prefix='/api')
 logger = logging.getLogger(__name__)
 
+# Hardcoded base paths - NOT configurable by users for security
+# All file operations are restricted to these predefined directories
+BASE_DATA_DIR = Path('/var/robot-command-console')
+FIRMWARE_DIR = BASE_DATA_DIR / 'firmware'
+LOGS_DIR = BASE_DATA_DIR / 'logs'
+REPORTS_DIR = BASE_DATA_DIR / 'reports'
+BACKUPS_DIR = BASE_DATA_DIR / 'backups'
+
+# Hardcoded file mapping for secure downloads
+# Maps file_id to absolute path (not user-configurable)
+ALLOWED_DOWNLOAD_FILES = {
+    # System logs - stored in /var/robot-command-console/logs/
+    'system_log': LOGS_DIR / 'system.log',
+    'error_log': LOGS_DIR / 'error.log',
+    'access_log': LOGS_DIR / 'access.log',
+    'debug_log': LOGS_DIR / 'debug.log',
+
+    # Reports - stored in /var/robot-command-console/reports/
+    'daily_report': REPORTS_DIR / 'daily.pdf',
+    'weekly_report': REPORTS_DIR / 'weekly.pdf',
+    'monthly_report': REPORTS_DIR / 'monthly.pdf',
+    'latest_report': REPORTS_DIR / 'latest.pdf',
+
+    # Firmware files - stored in /var/robot-command-console/firmware/
+    'firmware_latest': FIRMWARE_DIR / 'latest.bin',
+    'firmware_stable': FIRMWARE_DIR / 'stable.bin',
+    'firmware_v1': FIRMWARE_DIR / 'v1.0.bin',
+    'firmware_v2': FIRMWARE_DIR / 'v2.0.bin',
+
+    # Configuration backups - stored in /var/robot-command-console/backups/
+    'config_backup': BACKUPS_DIR / 'config.tar.gz',
+    'database_backup': BACKUPS_DIR / 'database.sql.gz',
+}
+
 
 def jwt_required(f):
     """JWT authentication decorator with JWT validation"""
@@ -84,14 +118,18 @@ def health_check():
         # Check database/storage status
         database_status = 'up'
         try:
-            # Simple check - verify downloads directory is accessible
-            download_dir = Path(Config.DOWNLOAD_DIR)
-            if download_dir.exists() and download_dir.is_dir():
-                database_status = 'up'
+            # Check if base data directory exists and is accessible
+            if BASE_DATA_DIR.exists() and BASE_DATA_DIR.is_dir():
+                # Check if critical subdirectories are accessible
+                if FIRMWARE_DIR.exists() and LOGS_DIR.exists():
+                    database_status = 'up'
+                else:
+                    database_status = 'degraded'
             else:
-                database_status = 'degraded'
+                database_status = 'down'
         except Exception as e:
             logger.warning(f"Storage check failed: {e}")
+            database_status = 'error'
             database_status = 'down'
 
         health_status = {
@@ -117,58 +155,94 @@ def health_check():
         }), 503
 
 
-@api_bp.route('/download/<path:filename>', methods=['GET'])
+@api_bp.route('/download/<file_id>', methods=['GET'])
 @jwt_required
-def download_file(filename):
+def download_file(file_id):
     """
-    Download endpoint for files (logs, reports, firmware)
+    Download endpoint for predefined files (logs, reports, firmware)
+
+    Uses hardcoded file paths stored in /var/robot-command-console/ for security.
+    Paths are NOT configurable by users to prevent path traversal attacks.
 
     Args:
-        filename: File path to download
+        file_id: Predefined file identifier (e.g., 'system_log', 'firmware_latest')
+
+    Returns:
+        File download or error response
     """
     try:
-        # Resolve base download directory from configuration
-        download_dir = Path(Config.DOWNLOAD_DIR).resolve()
-        base_dir = Path(download_dir)
+        # Check if file_id is in allowed list
+        if file_id not in ALLOWED_DOWNLOAD_FILES:
+            logger.warning(f"Attempted download of unknown file_id: {file_id}")
+            return jsonify({
+                'error': 'File not found',
+                'message': 'Invalid file identifier',
+                'available_files': list(ALLOWED_DOWNLOAD_FILES.keys())
+            }), 404
 
-        # Sanitize and validate the filename
-        safe_filename = os.path.basename(filename)
+        # Get the hardcoded absolute path for this file_id
+        file_path = ALLOWED_DOWNLOAD_FILES[file_id]
 
-        # Additional validation: check for path separators after basename
-        if os.sep in safe_filename or (os.altsep and os.altsep in safe_filename):
-            logger.warning("Path traversal attempt detected in sanitized filename")
-            return jsonify({'error': 'Invalid file name'}), 403
-
-        if safe_filename.startswith('.'):
-            logger.warning("Attempt to access hidden file")
-            return jsonify({'error': 'Invalid file name'}), 403
-
-        # Validate filename contains only safe characters
-        if not safe_filename or safe_filename == '':
-            logger.warning("Empty filename provided")
-            return jsonify({'error': 'Invalid file name'}), 403
-
-        # Build and resolve the requested file path using only safe_filename
-        requested_path = base_dir / safe_filename
+        # Verify the path is within our base directory (defense in depth)
         try:
-            resolved_path = requested_path.resolve(strict=True)
-            # Verify the resolved path is still within base_dir
-            resolved_path.relative_to(base_dir)
-        except (ValueError, RuntimeError, FileNotFoundError):
-            logger.warning("Invalid file path resolution for sanitized filename")
-            return jsonify({'error': 'Invalid file path'}), 403
+            file_path.resolve().relative_to(BASE_DATA_DIR.resolve())
+        except ValueError:
+            logger.error(f"Path traversal detected in hardcoded mapping for file_id: {file_id}")
+            return jsonify({'error': 'Security violation detected'}), 403
 
-        # Check if the resolved path is a file
-        if not resolved_path.is_file():
-            logger.warning(f"File not found: {safe_filename}")
-            return jsonify({'error': 'File not found'}), 404
+        # Check if the file exists
+        if not file_path.is_file():
+            logger.warning(f"File not found for file_id '{file_id}': {file_path}")
+            return jsonify({
+                'error': 'File not found',
+                'message': f'The file for {file_id} does not exist yet'
+            }), 404
 
-        logger.info(f"File download initiated: {safe_filename}")
-        return send_file(str(resolved_path), as_attachment=True)
+        # Return the file
+        logger.info(f"File download initiated for file_id: {file_id} from {file_path}")
+        return send_file(str(file_path), as_attachment=True, download_name=file_path.name)
 
     except Exception as e:
-        logger.error(f"Download failed: {type(e).__name__}")
+        logger.error(f"Download failed for file_id '{file_id}': {type(e).__name__}")
         return jsonify({'error': 'Download failed'}), 500
+
+
+@api_bp.route('/download/list', methods=['GET'])
+@jwt_required
+def list_available_files():
+    """
+    List all available files that can be downloaded
+
+    Returns:
+        JSON list of available file IDs and their descriptions
+    """
+    try:
+        # Build list with file existence status
+        files = []
+        for file_id, file_path in ALLOWED_DOWNLOAD_FILES.items():
+            # Determine category from parent directory
+            try:
+                category = file_path.parent.name
+            except:
+                category = 'other'
+
+            files.append({
+                'id': file_id,
+                'filename': file_path.name,
+                'exists': file_path.is_file(),
+                'category': category,
+                'size': file_path.stat().st_size if file_path.is_file() else 0
+            })
+
+        return jsonify({
+            'files': files,
+            'total': len(files),
+            'base_directory': str(BASE_DATA_DIR)
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Failed to list available files: {type(e).__name__}")
+        return jsonify({'error': 'Failed to retrieve file list'}), 500
 
 
 @api_bp.route('/queue/channel', methods=['GET'])

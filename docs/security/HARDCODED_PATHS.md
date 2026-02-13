@@ -4,16 +4,27 @@
 
 為了最大程度地防止路徑穿越攻擊，Edge API 下載端點使用完全硬編碼的檔案路徑，不接受使用者提供的任何路徑資訊。
 
+路徑遵循 FHS (Filesystem Hierarchy Standard) 標準：
+- `/var/cache/robot-ctl/` - 暫存/快取資料
+- `/var/lib/robot-ctl/` - 持久性應用程式資料
+
 ## 設計原則
 
 ### 1. 固定基礎目錄
-所有檔案儲存在預定義的系統目錄：
+所有檔案儲存在預定義的系統目錄，按照 FHS 標準分類：
+
+**暫存資料** (`/var/cache/robot-ctl/`)
 ```
-/var/robot-command-console/
-├── firmware/     # 韌體檔案
-├── logs/         # 系統日誌
-├── reports/      # 報告檔案
-└── backups/      # 備份檔案
+/var/cache/robot-ctl/
+├── logs/         # 系統日誌（可重新生成）
+└── reports/      # 報告檔案（臨時性）
+```
+
+**持久性資料** (`/var/lib/robot-ctl/`)
+```
+/var/lib/robot-ctl/
+├── firmware/     # 韌體檔案（應用程式資料）
+└── backups/      # 備份檔案（持久性）
 ```
 
 ### 2. 檔案 ID 映射
@@ -21,8 +32,8 @@
 
 ```python
 ALLOWED_DOWNLOAD_FILES = {
-    'firmware_latest': Path('/var/robot-command-console/firmware/latest.bin'),
-    'system_log': Path('/var/robot-command-console/logs/system.log'),
+    'firmware_latest': Path('/var/lib/robot-ctl/firmware/latest.bin'),
+    'system_log': Path('/var/cache/robot-ctl/logs/system.log'),
     ...
 }
 ```
@@ -82,7 +93,10 @@ curl -H "Authorization: Bearer <token>" \
     }
   ],
   "total": 2,
-  "base_directory": "/var/robot-command-console"
+  "base_directories": {
+    "cache": "/var/cache/robot-ctl",
+    "lib": "/var/lib/robot-ctl"
+  }
 }
 ```
 
@@ -123,9 +137,12 @@ ALLOWED_DOWNLOAD_FILES = {
 ```
 
 **注意：**
-1. 新檔案必須位於 `/var/robot-command-console/` 下的某個子目錄
-2. 需要重新啟動服務才能生效
-3. 不支援動態新增檔案（這是設計決策，確保安全性）
+1. 新檔案必須位於 `/var/cache/robot-ctl/` 或 `/var/lib/robot-ctl/` 下的某個子目錄
+2. 選擇正確的基礎目錄：
+   - 暫存/可重新生成的資料 → `/var/cache/robot-ctl/`
+   - 持久性應用程式資料 → `/var/lib/robot-ctl/`
+3. 需要重新啟動服務才能生效
+4. 不支援動態新增檔案（這是設計決策，確保安全性）
 
 ## 安全優勢
 
@@ -148,29 +165,45 @@ file_path.resolve().relative_to(BASE_DATA_DIR.resolve())
 ### 建立目錄結構
 
 ```bash
-sudo mkdir -p /var/robot-command-console/{firmware,logs,reports,backups}
-sudo chown -R robot-user:robot-group /var/robot-command-console
-sudo chmod 755 /var/robot-command-console
-sudo chmod 755 /var/robot-command-console/*
+# 建立暫存目錄
+sudo mkdir -p /var/cache/robot-ctl/{logs,reports}
+sudo chown -R robot-user:robot-group /var/cache/robot-ctl
+sudo chmod 755 /var/cache/robot-ctl
+sudo chmod 775 /var/cache/robot-ctl/logs
+sudo chmod 775 /var/cache/robot-ctl/reports
+
+# 建立持久性資料目錄
+sudo mkdir -p /var/lib/robot-ctl/{firmware,backups}
+sudo chown -R robot-user:robot-group /var/lib/robot-ctl
+sudo chmod 755 /var/lib/robot-ctl
+sudo chmod 755 /var/lib/robot-ctl/firmware
+sudo chmod 755 /var/lib/robot-ctl/backups
 ```
 
 ### 權限建議
 
+**暫存目錄** (`/var/cache/robot-ctl/`)
 ```bash
-# 基礎目錄：只有擁有者可寫
-chmod 755 /var/robot-command-console
-
-# 韌體目錄：只有系統可寫
-chmod 755 /var/robot-command-console/firmware
+# 基礎目錄：標準權限
+chmod 755 /var/cache/robot-ctl
 
 # 日誌目錄：應用程式可寫
-chmod 775 /var/robot-command-console/logs
+chmod 775 /var/cache/robot-ctl/logs
 
 # 報告目錄：應用程式可寫
-chmod 775 /var/robot-command-console/reports
+chmod 775 /var/cache/robot-ctl/reports
+```
+
+**持久性目錄** (`/var/lib/robot-ctl/`)
+```bash
+# 基礎目錄：標準權限
+chmod 755 /var/lib/robot-ctl
+
+# 韌體目錄：只有系統可寫
+chmod 755 /var/lib/robot-ctl/firmware
 
 # 備份目錄：只有系統可寫
-chmod 755 /var/robot-command-console/backups
+chmod 755 /var/lib/robot-ctl/backups
 ```
 
 ## 遷移指南
@@ -202,8 +235,8 @@ url = "/api/download/system_log"
 日誌檔案應該定期輪轉，建議使用 `logrotate`：
 
 ```bash
-# /etc/logrotate.d/robot-command-console
-/var/robot-command-console/logs/*.log {
+# /etc/logrotate.d/robot-ctl
+/var/cache/robot-ctl/logs/*.log {
     daily
     rotate 7
     compress
@@ -215,10 +248,14 @@ url = "/api/download/system_log"
 
 ### 磁碟空間監控
 
-定期檢查 `/var/robot-command-console` 的磁碟使用量：
+定期檢查磁碟使用量：
 
 ```bash
-du -sh /var/robot-command-console/*
+# 檢查暫存目錄
+du -sh /var/cache/robot-ctl/*
+
+# 檢查持久性資料目錄
+du -sh /var/lib/robot-ctl/*
 ```
 
 ## 故障排除
@@ -235,10 +272,12 @@ du -sh /var/robot-command-console/*
 如果出現權限錯誤：
 ```bash
 # 檢查檔案擁有者和權限
-ls -la /var/robot-command-console/*/
+ls -la /var/cache/robot-ctl/*/
+ls -la /var/lib/robot-ctl/*/
 
 # 修正權限
-sudo chown -R robot-user:robot-group /var/robot-command-console
+sudo chown -R robot-user:robot-group /var/cache/robot-ctl
+sudo chown -R robot-user:robot-group /var/lib/robot-ctl
 ```
 
 ---

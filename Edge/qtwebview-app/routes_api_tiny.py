@@ -35,14 +35,14 @@ def jwt_required(f):
         auth_header = request.headers.get('Authorization')
         if not auth_header:
             return jsonify({'error': 'No authorization token'}), 401
-        
+
         # Extract token from "Bearer <token>" format
         parts = auth_header.split()
         if len(parts) != 2 or parts[0].lower() != 'bearer':
             return jsonify({'error': 'Invalid authorization header format'}), 401
-        
+
         token = parts[1]
-        
+
         try:
             # Validate JWT token
             payload = jwt.decode(
@@ -80,7 +80,7 @@ def health_check():
                 queue_status = 'down'
         else:
             queue_status = 'not_configured'
-        
+
         # Check database/storage status
         database_status = 'up'
         try:
@@ -93,7 +93,7 @@ def health_check():
         except Exception as e:
             logger.warning(f"Storage check failed: {e}")
             database_status = 'down'
-        
+
         health_status = {
             'status': 'healthy',
             'timestamp': datetime.utcnow().isoformat(),
@@ -104,10 +104,10 @@ def health_check():
             },
             'version': '1.0.0'
         }
-        
+
         logger.info("Health check performed")
         return jsonify(health_status), 200
-        
+
     except Exception as e:
         logger.error(f"Health check failed: {type(e).__name__} in robot component")
         return jsonify({
@@ -133,21 +133,29 @@ def download_file(filename):
 
         # Sanitize and validate the filename
         safe_filename = os.path.basename(filename)
+
+        # Additional validation: check for path separators after basename
         if os.sep in safe_filename or (os.altsep and os.altsep in safe_filename):
-            logger.warning(f"Path traversal attempt detected: {filename}")
+            logger.warning("Path traversal attempt detected in sanitized filename")
             return jsonify({'error': 'Invalid file name'}), 403
 
         if safe_filename.startswith('.'):
-            logger.warning(f"Attempt to access hidden file: {filename}")
+            logger.warning("Attempt to access hidden file")
             return jsonify({'error': 'Invalid file name'}), 403
 
-        # Build and resolve the requested file path
+        # Validate filename contains only safe characters
+        if not safe_filename or safe_filename == '':
+            logger.warning("Empty filename provided")
+            return jsonify({'error': 'Invalid file name'}), 403
+
+        # Build and resolve the requested file path using only safe_filename
         requested_path = base_dir / safe_filename
         try:
             resolved_path = requested_path.resolve(strict=True)
+            # Verify the resolved path is still within base_dir
             resolved_path.relative_to(base_dir)
-        except (ValueError, RuntimeError, FileNotFoundError) as e:
-            logger.warning(f"Invalid file path resolution: {filename}")
+        except (ValueError, RuntimeError, FileNotFoundError):
+            logger.warning("Invalid file path resolution for sanitized filename")
             return jsonify({'error': 'Invalid file path'}), 403
 
         # Check if the resolved path is a file
@@ -159,7 +167,7 @@ def download_file(filename):
         return send_file(str(resolved_path), as_attachment=True)
 
     except Exception as e:
-        logger.error(f"Download failed: {type(e).__name__} - {e}")
+        logger.error(f"Download failed: {type(e).__name__}")
         return jsonify({'error': 'Download failed'}), 500
 
 
@@ -176,7 +184,7 @@ def get_queue_channel():
                 'error': 'Queue service not available',
                 'channels': []
             }), 503
-        
+
         # Return information about available channels
         # This is a simplified version - in production, you'd query actual queue service
         channels = {
@@ -196,10 +204,10 @@ def get_queue_channel():
             ],
             'timestamp': datetime.utcnow().isoformat()
         }
-        
+
         logger.info("Queue channel status retrieved")
         return jsonify(channels), 200
-        
+
     except Exception as e:
         logger.error(f"Failed to get queue channels: {e}")
         return jsonify({'error': '獲取佇列通道狀態失敗'}), 500
@@ -210,43 +218,43 @@ def get_queue_channel():
 def send_to_queue(channel_name):
     """
     Send message to specific queue channel
-    
+
     Args:
         channel_name: Target queue channel name
     """
     try:
         data = request.get_json()
-        
+
         if not data:
             return jsonify({'error': 'No data provided'}), 400
-        
+
         if not QUEUE_SERVICE_AVAILABLE:
             logger.warning(f"Queue service not available, message to {channel_name} not sent")
             return jsonify({
                 'error': 'Queue service not available',
                 'message': 'Message could not be queued'
             }), 503
-        
+
         # Create message for queue service
         message_id = f"msg_{datetime.utcnow().timestamp()}"
-        
+
         # In a real implementation, you would:
         # 1. Initialize OfflineQueueService instance
         # 2. Create a Message object with proper priority
         # 3. Call queue_service.send_message(message)
         # For now, we'll log and return success
-        
+
         logger.info(f"Message {message_id} queued to channel {channel_name}")
-        
+
         result = {
             'message_id': message_id,
             'channel': channel_name,
             'status': 'queued',
             'timestamp': datetime.utcnow().isoformat()
         }
-        
+
         return jsonify(result), 201
-        
+
     except Exception as e:
         logger.error(f"Failed to send message to {channel_name}: {e}")
         return jsonify({'error': '發送訊息到佇列失敗'}), 500
@@ -257,7 +265,7 @@ def send_to_queue(channel_name):
 def consume_from_queue(channel_name):
     """
     Consume message from specific queue channel
-    
+
     Args:
         channel_name: Source queue channel name
     """
@@ -267,13 +275,13 @@ def consume_from_queue(channel_name):
                 'error': 'Queue service not available',
                 'message': None
             }), 503
-        
+
         # In a real implementation, you would:
         # 1. Initialize OfflineQueueService instance
         # 2. Call queue_service.receive_message(channel_name)
         # 3. Return the message data or empty if no messages
         # This is a placeholder that returns empty message
-        
+
         message = {
             'message_id': None,
             'channel': channel_name,
@@ -281,10 +289,10 @@ def consume_from_queue(channel_name):
             'timestamp': datetime.utcnow().isoformat(),
             'status': 'no_messages'
         }
-        
+
         logger.info(f"Consume request from channel {channel_name} (no messages)")
         return jsonify(message), 200
-        
+
     except Exception as e:
         logger.error(f"Failed to consume from {channel_name}: {e}")
         return jsonify({'error': '從佇列消費訊息失敗'}), 500

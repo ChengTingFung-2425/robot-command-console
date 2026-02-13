@@ -231,7 +231,7 @@ def rate_command(command_id: int):
 
     except ValueError as e:
         logger.error(f"Rate command error: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 400
+        return jsonify({'success': False, 'error': '請求參數錯誤'}), 400
     except Exception as e:
         logger.error(f"Rate command error: {e}", exc_info=True)
         return jsonify({'success': False, 'error': '伺服器錯誤'}), 500

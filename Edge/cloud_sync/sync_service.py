@@ -2,8 +2,21 @@
 import logging
 from typing import List, Optional, Dict, Any
 from datetime import datetime
+import json
 
 from Edge.cloud_sync.client import CloudSyncClient
+
+# 嘗試導入 FHS 路徑管理
+try:
+    import sys
+    import os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+    from src.common.fhs_paths import get_sync_cache_dir, get_sync_log_path
+    FHS_PATHS_AVAILABLE = True
+except ImportError:
+    FHS_PATHS_AVAILABLE = False
+    get_sync_cache_dir = None
+    get_sync_log_path = None
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +45,18 @@ class CloudSyncService:
         self.client = CloudSyncClient(cloud_api_url, edge_id, api_key)
         self.auto_sync = auto_sync
         self.edge_id = edge_id
+        
+        # 初始化 FHS 標準路徑
+        if FHS_PATHS_AVAILABLE and get_sync_cache_dir:
+            try:
+                self.cache_dir = get_sync_cache_dir()
+                logger.info(f"Sync cache directory: {self.cache_dir}")
+            except Exception as e:
+                logger.warning(f"Failed to initialize FHS cache dir: {e}")
+                self.cache_dir = None
+        else:
+            self.cache_dir = None
+            logger.debug("FHS paths not available, cache disabled")
 
     def sync_approved_commands(self, db_session) -> Dict[str, Any]:
         """同步已批准的進階指令到雲端
@@ -105,6 +130,10 @@ class CloudSyncService:
                 f"Sync completed: {results['uploaded']} uploaded, "
                 f"{results['failed']} failed"
             )
+            
+            # 儲存同步結果到 FHS 快取
+            self._cache_sync_result(results)
+            
             return results
 
         except Exception as e:
@@ -227,6 +256,54 @@ class CloudSyncService:
         except Exception as e:
             logger.error(f"Error browsing cloud commands: {e}")
             return []
+    
+    def _cache_sync_result(self, results: Dict[str, Any]) -> None:
+        """將同步結果儲存到 FHS 快取目錄
+        
+        Args:
+            results: 同步結果統計
+        """
+        if not self.cache_dir:
+            return
+        
+        try:
+            timestamp_str = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+            cache_file = self.cache_dir / f"sync_result_{self.edge_id}_{timestamp_str}.json"
+            with open(cache_file, 'w', encoding='utf-8') as f:
+                json.dump({
+                    'timestamp': datetime.utcnow().isoformat(),
+                    'edge_id': self.edge_id,
+                    'results': results
+                }, f, indent=2)
+            logger.debug(f"Cached sync results to: {cache_file}")
+            
+            # 清理舊的快取檔案（保留最近 10 個）
+            self._cleanup_cache(max_files=10)
+        except Exception as e:
+            logger.warning(f"Failed to cache sync results: {e}")
+    
+    def _cleanup_cache(self, max_files: int = 10) -> None:
+        """清理舊的快取檔案
+        
+        Args:
+            max_files: 保留的最大檔案數
+        """
+        if not self.cache_dir:
+            return
+        
+        try:
+            cache_files = sorted(
+                self.cache_dir.glob(f"sync_result_{self.edge_id}_*.json"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True
+            )
+            
+            # 刪除超過限制的舊檔案
+            for old_file in cache_files[max_files:]:
+                old_file.unlink()
+                logger.debug(f"Removed old cache file: {old_file}")
+        except Exception as e:
+            logger.warning(f"Failed to cleanup cache: {e}")
 
     def get_cloud_status(self) -> Dict[str, Any]:
         """取得雲端服務狀態

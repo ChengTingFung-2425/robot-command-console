@@ -14,6 +14,17 @@ from Cloud.shared_commands.models import (
     SyncLog
 )
 
+# 嘗試導入 FHS 路徑管理
+try:
+    import sys
+    import os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+    from src.common.fhs_paths import get_sync_log_path
+    FHS_PATHS_AVAILABLE = True
+except ImportError:
+    FHS_PATHS_AVAILABLE = False
+    get_sync_log_path = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -480,6 +491,8 @@ class SharedCommandService:
         error_message: Optional[str] = None
     ) -> None:
         """記錄同步日誌
+        
+        將同步操作記錄到資料庫，並同時寫入本地 FHS 標準路徑的日誌檔案。
 
         Args:
             edge_id: Edge 裝置 ID
@@ -488,6 +501,7 @@ class SharedCommandService:
             status: 狀態（success/failed）
             error_message: 錯誤訊息
         """
+        # 記錄到資料庫
         log = SyncLog(
             edge_id=edge_id,
             command_id=command_id,
@@ -497,3 +511,25 @@ class SharedCommandService:
         )
         self.db.add(log)
         self.db.commit()
+        
+        # 同時記錄到本地檔案系統（FHS 標準路徑）
+        if FHS_PATHS_AVAILABLE and get_sync_log_path:
+            try:
+                log_path = get_sync_log_path()
+                timestamp = datetime.utcnow().isoformat()
+                log_entry = {
+                    'timestamp': timestamp,
+                    'edge_id': edge_id,
+                    'command_id': command_id,
+                    'action': action,
+                    'status': status,
+                    'error_message': error_message
+                }
+                
+                # 追加寫入 JSON Lines 格式
+                with open(log_path, 'a', encoding='utf-8') as f:
+                    f.write(json.dumps(log_entry) + '\n')
+                    
+                logger.debug(f"Sync log written to FHS path: {log_path}")
+            except Exception as e:
+                logger.warning(f"Failed to write sync log to file: {e}")

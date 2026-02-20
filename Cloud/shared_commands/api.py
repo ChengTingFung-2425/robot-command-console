@@ -73,7 +73,7 @@ def upload_command():
 
     except ValueError as e:
         logger.error(f"Upload command validation error: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 400
+        return jsonify({'success': False, 'error': '請求參數錯誤'}), 400
     except Exception as e:
         logger.error(f"Upload command error: {e}", exc_info=True)
         return jsonify({'success': False, 'error': '伺服器錯誤'}), 500

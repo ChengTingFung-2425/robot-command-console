@@ -44,7 +44,7 @@ class CloudSyncService:
         """
         try:
             # 動態導入以避免循環依賴
-            from Edge.WebUI.app.models import AdvancedCommand, User
+            from WebUI.app.models import AdvancedCommand, User
 
             # 查詢所有已批准的指令
             commands = db_session.query(AdvancedCommand).filter_by(
@@ -65,6 +65,12 @@ class CloudSyncService:
                     author = db_session.query(User).get(cmd.author_id)
                     if not author:
                         logger.warning(f"Author not found for command {cmd.id}")
+                        results['failed'] += 1
+                        results['errors'].append({
+                            'command_id': cmd.id,
+                            'command_name': cmd.name,
+                            'error': 'Author not found'
+                        })
                         continue
 
                     # 上傳指令
@@ -129,7 +135,7 @@ class CloudSyncService:
         """
         try:
             # 動態導入以避免循環依賴
-            from Edge.WebUI.app.models import AdvancedCommand
+            from WebUI.app.models import AdvancedCommand
 
             # 下載指令
             response = self.client.download_command(command_id)
@@ -139,6 +145,13 @@ class CloudSyncService:
                 return None
 
             data = response.get('data', {})
+            
+            # 驗證必要欄位
+            required_fields = ['name', 'description', 'category', 'content', 'version']
+            for field in required_fields:
+                if field not in data:
+                    logger.error(f"Missing required field '{field}' in downloaded command {command_id}")
+                    return None
 
             # 檢查是否已存在
             existing = db_session.query(AdvancedCommand).filter_by(
@@ -150,6 +163,7 @@ class CloudSyncService:
                 return existing
 
             # 建立本地指令
+            # 從雲端下載的指令需要本地審核，預設為 pending 狀態
             local_cmd = AdvancedCommand(
                 name=data['name'],
                 description=data['description'],
@@ -157,7 +171,7 @@ class CloudSyncService:
                 base_commands=data['content'],
                 version=data['version'],
                 author_id=user_id,
-                status='approved'  # 從雲端下載的指令預設為已批准
+                status='pending'  # 從雲端下載的指令需經過本地審核
             )
 
             db_session.add(local_cmd)

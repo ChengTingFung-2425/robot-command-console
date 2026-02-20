@@ -5,6 +5,7 @@ from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, asc
+import bleach
 
 from Cloud.shared_commands.models import (
     SharedAdvancedCommand,
@@ -14,6 +15,21 @@ from Cloud.shared_commands.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def sanitize_html(text: Optional[str]) -> Optional[str]:
+    """清理 HTML 內容以防止 XSS 攻擊
+    
+    Args:
+        text: 要清理的文字
+        
+    Returns:
+        清理後的文字，移除所有 HTML 標籤
+    """
+    if text is None:
+        return None
+    # 移除所有 HTML 標籤，只保留純文字
+    return bleach.clean(text, tags=[], strip=True)
 
 
 class SharedCommandService:
@@ -61,6 +77,9 @@ class SharedCommandService:
         Raises:
             ValueError: 參數驗證失敗
         """
+        # 清理輸入以防止 XSS
+        description = sanitize_html(description)
+        
         # 驗證內容為有效 JSON
         try:
             json.loads(content)
@@ -129,12 +148,22 @@ class SharedCommandService:
             min_rating: 最低評分
             sort_by: 排序欄位（rating/downloads/usage/created_at）
             order: 排序方向（asc/desc）
-            limit: 每頁筆數
+            limit: 每頁筆數（最大 100）
             offset: 分頁偏移量
 
         Returns:
             Tuple[List[SharedAdvancedCommand], int]: (指令列表, 總筆數)
         """
+        # 驗證並限制分頁參數
+        limit = min(limit, 100)  # 最大 100 筆
+        offset = max(offset, 0)  # 不能為負數
+        
+        # 驗證排序方向
+        valid_orders = {'asc', 'desc'}
+        sort_order = (order or 'desc').lower()
+        if sort_order not in valid_orders:
+            logger.warning(f"Invalid sort order '{order}', defaulting to 'desc'")
+            sort_order = 'desc'
         # 基本查詢
         q = self.db.query(SharedAdvancedCommand).filter_by(is_public=True)
 
@@ -167,7 +196,7 @@ class SharedCommandService:
         }
         sort_field = sort_field_map.get(sort_by, SharedAdvancedCommand.average_rating)
 
-        if order == 'desc':
+        if sort_order == 'desc':
             q = q.order_by(desc(sort_field))
         else:
             q = q.order_by(asc(sort_field))
@@ -244,10 +273,18 @@ class SharedCommandService:
         Raises:
             ValueError: 參數驗證失敗或指令不存在
         """
+        # 清理評論內容以防止 XSS
+        comment = sanitize_html(comment)
+        
         if not 1 <= rating <= 5:
             raise ValueError("評分必須在 1-5 之間")
 
-        command = self.get_command(command_id)
+        # 使用資料庫鎖定以防止競態條件
+        command = self.db.query(SharedAdvancedCommand).filter_by(
+            id=command_id,
+            is_public=True
+        ).with_for_update().first()
+        
         if not command:
             raise ValueError(f"指令不存在或不公開: {command_id}")
 
@@ -339,6 +376,9 @@ class SharedCommandService:
         Raises:
             ValueError: 指令不存在
         """
+        # 清理留言內容以防止 XSS
+        content = sanitize_html(content)
+        
         command = self.get_command(command_id)
         if not command:
             raise ValueError(f"指令不存在或不公開: {command_id}")

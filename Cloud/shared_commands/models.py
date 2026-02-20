@@ -55,7 +55,10 @@ class SharedAdvancedCommand(Base):
     )
 
     def to_dict(self) -> Dict[str, Any]:
-        """轉換為字典格式"""
+        """轉換為字典格式
+        
+        注意：為保護隱私，author_email 不包含在輸出中
+        """
         return {
             'id': self.id,
             'name': self.name,

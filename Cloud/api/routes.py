@@ -174,10 +174,11 @@ def upload_file():
         return jsonify(result), 200
 
     except ValueError as e:
-        return jsonify({"error": "Bad Request", "message": str(e)}), 400
+        logger.warning("File upload validation error", exc_info=True)
+        return jsonify({"error": "Bad Request", "message": "Invalid request"}), 400
     except Exception as e:
-        logger.error(f"File upload error: {e}")
-        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+        logger.error("File upload error", exc_info=True)
+        return jsonify({"error": "Internal Server Error", "message": "An internal error has occurred"}), 500
 
 
 @cloud_bp.route('/storage/download/<file_id>', methods=['GET'])

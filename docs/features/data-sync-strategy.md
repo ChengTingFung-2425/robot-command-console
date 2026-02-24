@@ -1,8 +1,8 @@
 # 資料同步策略
 
-> **Phase 3.3 功能**：Edge ↔ Cloud 資料同步  
-> **建立日期**：2026-02-24  
-> **狀態**：已實作
+> **Phase 3.3 功能**：Edge ↔ Cloud 資料同步
+> **建立日期**：2026-02-24
+> **狀態**：已實作（含先後發送機制與本地快取）
 
 ---
 
@@ -15,6 +15,49 @@
 | **用戶設定** | 雙向（Edge 主要，Cloud 備份） | 語言、主題、通知偏好等本地設定 |
 | **進階指令** | 單向上傳（Edge → Cloud），按需下載（Cloud → Edge） | 已批准的自訂指令共享至社群 |
 | **指令歷史** | 單向上傳（Edge → Cloud） | 執行記錄的雲端備份與分析 |
+
+---
+
+## 先後發送機制與本地快取
+
+### 設計原則
+
+**寫入操作（user_settings、command_history）**採用「先試後快取」策略：
+
+1. **在線**：直接呼叫雲端 API，成功即完成
+2. **離線/失敗**：自動將操作資料持久化到本地 SQLite 佇列（`CloudSyncQueue`）
+3. **恢復**：呼叫 `flush_queue()` 後按入隊序號（FIFO）依序補發
+
+```
+sync_user_settings() 或 sync_command_history()
+         │
+         ▼
+    try 直接 API 呼叫
+         │
+    成功  ├──────────────► 完成（同步時間記錄到回應）
+         │
+    失敗  └──────────────► CloudSyncQueue.enqueue()
+                                │
+                                ▼
+                          持久化到 SQLite
+                          （資料不遺失）
+                                │
+                    雲端恢復後呼叫 flush_queue()
+                                │
+                                ▼
+                          按 seq 升序補發
+                          （FIFO 先後順序）
+```
+
+### CloudSyncQueue 特性
+
+| 特性 | 說明 |
+|------|------|
+| **FIFO 先後順序** | 以 SQLite `seq` 整數欄位確保入隊順序 = 發送順序 |
+| **持久化快取** | SQLite 落盤；程式重啟後佇列仍保留，資料不遺失 |
+| **批次發送** | 可設定 `batch_size`（預設 20），批次取出後依序送出 |
+| **自動重試** | 單次失敗保留 PENDING，超出 `max_retry_count` 後標記 FAILED |
+| **執行緒安全** | 使用 `threading.RLock` 保護所有資料庫操作 |
 
 ---
 
@@ -31,7 +74,8 @@
 │                 │◄────────────────────┤                 │
 │  ┌───────────┐  │                     │  ┌───────────┐  │
 │  │ 本地快取  │  │                     │  │ 共享指令  │  │
-│  └───────────┘  │                     │  └───────────┘  │
+│  │(SQLite佇列)│  │                     │  └───────────┘  │
+│  └───────────┘  │                     │                 │
 │                 │                     │                 │
 │  ┌───────────┐  │   雙向同步          │  ┌───────────┐  │
 │  │ 用戶設定  │◄─┼────────────────────►│  │ 用戶設定  │  │
@@ -51,7 +95,8 @@
 ```
 Edge/cloud_sync/
 ├── client.py           # CloudSyncClient：API 呼叫（進階指令 + 設定 + 歷史）
-├── sync_service.py     # CloudSyncService：同步業務邏輯
+├── sync_queue.py       # CloudSyncQueue：先後發送佇列 + 本地快取（SQLite）
+├── sync_service.py     # CloudSyncService：同步業務邏輯（整合佇列）
 └── README.md           # Edge 同步模組文件
 
 Cloud/api/
@@ -252,6 +297,32 @@ result = sync_service.sync_command_history(
 )
 
 print(f"已同步 {result.get('synced_count', 0)} 筆歷史記錄")
+```
+
+### 離線快取與補發（先後發送機制）
+
+```python
+# 雲端不可用時，sync_user_settings 與 sync_command_history 會自動快取
+result = sync_service.sync_user_settings(
+    user_id='user-123',
+    settings={'theme': 'dark'}
+)
+
+if result.get('queued'):
+    # 資料已儲存到本地 SQLite 佇列，不遺失
+    print(f"設定已快取（op_id={result['op_id']}），待雲端恢復後補發")
+
+# ── 雲端恢復後 ──
+# 1. 通知服務雲端已可用
+sync_service.set_cloud_available(True)
+
+# 2. 補發所有快取項目（按入隊順序 FIFO）
+flush_result = sync_service.flush_queue()
+print(f"補發完成：sent={flush_result['sent']}, remaining={flush_result['remaining']}")
+
+# 3. 查詢佇列統計
+stats = sync_service.get_queue_statistics()
+print(f"佇列狀態：{stats}")
 ```
 
 ### 同步進階指令（已有功能）

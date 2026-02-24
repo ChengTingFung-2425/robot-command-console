@@ -186,7 +186,7 @@ def download_command(command_id: int):
 
     except ValueError as e:
         logger.error(f"Download command error: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 404
+        return jsonify({'success': False, 'error': '指令不存在或無法下載'}), 404
     except Exception as e:
         logger.error(f"Download command error: {e}", exc_info=True)
         return jsonify({'success': False, 'error': '伺服器錯誤'}), 500

@@ -114,8 +114,9 @@ def create_user():
             trust_score=int(trust_score),
         )
         return jsonify({"user": user.to_dict()}), 201
-    except UserAlreadyExistsError as e:
-        return jsonify({"error": "Conflict", "message": str(e)}), 409
+    except UserAlreadyExistsError:
+        # Do not expose internal exception details to the client
+        return jsonify({"error": "Conflict", "message": "User already exists"}), 409
     except (InvalidRoleError, ValueError) as e:
         return jsonify({"error": "Bad Request", "message": str(e)}), 400
     except Exception:

@@ -39,6 +39,7 @@ Cloud/
 ├── user_management/            # 用戶管理（雲端）
 ├── firmware_repository/        # 固件倉庫
 ├── notification/               # 通知服務
+├── shared_commands/            # 進階指令共享（✅ 已實作）
 └── analytics/                  # 數據分析（未來）
 ```
 
@@ -81,6 +82,27 @@ Cloud/
 - 固件上傳/下載
 - 版本管理
 - 更新推送
+
+### 5. 進階指令共享（Advanced Command Sharing）✅
+
+**狀態**: ✅ 已實作完成
+
+**來源**: 新功能  
+**目標**: `Cloud/shared_commands/`
+
+包含功能：
+- 指令上傳與存儲
+- 搜尋與篩選
+- 下載與同步
+- 評分系統
+- 留言討論
+- 精選與熱門指令
+- 同步日誌
+
+**相關文件**：
+- [shared_commands/README.md](shared_commands/README.md) - API 文件
+- [docs/features/advanced-command-sharing.md](../docs/features/advanced-command-sharing.md) - 功能說明
+- [Edge/cloud_sync/README.md](../Edge/cloud_sync/README.md) - Edge 同步模組
 
 ---
 
@@ -171,6 +193,7 @@ cloud:
 |------|----------|---------------|------|
 | 機器人控制 | ✅ | ❌ | 本地即時控制 |
 | 進階指令建立 | ✅ | ✅ | Edge 建立，可選上傳雲端共享 |
+| 進階指令共享 | ❌ | ✅ | 雲端共享與評分 |
 | 執行監控 | ✅ | ❌ | 本地監控 |
 | 討論區 | ❌ | ✅ | 雲端社群功能 |
 | 排行榜 | ❌ | ✅ | 雲端統計 |

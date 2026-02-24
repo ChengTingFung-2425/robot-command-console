@@ -85,6 +85,10 @@ def _get_settings_path(user_id: str) -> Path:
     Returns:
         設定檔案路徑
     """
+    # 防禦性檢查：確保 user_id 為安全字元，避免路徑遍歷
+    if not _validate_user_id(user_id):
+        raise ValueError(f"Invalid user_id for settings path: {user_id!r}")
+
     settings_dir = _storage_path / "user_settings"
     settings_dir.mkdir(parents=True, exist_ok=True)
     return settings_dir / f"settings_{user_id}.json"
@@ -99,6 +103,10 @@ def _get_history_path(user_id: str) -> Path:
     Returns:
         歷史檔案路徑
     """
+    # 防禦性檢查：確保 user_id 為安全字元，避免路徑遍歷
+    if not _validate_user_id(user_id):
+        raise ValueError(f"Invalid user_id for history path: {user_id!r}")
+
     history_dir = _storage_path / "command_history"
     history_dir.mkdir(parents=True, exist_ok=True)
     return history_dir / f"history_{user_id}.json"

@@ -27,6 +27,48 @@ except ImportError:
 api_bp = Blueprint('api_tiny', __name__, url_prefix='/api')
 logger = logging.getLogger(__name__)
 
+# Hardcoded base paths - NOT configurable by users for security
+# All file operations are restricted to these predefined directories
+# Following FHS (Filesystem Hierarchy Standard):
+#   /var/cache/robot-ctl/ - temporary/cache data (logs, reports)
+#   /var/lib/robot-ctl/   - persistent application data (firmware, backups)
+CACHE_BASE_DIR = Path('/var/cache/robot-ctl')
+LIB_BASE_DIR = Path('/var/lib/robot-ctl')
+
+# Cache directories (temporary data)
+LOGS_DIR = CACHE_BASE_DIR / 'logs'
+REPORTS_DIR = CACHE_BASE_DIR / 'reports'
+
+# Lib directories (persistent data)
+FIRMWARE_DIR = LIB_BASE_DIR / 'firmware'
+BACKUPS_DIR = LIB_BASE_DIR / 'backups'
+
+# Hardcoded file mapping for secure downloads
+# Maps file_id to absolute path (not user-configurable)
+ALLOWED_DOWNLOAD_FILES = {
+    # System logs - stored in /var/cache/robot-ctl/logs/
+    'system_log': LOGS_DIR / 'system.log',
+    'error_log': LOGS_DIR / 'error.log',
+    'access_log': LOGS_DIR / 'access.log',
+    'debug_log': LOGS_DIR / 'debug.log',
+
+    # Reports - stored in /var/cache/robot-ctl/reports/
+    'daily_report': REPORTS_DIR / 'daily.pdf',
+    'weekly_report': REPORTS_DIR / 'weekly.pdf',
+    'monthly_report': REPORTS_DIR / 'monthly.pdf',
+    'latest_report': REPORTS_DIR / 'latest.pdf',
+
+    # Firmware files - stored in /var/lib/robot-ctl/firmware/
+    'firmware_latest': FIRMWARE_DIR / 'latest.bin',
+    'firmware_stable': FIRMWARE_DIR / 'stable.bin',
+    'firmware_v1': FIRMWARE_DIR / 'v1.0.bin',
+    'firmware_v2': FIRMWARE_DIR / 'v2.0.bin',
+
+    # Configuration backups - stored in /var/lib/robot-ctl/backups/
+    'config_backup': BACKUPS_DIR / 'config.tar.gz',
+    'database_backup': BACKUPS_DIR / 'database.sql.gz',
+}
+
 
 def jwt_required(f):
     """JWT authentication decorator with JWT validation"""
@@ -35,14 +77,14 @@ def jwt_required(f):
         auth_header = request.headers.get('Authorization')
         if not auth_header:
             return jsonify({'error': 'No authorization token'}), 401
-        
+
         # Extract token from "Bearer <token>" format
         parts = auth_header.split()
         if len(parts) != 2 or parts[0].lower() != 'bearer':
             return jsonify({'error': 'Invalid authorization header format'}), 401
-        
+
         token = parts[1]
-        
+
         try:
             # Validate JWT token
             payload = jwt.decode(
@@ -80,20 +122,27 @@ def health_check():
                 queue_status = 'down'
         else:
             queue_status = 'not_configured'
-        
+
         # Check database/storage status
         database_status = 'up'
         try:
-            # Simple check - verify downloads directory is accessible
-            download_dir = Path(Config.DOWNLOAD_DIR)
-            if download_dir.exists() and download_dir.is_dir():
-                database_status = 'up'
+            # Check if base data directories exist and are accessible
+            cache_ok = CACHE_BASE_DIR.exists() and CACHE_BASE_DIR.is_dir()
+            lib_ok = LIB_BASE_DIR.exists() and LIB_BASE_DIR.is_dir()
+            
+            if cache_ok and lib_ok:
+                # Check if critical subdirectories are accessible
+                if FIRMWARE_DIR.exists() and LOGS_DIR.exists():
+                    database_status = 'up'
+                else:
+                    database_status = 'degraded'
             else:
-                database_status = 'degraded'
+                database_status = 'down'
         except Exception as e:
             logger.warning(f"Storage check failed: {e}")
+            database_status = 'error'
             database_status = 'down'
-        
+
         health_status = {
             'status': 'healthy',
             'timestamp': datetime.utcnow().isoformat(),
@@ -104,10 +153,10 @@ def health_check():
             },
             'version': '1.0.0'
         }
-        
+
         logger.info("Health check performed")
         return jsonify(health_status), 200
-        
+
     except Exception as e:
         logger.error(f"Health check failed: {type(e).__name__} in robot component")
         return jsonify({
@@ -117,50 +166,113 @@ def health_check():
         }), 503
 
 
-@api_bp.route('/download/<path:filename>', methods=['GET'])
+@api_bp.route('/download/<file_id>', methods=['GET'])
 @jwt_required
-def download_file(filename):
+def download_file(file_id):
     """
-    Download endpoint for files (logs, reports, firmware)
+    Download endpoint for predefined files (logs, reports, firmware)
+
+    Uses hardcoded file paths stored in /var/cache/robot-ctl/ and /var/lib/robot-ctl/ for security.
+    Paths are NOT configurable by users to prevent path traversal attacks.
 
     Args:
-        filename: File path to download
+        file_id: Predefined file identifier (e.g., 'system_log', 'firmware_latest')
+
+    Returns:
+        File download or error response
     """
     try:
-        # Resolve base download directory from configuration
-        download_dir = Path(Config.DOWNLOAD_DIR).resolve()
-        base_dir = Path(download_dir)
+        # Check if file_id is in allowed list
+        if file_id not in ALLOWED_DOWNLOAD_FILES:
+            logger.warning(f"Attempted download of unknown file_id: {file_id}")
+            return jsonify({
+                'error': 'File not found',
+                'message': 'Invalid file identifier',
+                'available_files': list(ALLOWED_DOWNLOAD_FILES.keys())
+            }), 404
 
-        # Sanitize and validate the filename
-        safe_filename = os.path.basename(filename)
-        if os.sep in safe_filename or (os.altsep and os.altsep in safe_filename):
-            logger.warning(f"Path traversal attempt detected: {filename}")
-            return jsonify({'error': 'Invalid file name'}), 403
+        # Get the hardcoded absolute path for this file_id
+        file_path = ALLOWED_DOWNLOAD_FILES[file_id]
 
-        if safe_filename.startswith('.'):
-            logger.warning(f"Attempt to access hidden file: {filename}")
-            return jsonify({'error': 'Invalid file name'}), 403
-
-        # Build and resolve the requested file path
-        requested_path = base_dir / safe_filename
+        # Verify the path is within our base directories (defense in depth)
         try:
-            resolved_path = requested_path.resolve(strict=True)
-            resolved_path.relative_to(base_dir)
-        except (ValueError, RuntimeError, FileNotFoundError) as e:
-            logger.warning(f"Invalid file path resolution: {filename}")
-            return jsonify({'error': 'Invalid file path'}), 403
+            resolved = file_path.resolve()
+            # Check if path is under either cache or lib base directory
+            is_under_cache = False
+            is_under_lib = False
+            try:
+                resolved.relative_to(CACHE_BASE_DIR.resolve())
+                is_under_cache = True
+            except ValueError:
+                pass
+            try:
+                resolved.relative_to(LIB_BASE_DIR.resolve())
+                is_under_lib = True
+            except ValueError:
+                pass
+            
+            if not (is_under_cache or is_under_lib):
+                raise ValueError("Path not under allowed directories")
+        except ValueError:
+            logger.error(f"Path traversal detected in hardcoded mapping for file_id: {file_id}")
+            return jsonify({'error': 'Security violation detected'}), 403
 
-        # Check if the resolved path is a file
-        if not resolved_path.is_file():
-            logger.warning(f"File not found: {safe_filename}")
-            return jsonify({'error': 'File not found'}), 404
+        # Check if the file exists
+        if not file_path.is_file():
+            logger.warning(f"File not found for file_id '{file_id}': {file_path}")
+            return jsonify({
+                'error': 'File not found',
+                'message': f'The file for {file_id} does not exist yet'
+            }), 404
 
-        logger.info(f"File download initiated: {safe_filename}")
-        return send_file(str(resolved_path), as_attachment=True)
+        # Return the file
+        logger.info(f"File download initiated for file_id: {file_id} from {file_path}")
+        return send_file(str(file_path), as_attachment=True, download_name=file_path.name)
 
     except Exception as e:
-        logger.error(f"Download failed: {type(e).__name__} - {e}")
+        logger.error(f"Download failed for file_id '{file_id}': {type(e).__name__}")
         return jsonify({'error': 'Download failed'}), 500
+
+
+@api_bp.route('/download/list', methods=['GET'])
+@jwt_required
+def list_available_files():
+    """
+    List all available files that can be downloaded
+
+    Returns:
+        JSON list of available file IDs and their descriptions
+    """
+    try:
+        # Build list with file existence status
+        files = []
+        for file_id, file_path in ALLOWED_DOWNLOAD_FILES.items():
+            # Determine category from parent directory
+            try:
+                category = file_path.parent.name
+            except:
+                category = 'other'
+
+            files.append({
+                'id': file_id,
+                'filename': file_path.name,
+                'exists': file_path.is_file(),
+                'category': category,
+                'size': file_path.stat().st_size if file_path.is_file() else 0
+            })
+
+        return jsonify({
+            'files': files,
+            'total': len(files),
+            'base_directories': {
+                'cache': str(CACHE_BASE_DIR),
+                'lib': str(LIB_BASE_DIR)
+            }
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Failed to list available files: {type(e).__name__}")
+        return jsonify({'error': 'Failed to retrieve file list'}), 500
 
 
 @api_bp.route('/queue/channel', methods=['GET'])
@@ -176,7 +288,7 @@ def get_queue_channel():
                 'error': 'Queue service not available',
                 'channels': []
             }), 503
-        
+
         # Return information about available channels
         # This is a simplified version - in production, you'd query actual queue service
         channels = {
@@ -196,10 +308,10 @@ def get_queue_channel():
             ],
             'timestamp': datetime.utcnow().isoformat()
         }
-        
+
         logger.info("Queue channel status retrieved")
         return jsonify(channels), 200
-        
+
     except Exception as e:
         logger.error(f"Failed to get queue channels: {e}")
         return jsonify({'error': '獲取佇列通道狀態失敗'}), 500
@@ -210,43 +322,43 @@ def get_queue_channel():
 def send_to_queue(channel_name):
     """
     Send message to specific queue channel
-    
+
     Args:
         channel_name: Target queue channel name
     """
     try:
         data = request.get_json()
-        
+
         if not data:
             return jsonify({'error': 'No data provided'}), 400
-        
+
         if not QUEUE_SERVICE_AVAILABLE:
             logger.warning(f"Queue service not available, message to {channel_name} not sent")
             return jsonify({
                 'error': 'Queue service not available',
                 'message': 'Message could not be queued'
             }), 503
-        
+
         # Create message for queue service
         message_id = f"msg_{datetime.utcnow().timestamp()}"
-        
+
         # In a real implementation, you would:
         # 1. Initialize OfflineQueueService instance
         # 2. Create a Message object with proper priority
         # 3. Call queue_service.send_message(message)
         # For now, we'll log and return success
-        
+
         logger.info(f"Message {message_id} queued to channel {channel_name}")
-        
+
         result = {
             'message_id': message_id,
             'channel': channel_name,
             'status': 'queued',
             'timestamp': datetime.utcnow().isoformat()
         }
-        
+
         return jsonify(result), 201
-        
+
     except Exception as e:
         logger.error(f"Failed to send message to {channel_name}: {e}")
         return jsonify({'error': '發送訊息到佇列失敗'}), 500
@@ -257,7 +369,7 @@ def send_to_queue(channel_name):
 def consume_from_queue(channel_name):
     """
     Consume message from specific queue channel
-    
+
     Args:
         channel_name: Source queue channel name
     """
@@ -267,13 +379,13 @@ def consume_from_queue(channel_name):
                 'error': 'Queue service not available',
                 'message': None
             }), 503
-        
+
         # In a real implementation, you would:
         # 1. Initialize OfflineQueueService instance
         # 2. Call queue_service.receive_message(channel_name)
         # 3. Return the message data or empty if no messages
         # This is a placeholder that returns empty message
-        
+
         message = {
             'message_id': None,
             'channel': channel_name,
@@ -281,10 +393,10 @@ def consume_from_queue(channel_name):
             'timestamp': datetime.utcnow().isoformat(),
             'status': 'no_messages'
         }
-        
+
         logger.info(f"Consume request from channel {channel_name} (no messages)")
         return jsonify(message), 200
-        
+
     except Exception as e:
         logger.error(f"Failed to consume from {channel_name}: {e}")
         return jsonify({'error': '從佇列消費訊息失敗'}), 500

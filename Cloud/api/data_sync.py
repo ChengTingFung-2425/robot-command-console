@@ -13,6 +13,9 @@ from .auth import CloudAuthService
 
 logger = logging.getLogger(__name__)
 
+# 僅允許安全的 user_id 字元（避免路徑遍歷等問題）
+_SAFE_ID_PATTERN = re.compile(r'^[A-Za-z0-9_-]{1,64}$')
+
 # Blueprint
 data_sync_bp = Blueprint('data_sync', __name__, url_prefix='/api/cloud/data_sync')
 

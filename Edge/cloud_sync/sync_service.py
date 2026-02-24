@@ -52,16 +52,14 @@ class CloudSyncService:
             api_key: API 金鑰（已棄用，請使用 jwt_token）
             jwt_token: JWT token（推薦使用）
             auto_sync: 是否自動同步
-            queue_db_path: 同步佇列 SQLite 路徑；None 使用記憶體資料庫
+            queue_db_path: 同步佇列 SQLite 路徑；None 時優先使用 FHS cache_dir/sync_queue.db，
+                           FHS 不可用才退回記憶體資料庫（不跨重啟持久）
         """
         self.client = CloudSyncClient(cloud_api_url, edge_id, api_key=api_key, jwt_token=jwt_token)
         self.auto_sync = auto_sync
         self.edge_id = edge_id
 
-        # 初始化先後發送佇列（本地快取）
-        self._sync_queue = CloudSyncQueue(db_path=queue_db_path)
-
-        # 初始化 FHS 標準路徑
+        # 初始化 FHS 標準路徑（必須先初始化，佇列路徑依賴 cache_dir）
         if FHS_PATHS_AVAILABLE and get_sync_cache_dir:
             try:
                 self.cache_dir = get_sync_cache_dir()
@@ -72,6 +70,31 @@ class CloudSyncService:
         else:
             self.cache_dir = None
             logger.debug("FHS paths not available, cache disabled")
+
+        # 決定同步佇列的 SQLite 路徑：
+        # 1. 呼叫端明確指定 → 直接使用
+        # 2. FHS cache_dir 可用 → 落到 cache_dir/sync_queue.db（跨重啟持久）
+        # 3. 否則 → 記憶體資料庫（不跨重啟）
+        if queue_db_path is not None:
+            resolved_queue_db = queue_db_path
+        elif self.cache_dir is not None:
+            resolved_queue_db = str(self.cache_dir / "sync_queue.db")
+        else:
+            resolved_queue_db = None  # 記憶體 DB
+            logger.warning(
+                "No persistent path for sync queue; using in-memory DB "
+                "(data will be lost on restart)"
+            )
+
+        self._sync_queue = CloudSyncQueue(db_path=resolved_queue_db)
+
+    def close(self) -> None:
+        """釋放同步佇列的資料庫連線
+
+        在記憶體資料庫模式下關閉持久連線；對檔案資料庫為空操作。
+        建議在服務結束或測試 tearDown 時呼叫，避免連線累積。
+        """
+        self._sync_queue.close()
 
     def sync_approved_commands(self, db_session) -> Dict[str, Any]:
         """同步已批准的進階指令到雲端

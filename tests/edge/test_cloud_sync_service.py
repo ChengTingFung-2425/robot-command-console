@@ -26,25 +26,31 @@ class TestCloudSyncService(unittest.TestCase):
         self.cloud_api_url = "https://test.example.com/api"
         self.edge_id = "edge-test-001"
         self.api_key = "test-api-key"
-        
+
     @patch('Edge.cloud_sync.sync_service.CloudSyncClient')
     @patch('Edge.cloud_sync.sync_service.get_sync_cache_dir')
     def test_init_with_fhs_paths(self, mock_get_cache, mock_client_class):
-        """測試初始化時設定 FHS 快取目錄"""
+        """測試初始化時設定 FHS 快取目錄，且同步佇列應使用落盤 SQLite"""
+        import tempfile
         from pathlib import Path
-        mock_cache_dir = Path("/tmp/test-cache")
-        mock_get_cache.return_value = mock_cache_dir
-        
-        with patch('Edge.cloud_sync.sync_service.FHS_PATHS_AVAILABLE', True):
-            service = CloudSyncService(
-                cloud_api_url=self.cloud_api_url,
-                edge_id=self.edge_id,
-                api_key=self.api_key
-            )
-            
-            assert service.cache_dir == mock_cache_dir
-            assert service.edge_id == self.edge_id
-            mock_get_cache.assert_called_once()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            mock_cache_dir = Path(tmpdir)
+            mock_get_cache.return_value = mock_cache_dir
+
+            with patch('Edge.cloud_sync.sync_service.FHS_PATHS_AVAILABLE', True):
+                service = CloudSyncService(
+                    cloud_api_url=self.cloud_api_url,
+                    edge_id=self.edge_id,
+                    api_key=self.api_key
+                )
+
+                assert service.cache_dir == mock_cache_dir
+                assert service.edge_id == self.edge_id
+                mock_get_cache.assert_called_once()
+                # 確認佇列 DB 落到 cache_dir/sync_queue.db
+                expected_db = str(mock_cache_dir / "sync_queue.db")
+                assert service._sync_queue._db_path == expected_db
+                service.close()
 
     @patch('Edge.cloud_sync.sync_service.CloudSyncClient')
     def test_init_without_fhs_paths(self, mock_client_class):
@@ -54,7 +60,7 @@ class TestCloudSyncService(unittest.TestCase):
                 cloud_api_url=self.cloud_api_url,
                 edge_id=self.edge_id
             )
-            
+
             assert service.cache_dir is None
 
     @patch('Edge.cloud_sync.sync_service.CloudSyncClient')
@@ -64,13 +70,13 @@ class TestCloudSyncService(unittest.TestCase):
         mock_client = Mock()
         mock_client.upload_command.return_value = {'success': True, 'data': {'id': 123}}
         mock_client_class.return_value = mock_client
-        
+
         # Mock database session and models
         mock_db = Mock()
         mock_user = Mock()
         mock_user.username = "testuser"
         mock_user.email = "test@example.com"
-        
+
         mock_cmd1 = Mock()
         mock_cmd1.id = 1
         mock_cmd1.name = "Test Command 1"
@@ -80,19 +86,19 @@ class TestCloudSyncService(unittest.TestCase):
         mock_cmd1.version = 1
         mock_cmd1.author_id = 1
         mock_cmd1.author = mock_user
-        
+
         mock_db.query.return_value.filter_by.return_value.all.return_value = [mock_cmd1]
         mock_db.query.return_value.get.return_value = mock_user
-        
+
         service = CloudSyncService(
             cloud_api_url=self.cloud_api_url,
             edge_id=self.edge_id,
             api_key=self.api_key
         )
-        
+
         with patch('Edge.cloud_sync.sync_service.FHS_PATHS_AVAILABLE', False):
             results = service.sync_approved_commands(mock_db)
-        
+
         assert results['total'] == 1
         assert results['uploaded'] == 1
         assert results['failed'] == 0
@@ -103,7 +109,7 @@ class TestCloudSyncService(unittest.TestCase):
         """測試同步指令時作者不存在的情況"""
         mock_client = Mock()
         mock_client_class.return_value = mock_client
-        
+
         # Mock database - command exists but author doesn't
         mock_db = Mock()
         mock_cmd = Mock()
@@ -111,17 +117,17 @@ class TestCloudSyncService(unittest.TestCase):
         mock_cmd.name = "Test Command"
         mock_cmd.author_id = 999
         mock_cmd.author = None
-        
+
         mock_db.query.return_value.filter_by.return_value.all.return_value = [mock_cmd]
         mock_db.query.return_value.get.return_value = None  # Author not found
-        
+
         service = CloudSyncService(
             cloud_api_url=self.cloud_api_url,
             edge_id=self.edge_id
         )
-        
+
         results = service.sync_approved_commands(mock_db)
-        
+
         # Should count as failed
         assert results['total'] == 1
         assert results['uploaded'] == 0
@@ -146,23 +152,23 @@ class TestCloudSyncService(unittest.TestCase):
             }
         }
         mock_client_class.return_value = mock_client
-        
+
         # Mock database
         mock_db = Mock()
         mock_db.query.return_value.filter_by.return_value.first.return_value = None  # No existing
-        
+
         # Mock AdvancedCommand model
         mock_advanced_command = Mock()
         mock_cmd_instance = Mock()
         mock_cmd_instance.id = 1
         mock_cmd_instance.name = 'Cloud Command'
         mock_advanced_command.return_value = mock_cmd_instance
-        
+
         service = CloudSyncService(
             cloud_api_url=self.cloud_api_url,
             edge_id=self.edge_id
         )
-        
+
         # Mock WebUI models
         import sys
         webui_mock = Mock()
@@ -175,10 +181,10 @@ class TestCloudSyncService(unittest.TestCase):
         sys.modules['WebUI'] = webui_mock
         sys.modules['WebUI.app'] = webui_app_mock
         sys.modules['WebUI.app.models'] = webui_models_mock
-        
+
         with patch('Edge.cloud_sync.sync_service.FHS_PATHS_AVAILABLE', False):
             result = service.download_and_import_command(123, mock_db, 1)
-        
+
         # Verify client was called and command was created
         mock_client.download_command.assert_called_once_with(123)
         assert result == mock_cmd_instance
@@ -196,17 +202,17 @@ class TestCloudSyncService(unittest.TestCase):
             }
         }
         mock_client_class.return_value = mock_client
-        
+
         mock_db = Mock()
-        
+
         service = CloudSyncService(
             cloud_api_url=self.cloud_api_url,
             edge_id=self.edge_id
         )
-        
+
         with patch('Edge.cloud_sync.sync_service.FHS_PATHS_AVAILABLE', False):
             result = service.download_and_import_command(123, mock_db, 1)
-        
+
         # Should return None due to missing fields
         assert result is None
 
@@ -225,18 +231,18 @@ class TestCloudSyncService(unittest.TestCase):
             }
         }
         mock_client_class.return_value = mock_client
-        
+
         service = CloudSyncService(
             cloud_api_url=self.cloud_api_url,
             edge_id=self.edge_id
         )
-        
+
         commands = service.browse_cloud_commands(
             category='patrol',
             min_rating=4.0,
             limit=10
         )
-        
+
         assert len(commands) == 2
         assert commands[0]['name'] == 'Command 1'
         mock_client.search_commands.assert_called_once_with(
@@ -254,14 +260,14 @@ class TestCloudSyncService(unittest.TestCase):
         mock_client = Mock()
         mock_client.search_commands.return_value = {'success': False}
         mock_client_class.return_value = mock_client
-        
+
         service = CloudSyncService(
             cloud_api_url=self.cloud_api_url,
             edge_id=self.edge_id
         )
-        
+
         commands = service.browse_cloud_commands()
-        
+
         assert commands == []
 
     @patch('Edge.cloud_sync.sync_service.CloudSyncClient')
@@ -282,14 +288,14 @@ class TestCloudSyncService(unittest.TestCase):
             }
         }
         mock_client_class.return_value = mock_client
-        
+
         service = CloudSyncService(
             cloud_api_url=self.cloud_api_url,
             edge_id=self.edge_id
         )
-        
+
         status = service.get_cloud_status()
-        
+
         assert status['available'] is True
         assert status['edge_id'] == self.edge_id
         assert 'categories' in status
@@ -301,36 +307,36 @@ class TestCloudSyncService(unittest.TestCase):
         from pathlib import Path
         import tempfile
         import json
-        
+
         mock_client_class.return_value = Mock()
-        
+
         # Use a temporary directory for testing
         with tempfile.TemporaryDirectory() as tmpdir:
             cache_dir = Path(tmpdir)
-            
+
             service = CloudSyncService(
                 cloud_api_url=self.cloud_api_url,
                 edge_id=self.edge_id
             )
             service.cache_dir = cache_dir
-            
+
             results = {
                 'total': 5,
                 'uploaded': 4,
                 'failed': 1,
                 'errors': []
             }
-            
+
             service._cache_sync_result(results)
-            
+
             # Verify cache file was created
             cache_files = list(cache_dir.glob(f"sync_result_{self.edge_id}_*.json"))
             assert len(cache_files) == 1
-            
+
             # Verify content
             with open(cache_files[0], 'r') as f:
                 cached_data = json.load(f)
-            
+
             assert cached_data['edge_id'] == self.edge_id
             assert cached_data['results']['total'] == 5
 
@@ -340,30 +346,30 @@ class TestCloudSyncService(unittest.TestCase):
         from pathlib import Path
         import tempfile
         import time
-        
+
         mock_client_class.return_value = Mock()
-        
+
         with tempfile.TemporaryDirectory() as tmpdir:
             cache_dir = Path(tmpdir)
-            
+
             service = CloudSyncService(
                 cloud_api_url=self.cloud_api_url,
                 edge_id=self.edge_id
             )
             service.cache_dir = cache_dir
-            
+
             # Create 15 test cache files
             for i in range(15):
                 cache_file = cache_dir / f"sync_result_{self.edge_id}_{i:04d}.json"
                 cache_file.write_text('{}')
                 time.sleep(0.01)  # Ensure different mtime
-            
+
             # Cleanup should keep only 10 most recent
             service._cleanup_cache(max_files=10)
-            
+
             remaining_files = list(cache_dir.glob(f"sync_result_{self.edge_id}_*.json"))
             assert len(remaining_files) == 10
-            
+
             # Verify oldest files were removed (0000-0004)
             remaining_names = [f.name for f in remaining_files]
             assert f"sync_result_{self.edge_id}_0000.json" not in remaining_names

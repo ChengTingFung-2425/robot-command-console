@@ -101,7 +101,7 @@ class CloudSyncQueue:
                 conn.close()
 
     def _init_db(self) -> None:
-        """初始化 SQLite 資料表與索引"""
+        """初始化 SQLite 資料表與索引，並將殘留 SENDING 重置回 PENDING"""
         with self._lock:
             with self._get_conn() as conn:
                 conn.execute("""
@@ -125,6 +125,10 @@ class CloudSyncQueue:
                 conn.execute(
                     "CREATE INDEX IF NOT EXISTS idx_sq_status "
                     "ON sync_queue (status)"
+                )
+                # 程序上次崩潰時可能留下 SENDING 狀態的項目；重置為 PENDING 以允許重試
+                conn.execute(
+                    "UPDATE sync_queue SET status = 'pending' WHERE status = 'sending'"
                 )
                 conn.commit()
 
@@ -221,7 +225,8 @@ class CloudSyncQueue:
                     })
                     return None
 
-        self._total_enqueued += 1
+            self._total_enqueued += 1
+
         logger.info("Sync item enqueued", extra={
             "op_id": op_id,
             "op_type": op_type,
@@ -255,14 +260,13 @@ class CloudSyncQueue:
             for item in batch:
                 op_id, op_type, payload, trace_id, retry_cnt = item
 
-                self._update_status(op_id, SyncItemStatus.SENDING)
-
                 try:
                     success = send_handler(op_type, payload)
                 except Exception as e:
                     logger.error("send_handler raised exception", extra={
                         "op_id": op_id,
                         "op_type": op_type,
+                        "trace_id": trace_id,
                         "error": str(e),
                         "service": "cloud_sync_queue",
                     })
@@ -276,6 +280,7 @@ class CloudSyncQueue:
                     logger.info("Sync item sent successfully", extra={
                         "op_id": op_id,
                         "op_type": op_type,
+                        "trace_id": trace_id,
                         "service": "cloud_sync_queue",
                     })
                 else:
@@ -291,6 +296,7 @@ class CloudSyncQueue:
                         logger.warning("Sync item permanently failed", extra={
                             "op_id": op_id,
                             "op_type": op_type,
+                            "trace_id": trace_id,
                             "retry_cnt": new_retry,
                             "service": "cloud_sync_queue",
                         })
@@ -304,6 +310,7 @@ class CloudSyncQueue:
                         logger.warning("Sync item failed, will retry", extra={
                             "op_id": op_id,
                             "op_type": op_type,
+                            "trace_id": trace_id,
                             "retry_cnt": new_retry,
                             "max_retry": self._max_retry_count,
                             "service": "cloud_sync_queue",

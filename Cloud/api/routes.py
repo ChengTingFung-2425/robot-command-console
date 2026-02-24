@@ -297,7 +297,7 @@ def delete_file(file_id: str):
 
     except Exception as e:
         logger.error(f"File deletion error: {e}")
-        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+        return jsonify({"error": "Internal Server Error", "message": "An internal server error occurred"}), 500
 
 
 @cloud_bp.route('/storage/stats', methods=['GET'])
@@ -320,7 +320,7 @@ def get_stats():
 
     except Exception as e:
         logger.error(f"Stats retrieval error: {e}")
-        return jsonify({"error": "Internal Server Error", "message": str(e)}), 500
+        return jsonify({"error": "Internal Server Error", "message": "An internal server error occurred"}), 500
 
 
 @cloud_bp.route('/health', methods=['GET'])

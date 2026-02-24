@@ -2,11 +2,12 @@
 import json
 import logging
 import re
-import threading
+import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from functools import wraps
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
 from flask import Blueprint, jsonify, request
 
@@ -25,27 +26,6 @@ _auth_service: Optional[CloudAuthService] = None
 
 # 儲存路徑（需在初始化時設定）
 _storage_path: Optional[Path] = None
-
-# 檔案層級的執行緒鎖（防止併發寫入同一個用戶歷史檔案的競態條件）
-# 最多保留 MAX_FILE_LOCKS 個鎖以避免記憶體無限成長
-_file_locks: Dict[str, threading.Lock] = {}
-_file_locks_lock = threading.Lock()
-_MAX_FILE_LOCKS = 1024
-
-
-def _get_file_lock(path: str) -> threading.Lock:
-    """取得或建立對應 path 的執行緒鎖
-
-    當鎖字典超過上限時，清除已有的鎖（僅在持有 _file_locks_lock 時安全）。
-    """
-    with _file_locks_lock:
-        if path not in _file_locks:
-            if len(_file_locks) >= _MAX_FILE_LOCKS:
-                # 超過上限時清除，讓 GC 回收不再被任何執行緒持有的鎖
-                _file_locks.clear()
-                logger.debug("file_locks evicted (exceeded max size)")
-            _file_locks[path] = threading.Lock()
-        return _file_locks[path]
 
 
 def init_data_sync_api(jwt_secret: str, storage_path: str) -> None:
@@ -164,26 +144,57 @@ def _get_settings_path(user_id: str) -> Path:
     return resolved_file
 
 
-def _get_history_path(user_id: str) -> Path:
-    """取得用戶指令歷史檔案路徑"""
-    # 防止路徑穿越與非法字元，確保歷史檔僅建立於 command_history 目錄下
-    if "/" in user_id or "\\" in user_id or ".." in user_id:
-        raise ValueError("Invalid user_id for history path")
-    # 與設定檔相同的格式限制，避免產生包含目錄分隔符的檔名
-    if not re.fullmatch(r"[A-Za-z0-9_-]+", user_id):
-        raise ValueError("Invalid user_id format for history path")
+# ==================== 歷史記錄 SQLite 儲存 ====================
 
+def _get_history_db_path() -> Path:
+    """取得歷史記錄 SQLite 資料庫路徑（所有用戶共用同一個 DB）"""
     history_dir = _storage_path / "command_history"
     history_dir.mkdir(parents=True, exist_ok=True)
-    # 構造歷史檔案路徑並以實際路徑驗證不會逃出 command_history 目錄
-    candidate = history_dir / f"history_{user_id}.json"
-    resolved_dir = history_dir.resolve()
-    resolved_file = candidate.resolve()
-    if resolved_file.parent != resolved_dir:
-        raise ValueError("Resolved history path escapes history directory")
-    return resolved_file
+    return history_dir / "history.db"
 
 
+@contextmanager
+def _history_db_conn() -> Generator[sqlite3.Connection, None, None]:
+    """取得 SQLite 連線（context manager）
+
+    每次呼叫都建立新的連線並在結束後關閉，確保連線不跨執行緒共用。
+    `check_same_thread=False` 允許 Flask 的執行緒池服務請求——
+    此處是安全的，因為每個請求使用獨立的 conn 物件，不存在共用狀態。
+    WAL 模式支援多讀單寫並行，避免 SQLITE_BUSY。
+    """
+    db_path = _get_history_db_path()
+    conn = sqlite3.connect(str(db_path), check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA foreign_keys=ON")
+        _ensure_history_table(conn)
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def _ensure_history_table(conn: sqlite3.Connection) -> None:
+    """確保 command_history 資料表存在"""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS command_history (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     TEXT    NOT NULL,
+            command_id  TEXT    NOT NULL,
+            edge_id     TEXT,
+            record_json TEXT    NOT NULL,
+            synced_at   TEXT    NOT NULL,
+            UNIQUE (user_id, command_id)
+        )
+    """)
+    conn.execute(
+        # 僅對 user_id 建立索引；id 是主鍵，SQLite 已自動索引，無需重複包含
+        "CREATE INDEX IF NOT EXISTS idx_history_user ON command_history (user_id)"
+    )
 
 
 # ==================== 用戶設定同步端點 ====================
@@ -329,8 +340,8 @@ def upload_history(user_id: str):
         }
 
     Note:
-        歷史記錄以 command_id 去重。目前使用 JSON 檔案儲存；若記錄量超過
-        數千筆，建議遷移至 SQLite 以獲得更好的查詢效能。
+        歷史記錄儲存於 SQLite，以 (user_id, command_id) 為唯一鍵自動去重。
+        SQLite WAL 模式支援多讀單寫並行，不需額外執行緒鎖。
     """
     if _storage_path is None:
         return jsonify({"success": False, "error": "Storage not initialized"}), 503
@@ -350,41 +361,41 @@ def upload_history(user_id: str):
     if records is None or not isinstance(records, list):
         return jsonify({"success": False, "error": "Missing or invalid 'records' field"}), 400
 
+    edge_id = data.get('edge_id', '')
+    synced_at = datetime.now(timezone.utc).isoformat()
+
     try:
-        history_path = _get_history_path(user_id)
-        file_lock = _get_file_lock(str(history_path))
+        synced_count = 0
+        with _history_db_conn() as conn:
+            for record in records:
+                command_id = record.get('command_id')
+                if not command_id:
+                    continue
+                cursor = conn.execute(
+                    """
+                    INSERT OR IGNORE INTO command_history
+                        (user_id, command_id, edge_id, record_json, synced_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    # INSERT OR IGNORE 以「第一次寫入為準」的策略去重：
+                    # 歷史記錄一旦寫入即視為不可變，後續相同 command_id 的上傳
+                    # 不會覆蓋既有資料。若需更新舊紀錄，應改用 INSERT OR REPLACE。
+                    (user_id, command_id, edge_id, json.dumps(record), synced_at)
+                )
+                synced_count += cursor.rowcount
 
-        with file_lock:
-            # 讀取現有歷史記錄
-            existing: List[Dict[str, Any]] = []
-            if history_path.exists():
-                with open(history_path, 'r', encoding='utf-8') as f:
-                    stored = json.load(f)
-                    existing = stored.get('records', [])
-
-            # 合併新記錄（以 command_id 去重）
-            existing_ids = {r.get('command_id') for r in existing if r.get('command_id')}
-            new_records = [r for r in records if r.get('command_id') not in existing_ids]
-            merged = existing + new_records
-
-            payload = {
-                'user_id': user_id,
-                'edge_id': data.get('edge_id'),
-                'updated_at': datetime.now(timezone.utc).isoformat(),
-                'records': merged
-            }
-
-            with open(history_path, 'w', encoding='utf-8') as f:
-                json.dump(payload, f, indent=2, ensure_ascii=False)
+            total = conn.execute(
+                "SELECT COUNT(*) FROM command_history WHERE user_id = ?", (user_id,)
+            ).fetchone()[0]
 
         logger.info(
             f"History synced for user '{user_id}': "
-            f"{len(new_records)} new records added, total {len(merged)}"
+            f"{synced_count} new records added, total {total}"
         )
         return jsonify({
             "success": True,
-            "synced_count": len(new_records),
-            "total": len(merged)
+            "synced_count": synced_count,
+            "total": total
         })
 
     except Exception as e:
@@ -414,8 +425,8 @@ def download_history(user_id: str):
         }
 
     Note:
-        分頁目前在記憶體中切片完成。若歷史量超過數千筆，
-        建議遷移至 SQLite 以獲得更好的效能。
+        分頁查詢透過 SQLite LIMIT/OFFSET 實作，僅讀取所需資料列，
+        不需將全部記錄載入記憶體。
     """
     if _storage_path is None:
         return jsonify({"success": False, "error": "Storage not initialized"}), 503
@@ -433,24 +444,28 @@ def download_history(user_id: str):
         limit = min(max(limit, 1), 1000)
         offset = max(offset, 0)
 
-        history_path = _get_history_path(user_id)
-        if not history_path.exists():
-            return jsonify({
-                "success": True,
-                "data": {"records": [], "total": 0}
-            })
+        with _history_db_conn() as conn:
+            total = conn.execute(
+                "SELECT COUNT(*) FROM command_history WHERE user_id = ?", (user_id,)
+            ).fetchone()[0]
 
-        with open(history_path, 'r', encoding='utf-8') as f:
-            stored = json.load(f)
+            rows = conn.execute(
+                """
+                SELECT record_json FROM command_history
+                WHERE user_id = ?
+                ORDER BY id
+                LIMIT ? OFFSET ?
+                """,
+                (user_id, limit, offset)
+            ).fetchall()
 
-        all_records = stored.get('records', [])
-        page = all_records[offset:offset + limit]
+        page: List[Dict[str, Any]] = [json.loads(row["record_json"]) for row in rows]
 
         return jsonify({
             "success": True,
             "data": {
                 "records": page,
-                "total": len(all_records)
+                "total": total
             }
         })
 

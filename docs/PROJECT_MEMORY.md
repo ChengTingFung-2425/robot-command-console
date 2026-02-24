@@ -27,29 +27,38 @@
 
 ```python
 # ❌ 危險：洩露 Python 例外類別名稱與內部路徑/邏輯
+# Flask
 except InvalidRoleError as e:
-    return jsonify({"message": str(e)}), 400    # str(e) 可能含內部資訊
+    return jsonify({"message": str(e)}), 400
 
-except ValueError as e:
-    return jsonify({"message": str(e)}), 404    # 同上
+# FastAPI
+except Exception as e:
+    raise HTTPException(status_code=500, detail=str(e))
 
-# ✅ 正確：catch 例外但只回傳通用語意訊息（不含堆疊或類別名稱）
+# WebSocket
+await websocket.close(code=1011, reason=f"串流錯誤: {str(e)}")
+
+# ✅ 正確（Flask）：catch 例外但只回傳通用語意訊息
 except InvalidRoleError:
     return jsonify({"error": "Bad Request", "message": "Invalid role specified"}), 400
 
 except ValueError:
     return jsonify({"error": "Not Found", "message": "Data not exist"}), 404
 
-except UserNotFoundError:
-    return jsonify({"error": "Not Found", "message": "User not found"}), 404
-
-except UserAlreadyExistsError:
-    return jsonify({"error": "Conflict", "message": "User already exists"}), 409
-
-# ✅ 內部錯誤：只記錄 log，不回傳 stack trace
 except Exception:
     logger.exception("Failed to ...")        # stack trace 寫入 log
-    return jsonify({"error": "Internal Server Error"}), 500  # 客戶端只見通用訊息
+    return jsonify({"error": "Internal Server Error"}), 500
+
+# ✅ 正確（FastAPI）：
+except Exception:
+    logger.exception("...", exc_info=True)   # 細節寫 log
+    raise HTTPException(status_code=500, detail="Internal server error")
+
+# ✅ 正確（WebSocket）：
+await websocket.close(code=1011, reason="Stream error")
+
+# ✅ 允許（logger.error extra={}）：這是後端日誌，不送給客戶端
+logger.error("...", extra={'error': str(e)}, exc_info=True)
 ```
 
 **通用語意對照表**：
@@ -63,7 +72,8 @@ except Exception:
 | 任何未預期例外 | Internal Server Error（不含細節） | 500 |
 
 **修復記錄（2026-02-24）**：
-- `Cloud/user_management/api.py`：移除所有 `str(e)` 直接回傳，改用上表通用訊息
+- `Cloud/user_management/api.py`：移除所有 `str(e)` 直接回傳（Flask jsonify）
+- `Edge/MCP/api.py`：移除 16 個 `HTTPException(detail=str(e))` + 1 個 WebSocket reason（FastAPI）
 
 ### 🔒 路徑穿越（Path Traversal）修復模式
 

@@ -14,6 +14,8 @@ import json
 import hashlib
 from pathlib import Path
 from typing import Optional
+from werkzeug.utils import secure_filename
+import re
 
 # Add parent directories to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -40,6 +42,61 @@ logger = logging.getLogger(__name__)
 _deployment_tasks = {}
 
 
+def _validate_and_sanitize_filename(filename: str) -> Optional[str]:
+    """
+    Validate and sanitize firmware filename using secure practices.
+    
+    Rules enforced:
+    - Only one "." allowed (for extension)
+    - No directory separators (/, \\)
+    - Alphanumeric characters, dash, underscore, and one dot only
+    - Use allowlist pattern validation
+    
+    Args:
+        filename: Original filename from upload
+    
+    Returns:
+        Sanitized filename if safe, None otherwise
+    """
+    if not filename:
+        return None
+    
+    # First pass: use werkzeug's secure_filename
+    safe_name = secure_filename(filename)
+    if not safe_name or safe_name == '':
+        return None
+    
+    # Second pass: enforce stricter rules
+    # Rule 1: Only allow one dot (for extension)
+    if safe_name.count('.') != 1:
+        logger.warning(f"Filename has invalid dot count: {filename}")
+        return None
+    
+    # Rule 2: No directory separators (already handled by secure_filename, but double-check)
+    if '/' in safe_name or '\\' in safe_name:
+        logger.warning(f"Filename contains directory separators: {filename}")
+        return None
+    
+    # Rule 3: Use allowlist - alphanumeric, dash, underscore, single dot
+    if not re.match(r'^[a-zA-Z0-9_-]+\.[a-zA-Z0-9]+$', safe_name):
+        logger.warning(f"Filename doesn't match allowlist pattern: {filename}")
+        return None
+    
+    # Rule 4: Prevent sequences like "..", even after replacement
+    if '..' in safe_name or safe_name.startswith('.') or safe_name.endswith('.'):
+        logger.warning(f"Filename contains dangerous sequences: {filename}")
+        return None
+    
+    # Rule 5: Validate extension is in allowed list
+    allowed_extensions = {'.bin', '.hex', '.fw', '.img'}
+    file_ext = Path(safe_name).suffix.lower()
+    if file_ext not in allowed_extensions:
+        logger.warning(f"Filename has invalid extension: {filename}")
+        return None
+    
+    return safe_name
+
+
 def _validate_and_sanitize_identifier(identifier: str) -> Optional[str]:
     """
     Validate and sanitize identifier for safe use in file paths.
@@ -55,7 +112,6 @@ def _validate_and_sanitize_identifier(identifier: str) -> Optional[str]:
         return None
     
     # Only allow alphanumeric, dash, underscore
-    import re
     if not re.match(r'^[a-zA-Z0-9_-]+$', identifier):
         return None
     
@@ -79,6 +135,7 @@ def _ensure_directories():
     
     return firmware_dir, vars_dir
 
+
 def _get_firmware_metadata(firmware_path):
     """Get metadata for a firmware file"""
     try:
@@ -95,7 +152,7 @@ def _get_firmware_metadata(firmware_path):
             'filename': firmware_path.name,
             'version': firmware_path.stem,  # Could parse from filename
             'upload_date': datetime.fromtimestamp(stat.st_mtime).isoformat(),
-            'size': f"{stat.st_size / (1024*1024):.2f}MB",
+            'size': f"{stat.st_size / (1024 * 1024):.2f}MB",
             'size_bytes': stat.st_size,
             'checksum': hash_md5.hexdigest(),
             'status': 'available'
@@ -243,18 +300,19 @@ def upload_firmware():
         if file.filename == '':
             return jsonify({'error': 'Empty filename'}), 400
         
-        # Validate file extension
-        allowed_extensions = {'.bin', '.hex', '.fw', '.img'}
-        file_ext = Path(file.filename).suffix.lower()
-        if file_ext not in allowed_extensions:
-            return jsonify({'error': f'Invalid file type. Allowed: {", ".join(allowed_extensions)}'}), 400
+        # Validate and sanitize filename using strict validation
+        safe_filename = _validate_and_sanitize_filename(file.filename)
+        if not safe_filename:
+            logger.warning(f"Invalid firmware filename rejected: {file.filename}")
+            return jsonify({'error': 'Invalid filename format'}), 400
         
         firmware_dir, _ = _ensure_directories()
         
-        # Generate unique firmware ID
+        # Generate unique firmware ID and use validated filename extension
+        file_ext = Path(safe_filename).suffix.lower()
         firmware_id = f"fw_{int(datetime.utcnow().timestamp())}"
-        safe_filename = f"{firmware_id}{file_ext}"
-        file_path = Path(firmware_dir) / safe_filename
+        final_filename = f"{firmware_id}{file_ext}"
+        file_path = Path(firmware_dir) / final_filename
         
         # Save file
         file.save(str(file_path))
@@ -273,9 +331,10 @@ def upload_firmware():
         
         result = {
             'firmware_id': firmware_id,
-            'filename': safe_filename,
+            'filename': final_filename,
             'original_filename': file.filename,
-            'size': f"{file_size / (1024*1024):.2f}MB",
+            'sanitized_filename': safe_filename,
+            'size': f"{file_size / (1024 * 1024):.2f}MB",
             'size_bytes': file_size,
             'checksum': hash_md5.hexdigest(),
             'status': 'uploaded',

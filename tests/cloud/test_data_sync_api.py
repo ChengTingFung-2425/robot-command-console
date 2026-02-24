@@ -4,7 +4,7 @@ import tempfile
 import pytest
 from flask import Flask
 
-from Cloud.api.data_sync import data_sync_bp, init_data_sync_api
+from Cloud.api.data_sync import _validate_user_id, data_sync_bp, init_data_sync_api
 
 
 @pytest.fixture
@@ -32,11 +32,49 @@ def client(app):
     return app.test_client()
 
 
-def _make_token(app_instance) -> str:
+def _make_token(user_id: str = 'user-123', role: str = 'user') -> str:
     """產生測試用 JWT token"""
     from Cloud.api.auth import CloudAuthService
     auth = CloudAuthService('test-secret-key')
-    return auth.generate_token(user_id='user-123', username='testuser', role='user')
+    return auth.generate_token(user_id=user_id, username=user_id, role=role)
+
+
+class TestValidateUserId:
+    """測試 _validate_user_id 函式的安全驗證邏輯"""
+
+    def test_valid_alphanumeric(self):
+        assert _validate_user_id('user123') is True
+
+    def test_valid_with_dash(self):
+        assert _validate_user_id('user-123') is True
+
+    def test_valid_with_underscore(self):
+        assert _validate_user_id('user_123') is True
+
+    def test_rejects_dot(self):
+        """user_id 不允許點號，防止 .. 路徑穿越"""
+        assert _validate_user_id('user.name') is False
+
+    def test_rejects_double_dot(self):
+        assert _validate_user_id('..') is False
+
+    def test_rejects_slash(self):
+        assert _validate_user_id('user/admin') is False
+
+    def test_rejects_backslash(self):
+        assert _validate_user_id('user\\admin') is False
+
+    def test_rejects_empty(self):
+        assert _validate_user_id('') is False
+
+    def test_rejects_too_long(self):
+        assert _validate_user_id('a' * 65) is False
+
+    def test_accepts_max_length(self):
+        assert _validate_user_id('a' * 64) is True
+
+    def test_rejects_path_traversal_pattern(self):
+        assert _validate_user_id('../etc/passwd') is False
 
 
 class TestDataSyncSettingsAPI:
@@ -44,7 +82,7 @@ class TestDataSyncSettingsAPI:
 
     def test_upload_settings_success(self, client, app):
         """測試上傳設定 - 成功案例"""
-        token = _make_token(app)
+        token = _make_token('user-123')
         response = client.post(
             '/api/cloud/data_sync/settings/user-123',
             json={
@@ -60,7 +98,7 @@ class TestDataSyncSettingsAPI:
 
     def test_upload_settings_missing_settings_field(self, client, app):
         """測試上傳設定 - 缺少 settings 欄位"""
-        token = _make_token(app)
+        token = _make_token('user-123')
         response = client.post(
             '/api/cloud/data_sync/settings/user-123',
             json={'edge_id': 'edge-001'},
@@ -68,20 +106,22 @@ class TestDataSyncSettingsAPI:
         )
         assert response.status_code == 400
 
-    def test_upload_settings_invalid_user_id(self, client, app):
-        """測試上傳設定 - 含路徑穿越字元的 user_id"""
-        token = _make_token(app)
+    def test_upload_settings_invalid_user_id_rejected(self, client, app):
+        """測試端點拒絕含不合法字元的 path user_id（驗證 _validate_user_id 運作）"""
+        # 使用合法的 user-123 token，但嘗試 POST 到含點號的 user_id 路徑
+        # 預期端點在 _validate_user_id 驗證階段回傳 400
+        token = _make_token('user-123')
         response = client.post(
-            '/api/cloud/data_sync/settings/../../../etc/passwd',
+            '/api/cloud/data_sync/settings/user.invalid',
             json={'settings': {}},
             headers={'Authorization': f'Bearer {token}'}
         )
-        # Flask 不允許含 .. 的路由，回傳 404
-        assert response.status_code == 404
+        # user.invalid 含點號，被 _validate_user_id 拒絕 → 400
+        assert response.status_code == 400
 
     def test_download_settings_success(self, client, app):
         """測試下載設定 - 成功案例（先上傳再下載）"""
-        token = _make_token(app)
+        token = _make_token('user-456')
         settings = {'theme': 'light', 'language': 'en'}
 
         # 先上傳
@@ -104,7 +144,7 @@ class TestDataSyncSettingsAPI:
 
     def test_download_settings_not_found(self, client, app):
         """測試下載設定 - 設定不存在"""
-        token = _make_token(app)
+        token = _make_token('nonexistent-user')
         response = client.get(
             '/api/cloud/data_sync/settings/nonexistent-user',
             headers={'Authorization': f'Bearer {token}'}
@@ -116,13 +156,51 @@ class TestDataSyncSettingsAPI:
         response = client.get('/api/cloud/data_sync/settings/user-123')
         assert response.status_code == 401
 
+    def test_download_settings_forbidden_other_user(self, client, app):
+        """測試下載其他用戶的設定 - 應被拒絕（403）"""
+        # user-123 嘗試存取 user-456 的設定
+        token = _make_token('user-123')
+        response = client.get(
+            '/api/cloud/data_sync/settings/user-456',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert response.status_code == 403
+
+    def test_upload_settings_forbidden_other_user(self, client, app):
+        """測試上傳到其他用戶的設定 - 應被拒絕（403）"""
+        token = _make_token('user-123')
+        response = client.post(
+            '/api/cloud/data_sync/settings/user-999',
+            json={'settings': {'theme': 'dark'}},
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert response.status_code == 403
+
+    def test_admin_can_access_other_user_settings(self, client, app):
+        """測試 admin 角色可以存取其他用戶的設定"""
+        # 先用 user-456 上傳設定
+        user_token = _make_token('user-456')
+        client.post(
+            '/api/cloud/data_sync/settings/user-456',
+            json={'settings': {'theme': 'light'}},
+            headers={'Authorization': f'Bearer {user_token}'}
+        )
+
+        # admin 應可下載 user-456 的設定
+        admin_token = _make_token('admin-001', role='admin')
+        response = client.get(
+            '/api/cloud/data_sync/settings/user-456',
+            headers={'Authorization': f'Bearer {admin_token}'}
+        )
+        assert response.status_code == 200
+
 
 class TestDataSyncHistoryAPI:
     """測試指令歷史同步端點"""
 
     def test_upload_history_success(self, client, app):
         """測試上傳歷史 - 成功案例"""
-        token = _make_token(app)
+        token = _make_token('user-123')
         records = [
             {'command_id': 'cmd-001', 'status': 'succeeded', 'robot_id': 'robot-1'},
             {'command_id': 'cmd-002', 'status': 'failed', 'robot_id': 'robot-1'},
@@ -140,7 +218,7 @@ class TestDataSyncHistoryAPI:
 
     def test_upload_history_deduplication(self, client, app):
         """測試上傳歷史 - 重複記錄去重"""
-        token = _make_token(app)
+        token = _make_token('user-123')
         records = [{'command_id': 'cmd-001', 'status': 'succeeded'}]
 
         # 上傳兩次相同的記錄
@@ -161,7 +239,7 @@ class TestDataSyncHistoryAPI:
 
     def test_upload_history_missing_records_field(self, client, app):
         """測試上傳歷史 - 缺少 records 欄位"""
-        token = _make_token(app)
+        token = _make_token('user-123')
         response = client.post(
             '/api/cloud/data_sync/history/user-123',
             json={'edge_id': 'edge-001'},
@@ -171,7 +249,7 @@ class TestDataSyncHistoryAPI:
 
     def test_download_history_success(self, client, app):
         """測試下載歷史 - 成功案例"""
-        token = _make_token(app)
+        token = _make_token('user-789')
         records = [
             {'command_id': 'cmd-001', 'status': 'succeeded'},
             {'command_id': 'cmd-002', 'status': 'failed'},
@@ -197,7 +275,7 @@ class TestDataSyncHistoryAPI:
 
     def test_download_history_empty(self, client, app):
         """測試下載歷史 - 無歷史記錄"""
-        token = _make_token(app)
+        token = _make_token('no-history-user')
         response = client.get(
             '/api/cloud/data_sync/history/no-history-user',
             headers={'Authorization': f'Bearer {token}'}
@@ -210,7 +288,7 @@ class TestDataSyncHistoryAPI:
 
     def test_download_history_pagination(self, client, app):
         """測試下載歷史 - 分頁查詢"""
-        token = _make_token(app)
+        token = _make_token('user-page')
         records = [{'command_id': f'cmd-{i:03d}', 'status': 'succeeded'} for i in range(10)]
 
         client.post(
@@ -241,3 +319,40 @@ class TestDataSyncHistoryAPI:
         """測試歷史端點需要認證"""
         response = client.get('/api/cloud/data_sync/history/user-123')
         assert response.status_code == 401
+
+    def test_download_history_forbidden_other_user(self, client, app):
+        """測試下載其他用戶的歷史 - 應被拒絕（403）"""
+        token = _make_token('user-123')
+        response = client.get(
+            '/api/cloud/data_sync/history/user-456',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert response.status_code == 403
+
+    def test_upload_history_forbidden_other_user(self, client, app):
+        """測試上傳到其他用戶的歷史 - 應被拒絕（403）"""
+        token = _make_token('user-123')
+        response = client.post(
+            '/api/cloud/data_sync/history/user-999',
+            json={'records': [{'command_id': 'cmd-001'}]},
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert response.status_code == 403
+
+    def test_admin_can_access_other_user_history(self, client, app):
+        """測試 admin 角色可以存取其他用戶的歷史"""
+        # 先用 user-789 上傳
+        user_token = _make_token('user-789')
+        client.post(
+            '/api/cloud/data_sync/history/user-789',
+            json={'records': [{'command_id': 'cmd-001'}]},
+            headers={'Authorization': f'Bearer {user_token}'}
+        )
+
+        # admin 應可下載 user-789 的歷史
+        admin_token = _make_token('admin-001', role='admin')
+        response = client.get(
+            '/api/cloud/data_sync/history/user-789',
+            headers={'Authorization': f'Bearer {admin_token}'}
+        )
+        assert response.status_code == 200

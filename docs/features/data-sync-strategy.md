@@ -62,6 +62,25 @@ Cloud/api/
 
 ---
 
+## Cloud API 整合方式
+
+在 Flask 應用程式中註冊 Blueprint 並初始化：
+
+```python
+from flask import Flask
+from Cloud.api.data_sync import data_sync_bp, init_data_sync_api
+
+app = Flask(__name__)
+app.register_blueprint(data_sync_bp)
+
+init_data_sync_api(
+    jwt_secret='your-secret-key',
+    storage_path='/var/data/cloud_sync'
+)
+```
+
+---
+
 ## Cloud API 端點
 
 ### 用戶設定同步
@@ -265,12 +284,23 @@ local_cmd = sync_service.download_and_import_command(
 ### 認證
 所有 Cloud API 端點需要 JWT token（`Authorization: Bearer <token>`）。
 
-### 路徑安全
-`user_id` 參數只允許 `A-Za-z0-9._-` 字元，防止路徑穿越攻擊。
+### 授權（資料隔離）
+每個端點在驗證 JWT token 後，會進一步比對 token 中的 `user_id` 與 URL 路徑中的 `user_id`：
+- **一般用戶**：只能存取自己的設定與歷史（`token.user_id == path.user_id`）
+- **Admin 角色**：可以存取任意用戶的資料（用於管理用途）
+- 不符合條件時返回 `403 Forbidden`
 
-### 資料隔離
-- 每個用戶的設定和歷史獨立儲存
-- JWT token 驗證確保只有授權用戶可以存取自己的資料
+```python
+# 認證通過後的授權邏輯示意
+if token.role != 'admin' and token.user_id != path_user_id:
+    return 403 Forbidden
+```
+
+### 路徑安全
+`user_id` 參數只允許 `A-Za-z0-9_-` 字元且長度 1-64，防止路徑穿越攻擊。點號（`.`）等特殊字元會被拒絕。
+
+### 併發安全
+歷史記錄的讀寫操作使用執行緒鎖（threading.Lock），防止同一用戶的歷史檔案在高併發情境下發生競態條件。
 
 ---
 

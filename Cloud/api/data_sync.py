@@ -193,10 +193,18 @@ def download_settings(user_id: str):
 
     try:
         settings_path = _get_settings_path(user_id)
-        if not settings_path.exists():
+        # 防禦性檢查：確保路徑位於 _storage_path 根目錄之下
+        root_path = _storage_path.resolve()
+        resolved_settings_path = settings_path.resolve()
+        try:
+            resolved_settings_path.relative_to(root_path)
+        except ValueError:
+            return jsonify({"success": False, "error": "Invalid user_id"}), 400
+
+        if not resolved_settings_path.exists():
             return jsonify({"success": False, "error": "Settings not found"}), 404
 
-        with open(settings_path, 'r', encoding='utf-8') as f:
+        with open(resolved_settings_path, 'r', encoding='utf-8') as f:
             payload = json.load(f)
 
         return jsonify({"success": True, "data": payload})

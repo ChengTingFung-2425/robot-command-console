@@ -311,6 +311,112 @@ class CloudSyncService:
         except Exception as e:
             logger.warning(f"Failed to cleanup cache: {e}")
 
+    # ==================== 用戶設定同步 ====================
+
+    def sync_user_settings(
+        self,
+        user_id: str,
+        settings: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """將本地用戶設定同步（備份）到雲端
+
+        Edge 為主要來源，雲端為備份。當用戶更新設定後呼叫此方法
+        將最新設定上傳到雲端，供日後還原或在新裝置上使用。
+
+        Args:
+            user_id: 用戶 ID
+            settings: 用戶設定字典（例如語言、主題、通知偏好等）
+
+        Returns:
+            Dict[str, Any]: 同步結果
+                - success: 是否成功
+                - updated_at: 更新時間（成功時）
+                - error: 錯誤訊息（失敗時）
+        """
+        try:
+            response = self.client.upload_user_settings(
+                user_id=user_id,
+                settings=settings,
+                edge_id=self.edge_id
+            )
+            if response.get('success'):
+                logger.info(f"User settings synced to cloud for user '{user_id}'")
+            else:
+                logger.warning(f"Failed to sync settings for user '{user_id}'")
+            return response
+        except Exception as e:
+            logger.error(f"Error syncing user settings for '{user_id}': {e}")
+            return {'success': False, 'error': str(e)}
+
+    def restore_user_settings(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """從雲端下載用戶設定（還原備份）
+
+        從雲端備份還原用戶設定，適用於新裝置初始化或設定重置後的還原。
+
+        Args:
+            user_id: 用戶 ID
+
+        Returns:
+            Optional[Dict[str, Any]]: 用戶設定字典，若雲端無備份則返回 None
+        """
+        try:
+            response = self.client.download_user_settings(user_id=user_id)
+            if response.get('success'):
+                data = response.get('data', {})
+                settings = data.get('settings')
+                logger.info(f"Restored settings from cloud for user '{user_id}'")
+                return settings
+            else:
+                logger.warning(f"No cloud settings found for user '{user_id}'")
+                return None
+        except Exception as e:
+            logger.error(f"Error restoring user settings for '{user_id}': {e}")
+            return None
+
+    # ==================== 指令歷史同步 ====================
+
+    def sync_command_history(
+        self,
+        user_id: str,
+        records: list
+    ) -> Dict[str, Any]:
+        """將指令執行歷史上傳到雲端
+
+        將本地 CommandRecord 記錄批次上傳到雲端，用於分析、備份及跨裝置查詢。
+        雲端會自動以 command_id 去重，避免重複記錄。
+
+        Args:
+            user_id: 用戶 ID
+            records: 指令歷史記錄列表，每筆為 dict 格式（CommandRecord.to_dict()）
+
+        Returns:
+            Dict[str, Any]: 同步結果
+                - success: 是否成功
+                - synced_count: 本次新增的記錄數
+                - total: 雲端總記錄數
+                - error: 錯誤訊息（失敗時）
+        """
+        if not records:
+            return {'success': True, 'synced_count': 0, 'total': 0}
+
+        try:
+            response = self.client.upload_command_history(
+                user_id=user_id,
+                records=records,
+                edge_id=self.edge_id
+            )
+            if response.get('success'):
+                logger.info(
+                    f"Command history synced for user '{user_id}': "
+                    f"{response.get('synced_count', 0)} records added"
+                )
+            else:
+                logger.warning(f"Failed to sync history for user '{user_id}'")
+            return response
+        except Exception as e:
+            logger.error(f"Error syncing command history for '{user_id}': {e}")
+            return {'success': False, 'error': str(e)}
+
     def get_cloud_status(self) -> Dict[str, Any]:
         """取得雲端服務狀態
 

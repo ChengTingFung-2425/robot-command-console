@@ -1,15 +1,26 @@
 # Edge ↔ Cloud 同步模組
 
-此模組提供 Edge 應用程式與 Cloud 雲端服務之間的進階指令同步功能。
+此模組提供 Edge 應用程式與 Cloud 雲端服務之間的資料同步功能。
 
 ## 功能概覽
 
+### 進階指令同步
 - ✅ 上傳本地已批准的進階指令到雲端
 - ✅ 從雲端瀏覽與搜尋共享指令
 - ✅ 下載雲端指令到本地
 - ✅ 雲端服務健康檢查
 - ✅ 批量同步功能
 - ✅ 錯誤處理與重試
+
+### 用戶設定同步
+- ✅ 備份本地用戶設定到雲端
+- ✅ 從雲端還原用戶設定
+- ✅ 雙向同步（Edge 為主要來源，Cloud 為備份）
+
+### 指令歷史同步
+- ✅ 上傳指令執行歷史到雲端（分析與備份）
+- ✅ 從雲端下載歷史記錄（分頁查詢）
+- ✅ 自動去重（以 command_id 為依據）
 
 ## 模組結構
 
@@ -88,6 +99,47 @@ if status['available']:
     print(f"Categories: {len(status.get('categories', []))}")
 else:
     print("Cloud service is unavailable")
+```
+
+### 同步用戶設定（備份）
+
+```python
+# 備份本地用戶設定到雲端
+result = sync_service.sync_user_settings(
+    user_id='user-123',
+    settings={'theme': 'dark', 'language': 'zh-TW'}
+)
+
+if result.get('success'):
+    print(f"Settings backed up at {result['updated_at']}")
+```
+
+### 還原用戶設定（從雲端備份）
+
+```python
+# 在新裝置或重置後從雲端還原設定
+settings = sync_service.restore_user_settings(user_id='user-123')
+
+if settings:
+    print(f"Restored settings: {settings}")
+else:
+    print("No cloud backup found, using defaults")
+```
+
+### 同步指令執行歷史
+
+```python
+from Edge.robot_service.command_history_manager import CommandHistoryManager
+
+history_manager = CommandHistoryManager()
+records = history_manager.get_command_history(limit=500)
+
+result = sync_service.sync_command_history(
+    user_id='user-123',
+    records=[r.to_dict() for r in records]
+)
+
+print(f"Synced {result.get('synced_count', 0)} history records")
 ```
 
 ## 配置選項

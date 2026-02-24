@@ -113,6 +113,7 @@ python3 -m flake8 src/ MCP/ --select=E,F,W --exclude=.venv,node_modules,__pycach
 | **架構** | [architecture.md](architecture.md) |
 | **規劃** | [plans/MASTER_PLAN.md](plans/MASTER_PLAN.md) |
 | **開發指南** | [development/](development/) |
+| **🔖 函式庫說明** | [development/LIBRARY_REFERENCE.md](development/LIBRARY_REFERENCE.md) — 各套件用途、使用位置、選型理由 |
 | **安全文件** | [security/TOKEN_SECURITY.md](security/TOKEN_SECURITY.md) |
 | **使用者指引** | [user_guide/USER_GUIDE_INDEX.md](user_guide/USER_GUIDE_INDEX.md) |
 | **詳細經驗** | [memory/](memory/)（Phase 3, CLI, TUI, 安全性等） |

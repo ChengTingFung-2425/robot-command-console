@@ -21,6 +21,96 @@
 
 ## ⚠️ 常見錯誤提醒（AI 助手必讀）
 
+### 🔐 資訊洩露防護 Notes（API Exception Handling）
+
+**禁止在 API 回應中使用 `str(e)` 暴露例外細節：**
+
+```python
+# ❌ 危險：洩露 Python 例外類別名稱與內部路徑/邏輯
+# Flask
+except InvalidRoleError as e:
+    return jsonify({"message": str(e)}), 400
+
+# FastAPI
+except Exception as e:
+    raise HTTPException(status_code=500, detail=str(e))
+
+# WebSocket
+await websocket.close(code=1011, reason=f"串流錯誤: {str(e)}")
+
+# ✅ 正確（Flask）：catch 例外但只回傳通用語意訊息
+except InvalidRoleError:
+    return jsonify({"error": "Bad Request", "message": "Invalid role specified"}), 400
+
+except ValueError:
+    return jsonify({"error": "Not Found", "message": "Data not found"}), 404
+
+except Exception:
+    logger.exception("Failed to ...")        # stack trace 寫入 log
+    return jsonify({"error": "Internal Server Error"}), 500
+
+# ✅ 正確（FastAPI）：
+except Exception:
+    logger.exception("...", exc_info=True)   # 細節寫 log
+    raise HTTPException(status_code=500, detail="Internal server error")
+
+# ✅ 正確（WebSocket）：
+await websocket.close(code=1011, reason="Stream error")
+
+# ✅ 允許（logger.error extra={}）：這是後端日誌，不送給客戶端
+logger.error("...", extra={'error': str(e)}, exc_info=True)
+```
+
+**通用語意對照表**：
+
+| 例外類別 | 對客戶端的訊息 | HTTP 狀態碼 |
+|----------|--------------|-------------|
+| `UserNotFoundError` | User not found | 404 |
+| `UserAlreadyExistsError` | User already exists | 409 |
+| `InvalidRoleError` | Invalid role specified | 400 |
+| `ValueError`（業務邏輯）| Data not exist / Invalid input value | 404 / 400 |
+| 任何未預期例外 | Internal Server Error（不含細節） | 500 |
+
+**修復記錄（2026-02-24）**：
+- `Cloud/user_management/api.py`：移除所有 `str(e)` 直接回傳（Flask jsonify）
+- `Edge/MCP/api.py`：移除 16 個 `HTTPException(detail=str(e))` + 1 個 WebSocket reason（FastAPI）
+
+### 🔒 路徑穿越（Path Traversal）修復模式
+
+**`startswith` 路徑檢查存在繞過漏洞，禁止使用：**
+
+```python
+# ❌ 危險：/tmp/storage_evil 會通過此檢查（startswith 繞過）
+if not str(path.resolve()).startswith(str(base.resolve())):
+    raise ValueError("Path traversal detected")
+
+# ✅ 首選：werkzeug.safe_join（專案已有 Werkzeug 依賴）
+from werkzeug.utils import safe_join
+safe_path = safe_join(str(base_dir), user_input)
+if safe_path is None:          # None 表示路徑穿越被攔截
+    raise ValueError("Path traversal detected")
+file_path = Path(safe_path)   # 確認安全後再轉成 Path
+
+# ✅ 備選：Python 3.9+ is_relative_to（stdlib，無額外依賴）
+if not path.resolve().is_relative_to(base.resolve()):
+    raise ValueError("Path traversal detected")
+```
+
+**為何 `startswith` 不安全**：
+- `base = /tmp/storage`，攻擊者輸入使路徑變成 `/tmp/storage_evil`
+- `/tmp/storage_evil` 確實以 `/tmp/storage` **開頭**，`startswith` 會放行
+- `safe_join` 和 `is_relative_to` 均不受此繞過影響
+
+**`werkzeug.safe_join` 的優勢**：
+- 路徑建構與安全驗證一次完成，程式碼更簡潔
+- 同時防禦：`../` 穿越、絕對路徑注入、`startswith` 繞過
+- 專案已依賴 Werkzeug（Flask 生態系標準），無需新增依賴
+- 返回 `None` 語意明確，不需 try/except
+
+**修復記錄（2026-02-24）**：
+- `Cloud/api/storage.py` L76–L84：`upload_file()` 路徑建構改用 `safe_join`
+- `Edge/qtwebview-app/routes_firmware_tiny.py` L653–L660：`robot_variables()` 路徑檢查改用 `safe_join`
+
 ### 🔍 Linting 錯誤（最常見）
 
 **在每次代碼變更後，務必執行 linting 檢查**：
@@ -77,6 +167,7 @@ python3 -m flake8 src/ MCP/ --select=E,F,W --exclude=.venv,node_modules,__pycach
 | **架構** | [architecture.md](architecture.md) |
 | **規劃** | [plans/MASTER_PLAN.md](plans/MASTER_PLAN.md) |
 | **開發指南** | [development/](development/) |
+| **🔖 函式庫說明** | [development/LIBRARY_REFERENCE.md](development/LIBRARY_REFERENCE.md) — 各套件用途、使用位置、選型理由 |
 | **安全文件** | [security/TOKEN_SECURITY.md](security/TOKEN_SECURITY.md) |
 | **使用者指引** | [user_guide/USER_GUIDE_INDEX.md](user_guide/USER_GUIDE_INDEX.md) |
 | **詳細經驗** | [memory/](memory/)（Phase 3, CLI, TUI, 安全性等） |
@@ -102,6 +193,8 @@ python3 -m flake8 src/ MCP/ --select=E,F,W --exclude=.venv,node_modules,__pycach
 |------|------|----------|
 | [security_lessons.md](memory/security_lessons.md) | 安全最佳實踐 | Token 生成、動作驗證、密碼處理、審計日誌 |
 | [phase3_2_lessons.md](memory/phase3_2_lessons.md) | CodeQL 安全修復 | 路徑遍歷防護、資訊洩露防護、安全事件日誌 |
+| PROJECT_MEMORY.md（本文件）| **路徑穿越修復模式** | **`startswith` 繞過漏洞、`werkzeug.safe_join` 首選用法** |
+| PROJECT_MEMORY.md（本文件）| **🔐 API 資訊洩露防護 Notes** | **禁止 `str(e)` 回傳例外、通用語意訊息對照表** |
 
 ### 🛠️ 開發工具系列
 
@@ -169,6 +262,34 @@ TROUBLESHOOTING.md     - 系統化診斷流程
 FEATURES_REFERENCE.md  - 完整功能說明
 WEBUI_USER_GUIDE.md    - 介面詳細指南
 ```
+
+### 0.5 路徑穿越防護：werkzeug.safe_join ⭐⭐⭐
+
+**使用頻率**：每次處理使用者輸入路徑
+**修復日期**：2026-02-24
+
+**核心原則**：`str(path).startswith(str(base))` 有繞過漏洞，專案中禁止使用。
+
+```python
+# ✅ 首選（Werkzeug 已在 requirements.txt，Flask 生態標準）
+from werkzeug.utils import safe_join
+safe_path = safe_join(str(base_dir), user_input_a, user_input_b)
+if safe_path is None:           # None = 路徑穿越被攔截
+    raise ValueError("Path traversal detected")
+file_path = Path(safe_path)     # 確認安全後使用
+
+# ✅ 備選（stdlib，需 Python 3.9+）
+if not Path(user_path).resolve().is_relative_to(Path(base_dir).resolve()):
+    raise ValueError("Path traversal detected")
+
+# ❌ 禁止（startswith 繞過：/base_dir_evil 會通過此檢查）
+if not str(path.resolve()).startswith(str(base.resolve())):
+    ...
+```
+
+**修復的檔案**：
+- `Cloud/api/storage.py` — `upload_file()` 使用 `safe_join` 同時建路徑 + 驗安全
+- `Edge/qtwebview-app/routes_firmware_tiny.py` — `robot_variables()` 使用 `safe_join`
 
 ### 1. Linting 自動修正（最常用）⭐⭐⭐
 

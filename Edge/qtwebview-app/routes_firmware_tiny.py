@@ -14,7 +14,7 @@ import json
 import hashlib
 from pathlib import Path
 from typing import Optional
-from werkzeug.utils import secure_filename
+from werkzeug.utils import secure_filename, safe_join
 import re
 
 # Add parent directories to path for imports
@@ -651,20 +651,13 @@ def robot_variables(robot_id):
     
     try:
         _, vars_dir = _ensure_directories()
-        # Use sanitized identifier for path construction
-        vars_file = Path(vars_dir) / f"{safe_robot_id}.json"
-        
-        # Additional safety check: ensure resolved path is within vars_dir
-        try:
-            vars_file_resolved = vars_file.resolve()
-            vars_dir_resolved = Path(vars_dir).resolve()
-            if not str(vars_file_resolved).startswith(str(vars_dir_resolved)):
-                logger.error(f"Path traversal attempt detected: {robot_id}")
-                return jsonify({'error': 'Invalid robot_id'}), 400
-        except (OSError, RuntimeError) as e:
-            logger.error(f"Path resolution error for robot_id {robot_id}: {e}")
+        # Use werkzeug.safe_join to construct path and prevent traversal in one step
+        safe_path = safe_join(vars_dir, f"{safe_robot_id}.json")
+        if safe_path is None:
+            logger.error(f"Path traversal attempt detected: {robot_id}")
             return jsonify({'error': 'Invalid robot_id'}), 400
-        
+        vars_file = Path(safe_path)
+
         if request.method == 'GET':
             # Get actual robot variables from storage
             if vars_file.exists():

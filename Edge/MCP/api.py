@@ -358,7 +358,7 @@ async def create_command(request: CommandRequest):
             'error': str(e)
         }, exc_info=True)
 
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @v1_router.get("/command/{command_id}")
@@ -673,7 +673,7 @@ async def stream_media(websocket: WebSocket, robot_id: str):
             'robot_id': robot_id,
             'error': str(e)
         }, exc_info=True)
-        await websocket.close(code=1011, reason=f"串流錯誤: {str(e)}")
+        await websocket.close(code=1011, reason="Stream error")
     finally:
         ACTIVE_WEBSOCKETS.dec()
 
@@ -724,7 +724,7 @@ async def process_audio_command(request: AudioCommandRequest):
 
     except Exception as e:
         logger.error(f"處理音訊指令失敗: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ===== LLM 提供商管理 API =====
@@ -804,7 +804,7 @@ async def invoke_llm_with_tools(
         raise
     except Exception as e:
         logger.error(f"LLM 呼叫失敗: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @v1_router.get("/llm/tools")
@@ -824,7 +824,7 @@ async def get_mcp_tools():
         }
     except Exception as e:
         logger.error(f"取得工具定義失敗: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @v1_router.get("/llm/providers")
@@ -842,7 +842,7 @@ async def list_llm_providers():
         }
     except Exception as e:
         logger.error(f"列出 LLM 提供商失敗: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @v1_router.get("/llm/providers/health")
@@ -870,7 +870,7 @@ async def get_providers_health():
         }
     except Exception as e:
         logger.error(f"取得提供商健康狀態失敗: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @v1_router.post("/llm/providers/discover")
@@ -904,7 +904,7 @@ async def discover_llm_providers(host: str = "localhost", timeout: int = 5):
         }
     except Exception as e:
         logger.error(f"偵測 LLM 提供商失敗: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @v1_router.post("/llm/providers/select")
@@ -927,7 +927,7 @@ async def select_llm_provider(provider_name: str):
         raise
     except Exception as e:
         logger.error(f"選擇 LLM 提供商失敗: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @v1_router.get("/llm/providers/{provider_name}/models")
@@ -969,7 +969,7 @@ async def list_provider_models(provider_name: str):
         raise
     except Exception as e:
         logger.error(f"列出提供商模型失敗: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @v1_router.post("/llm/providers/{provider_name}/refresh")
@@ -995,7 +995,7 @@ async def refresh_provider_health(provider_name: str):
         raise
     except Exception as e:
         logger.error(f"重新檢查提供商健康狀態失敗: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ===== 連線狀態與警告 API =====
@@ -1131,7 +1131,7 @@ async def list_plugins(
 
     except Exception as e:
         logger.error(f"列出插件失敗: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @v1_router.get("/plugins/health")
@@ -1148,7 +1148,7 @@ async def get_plugins_health():
 
     except Exception as e:
         logger.error(f"取得插件健康狀態失敗: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @v1_router.get("/plugins/{plugin_name}/commands")
@@ -1180,7 +1180,7 @@ async def get_plugin_commands(plugin_name: str):
         raise
     except Exception as e:
         logger.error(f"取得插件指令失敗: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @v1_router.post("/plugins/{plugin_name}/execute")
@@ -1217,7 +1217,7 @@ async def execute_plugin_command(
 
     except Exception as e:
         logger.error(f"執行插件指令失敗: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @v1_router.get("/devices/{device_name}/info")
@@ -1242,7 +1242,7 @@ async def get_device_info(device_name: str):
         raise
     except Exception as e:
         logger.error(f"取得裝置資訊失敗: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @v1_router.post("/devices/{device_name}/read")
@@ -1268,7 +1268,7 @@ async def read_device_data(
 
     except Exception as e:
         logger.error(f"讀取裝置資料失敗: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # 註冊 v1 router

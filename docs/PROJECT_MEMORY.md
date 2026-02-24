@@ -886,7 +886,26 @@ def get_robot_status():
 
 ## 🔄 最近更新
 
-### 2025-12-17: 方案 B Phase 1 - Server 端 JWT Token 認證 API 實作
+### 2026-02-24: 雲端同步先後發送機制與本地快取（Phase 3.3）
+
+- 新增 `Edge/cloud_sync/sync_queue.py`：CloudSyncQueue（SQLite-backed FIFO 佇列）
+  - 以 `seq` 整數欄位確保先後發送順序（FIFO）
+  - SQLite 落盤持久化，程式重啟後佇列仍保留
+  - 支援批次發送（`batch_size`）、重試（`max_retry_count`）
+  - 執行緒安全（`threading.RLock`）
+- 增強 `Edge/cloud_sync/sync_service.py`：CloudSyncService 整合佇列
+  - `sync_user_settings` / `sync_command_history`：雲端不可用時自動入隊
+  - 新增 `set_cloud_available`、`flush_queue`、`get_queue_statistics` 方法
+  - `get_cloud_status` 現在包含 `sync_queue` 統計
+- 更新 `Edge/cloud_sync/__init__.py`：匯出 `CloudSyncQueue`
+- 新增 `tests/edge/test_cloud_sync_queue.py`：19 個單元測試（100% 通過）
+- 更新 `tests/edge/test_cloud_sync_service.py`：修正失敗行為測試（queued 取代 error）
+- 更新 `docs/features/data-sync-strategy.md`：補充先後發送機制架構說明與範例
+
+**關鍵設計決策**：
+- 「先試後快取」策略：先直接呼叫 API，失敗才入隊，成功路徑無額外開銷
+- `batch_all_failed` 停止機制：整批失敗（表示離線）才停止 flush 循環，避免無限重試
+- 回應格式變更：`sync_user_settings` / `sync_command_history` 失敗時回傳 `{success: False, queued: True, op_id: ...}` 而非 `{success: False, error: ...}`
 - 實作 Server 端認證 API 模組（WebUI/app/auth_api.py）
 - 5 個 API 端點：/api/auth/login, refresh, verify, revoke, me
 - JWT Token 策略：Access 15分鐘 + Refresh 7天 + Device ID 綁定

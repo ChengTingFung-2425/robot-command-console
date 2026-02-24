@@ -399,7 +399,7 @@ class TestCloudSyncService(unittest.TestCase):
 
     @patch('Edge.cloud_sync.sync_service.CloudSyncClient')
     def test_sync_user_settings_failure(self, mock_client_class):
-        """測試同步用戶設定 - 失敗案例（API 異常）"""
+        """測試同步用戶設定 - API 異常時自動快取到本地佇列"""
         import requests as req
         mock_client = Mock()
         mock_client.upload_user_settings.side_effect = req.RequestException("Connection failed")
@@ -416,7 +416,9 @@ class TestCloudSyncService(unittest.TestCase):
         )
 
         assert result['success'] is False
-        assert 'error' in result
+        # 雲端不可用時應自動快取（queued=True）
+        assert result.get('queued') is True
+        assert 'op_id' in result
 
     @patch('Edge.cloud_sync.sync_service.CloudSyncClient')
     def test_restore_user_settings_success(self, mock_client_class):
@@ -513,7 +515,7 @@ class TestCloudSyncService(unittest.TestCase):
 
     @patch('Edge.cloud_sync.sync_service.CloudSyncClient')
     def test_sync_command_history_failure(self, mock_client_class):
-        """測試同步指令歷史 - 失敗案例"""
+        """測試同步指令歷史 - API 異常時自動快取到本地佇列"""
         import requests as req
         mock_client = Mock()
         mock_client.upload_command_history.side_effect = req.RequestException("Timeout")
@@ -530,7 +532,71 @@ class TestCloudSyncService(unittest.TestCase):
         )
 
         assert result['success'] is False
-        assert 'error' in result
+        # 雲端不可用時應自動快取（queued=True）
+        assert result.get('queued') is True
+        assert 'op_id' in result
+
+    @patch('Edge.cloud_sync.sync_service.CloudSyncClient')
+    def test_flush_queue_sends_cached_items(self, mock_client_class):
+        """測試 flush_queue 補發快取的失敗操作"""
+        import requests as req
+        mock_client = Mock()
+        # 第一次呼叫失敗，第二次成功（模擬先斷線後恢復）
+        mock_client.upload_user_settings.side_effect = [
+            req.RequestException("Connection failed"),
+            {'success': True, 'updated_at': '2026-01-01T00:00:00Z'}
+        ]
+        mock_client_class.return_value = mock_client
+
+        service = CloudSyncService(
+            cloud_api_url=self.cloud_api_url,
+            edge_id=self.edge_id
+        )
+
+        # 第一次同步失敗 → 自動快取
+        result = service.sync_user_settings(
+            user_id='user-123',
+            settings={'theme': 'dark'}
+        )
+        assert result.get('queued') is True
+
+        # 標記雲端恢復並補發
+        service.set_cloud_available(True)
+        flush_result = service.flush_queue()
+        assert flush_result['sent'] == 1
+        assert flush_result['remaining'] == 0
+        mock_client.upload_user_settings.assert_called()
+
+    @patch('Edge.cloud_sync.sync_service.CloudSyncClient')
+    def test_get_queue_statistics(self, mock_client_class):
+        """測試 get_queue_statistics 返回正確統計"""
+        mock_client_class.return_value = Mock()
+
+        service = CloudSyncService(
+            cloud_api_url=self.cloud_api_url,
+            edge_id=self.edge_id
+        )
+
+        stats = service.get_queue_statistics()
+        assert 'pending' in stats
+        assert 'total_enqueued' in stats
+        assert 'is_online' in stats
+
+    @patch('Edge.cloud_sync.sync_service.CloudSyncClient')
+    def test_get_cloud_status_includes_queue_stats(self, mock_client_class):
+        """測試 get_cloud_status 包含同步佇列統計"""
+        mock_client = Mock()
+        mock_client.health_check.return_value = False
+        mock_client_class.return_value = mock_client
+
+        service = CloudSyncService(
+            cloud_api_url=self.cloud_api_url,
+            edge_id=self.edge_id
+        )
+
+        status = service.get_cloud_status()
+        assert 'sync_queue' in status
+        assert 'pending' in status['sync_queue']
 
 
 if __name__ == '__main__':

@@ -115,10 +115,11 @@ def create_user():
         )
         return jsonify({"user": user.to_dict()}), 201
     except UserAlreadyExistsError:
-        # Do not expose internal exception details to the client
         return jsonify({"error": "Conflict", "message": "User already exists"}), 409
-    except (InvalidRoleError, ValueError) as e:
-        return jsonify({"error": "Bad Request", "message": str(e)}), 400
+    except InvalidRoleError:
+        return jsonify({"error": "Bad Request", "message": "Invalid role specified"}), 400
+    except ValueError:
+        return jsonify({"error": "Bad Request", "message": "Invalid input value"}), 400
     except Exception:
         logger.exception("Failed to create user")
         return jsonify({"error": "Internal Server Error"}), 500
@@ -189,8 +190,8 @@ def update_role(user_id: str):
         return jsonify({"user": user.to_dict()}), 200
     except UserNotFoundError:
         return jsonify({"error": "Not Found", "message": "User not found"}), 404
-    except InvalidRoleError as e:
-        return jsonify({"error": "Bad Request", "message": str(e)}), 400
+    except InvalidRoleError:
+        return jsonify({"error": "Bad Request", "message": "Invalid role specified"}), 400
     except Exception:
         logger.exception("Failed to update role for %s", user_id)
         return jsonify({"error": "Internal Server Error"}), 500
@@ -289,8 +290,8 @@ def unlink_edge(user_id: str, edge_id: str):
         return jsonify({"user": user.to_dict(), "message": "Edge identity unlinked"}), 200
     except UserNotFoundError:
         return jsonify({"error": "Not Found", "message": "User not found"}), 404
-    except ValueError as e:
-        return jsonify({"error": "Not Found", "message": str(e)}), 404
+    except ValueError:
+        return jsonify({"error": "Not Found", "message": "Edge identity not found"}), 404
     except Exception:
         logger.exception("Failed to unlink edge for %s", user_id)
         return jsonify({"error": "Internal Server Error"}), 500

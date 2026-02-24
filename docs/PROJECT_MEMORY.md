@@ -21,6 +21,50 @@
 
 ## ⚠️ 常見錯誤提醒（AI 助手必讀）
 
+### 🔐 資訊洩露防護 Notes（API Exception Handling）
+
+**禁止在 API 回應中使用 `str(e)` 暴露例外細節：**
+
+```python
+# ❌ 危險：洩露 Python 例外類別名稱與內部路徑/邏輯
+except InvalidRoleError as e:
+    return jsonify({"message": str(e)}), 400    # str(e) 可能含內部資訊
+
+except ValueError as e:
+    return jsonify({"message": str(e)}), 404    # 同上
+
+# ✅ 正確：catch 例外但只回傳通用語意訊息（不含堆疊或類別名稱）
+except InvalidRoleError:
+    return jsonify({"error": "Bad Request", "message": "Invalid role specified"}), 400
+
+except ValueError:
+    return jsonify({"error": "Not Found", "message": "Data not exist"}), 404
+
+except UserNotFoundError:
+    return jsonify({"error": "Not Found", "message": "User not found"}), 404
+
+except UserAlreadyExistsError:
+    return jsonify({"error": "Conflict", "message": "User already exists"}), 409
+
+# ✅ 內部錯誤：只記錄 log，不回傳 stack trace
+except Exception:
+    logger.exception("Failed to ...")        # stack trace 寫入 log
+    return jsonify({"error": "Internal Server Error"}), 500  # 客戶端只見通用訊息
+```
+
+**通用語意對照表**：
+
+| 例外類別 | 對客戶端的訊息 | HTTP 狀態碼 |
+|----------|--------------|-------------|
+| `UserNotFoundError` | User not found | 404 |
+| `UserAlreadyExistsError` | User already exists | 409 |
+| `InvalidRoleError` | Invalid role specified | 400 |
+| `ValueError`（業務邏輯）| Data not exist / Invalid input value | 404 / 400 |
+| 任何未預期例外 | Internal Server Error（不含細節） | 500 |
+
+**修復記錄（2026-02-24）**：
+- `Cloud/user_management/api.py`：移除所有 `str(e)` 直接回傳，改用上表通用訊息
+
 ### 🔒 路徑穿越（Path Traversal）修復模式
 
 **`startswith` 路徑檢查存在繞過漏洞，禁止使用：**
@@ -140,6 +184,7 @@ python3 -m flake8 src/ MCP/ --select=E,F,W --exclude=.venv,node_modules,__pycach
 | [security_lessons.md](memory/security_lessons.md) | 安全最佳實踐 | Token 生成、動作驗證、密碼處理、審計日誌 |
 | [phase3_2_lessons.md](memory/phase3_2_lessons.md) | CodeQL 安全修復 | 路徑遍歷防護、資訊洩露防護、安全事件日誌 |
 | PROJECT_MEMORY.md（本文件）| **路徑穿越修復模式** | **`startswith` 繞過漏洞、`werkzeug.safe_join` 首選用法** |
+| PROJECT_MEMORY.md（本文件）| **🔐 API 資訊洩露防護 Notes** | **禁止 `str(e)` 回傳例外、通用語意訊息對照表** |
 
 ### 🛠️ 開發工具系列
 

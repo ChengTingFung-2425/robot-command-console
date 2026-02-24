@@ -369,6 +369,169 @@ class TestCloudSyncService(unittest.TestCase):
             assert f"sync_result_{self.edge_id}_0000.json" not in remaining_names
             assert f"sync_result_{self.edge_id}_0014.json" in remaining_names
 
+    @patch('Edge.cloud_sync.sync_service.CloudSyncClient')
+    def test_sync_user_settings_success(self, mock_client_class):
+        """測試同步用戶設定 - 成功案例"""
+        mock_client = Mock()
+        mock_client.upload_user_settings.return_value = {
+            'success': True,
+            'message': 'Settings synced',
+            'updated_at': '2026-01-01T00:00:00Z'
+        }
+        mock_client_class.return_value = mock_client
+
+        service = CloudSyncService(
+            cloud_api_url=self.cloud_api_url,
+            edge_id=self.edge_id
+        )
+
+        result = service.sync_user_settings(
+            user_id='user-123',
+            settings={'theme': 'dark', 'language': 'zh-TW'}
+        )
+
+        assert result['success'] is True
+        mock_client.upload_user_settings.assert_called_once_with(
+            user_id='user-123',
+            settings={'theme': 'dark', 'language': 'zh-TW'},
+            edge_id=self.edge_id
+        )
+
+    @patch('Edge.cloud_sync.sync_service.CloudSyncClient')
+    def test_sync_user_settings_failure(self, mock_client_class):
+        """測試同步用戶設定 - 失敗案例（API 異常）"""
+        import requests as req
+        mock_client = Mock()
+        mock_client.upload_user_settings.side_effect = req.RequestException("Connection failed")
+        mock_client_class.return_value = mock_client
+
+        service = CloudSyncService(
+            cloud_api_url=self.cloud_api_url,
+            edge_id=self.edge_id
+        )
+
+        result = service.sync_user_settings(
+            user_id='user-123',
+            settings={'theme': 'dark'}
+        )
+
+        assert result['success'] is False
+        assert 'error' in result
+
+    @patch('Edge.cloud_sync.sync_service.CloudSyncClient')
+    def test_restore_user_settings_success(self, mock_client_class):
+        """測試從雲端還原用戶設定 - 成功案例"""
+        mock_client = Mock()
+        mock_client.download_user_settings.return_value = {
+            'success': True,
+            'data': {
+                'user_id': 'user-123',
+                'settings': {'theme': 'dark', 'language': 'zh-TW'},
+                'updated_at': '2026-01-01T00:00:00Z'
+            }
+        }
+        mock_client_class.return_value = mock_client
+
+        service = CloudSyncService(
+            cloud_api_url=self.cloud_api_url,
+            edge_id=self.edge_id
+        )
+
+        settings = service.restore_user_settings(user_id='user-123')
+
+        assert settings is not None
+        assert settings['theme'] == 'dark'
+        assert settings['language'] == 'zh-TW'
+        mock_client.download_user_settings.assert_called_once_with(user_id='user-123')
+
+    @patch('Edge.cloud_sync.sync_service.CloudSyncClient')
+    def test_restore_user_settings_not_found(self, mock_client_class):
+        """測試從雲端還原用戶設定 - 設定不存在"""
+        mock_client = Mock()
+        mock_client.download_user_settings.return_value = {
+            'success': False,
+            'error': 'Settings not found'
+        }
+        mock_client_class.return_value = mock_client
+
+        service = CloudSyncService(
+            cloud_api_url=self.cloud_api_url,
+            edge_id=self.edge_id
+        )
+
+        settings = service.restore_user_settings(user_id='new-user')
+
+        assert settings is None
+
+    @patch('Edge.cloud_sync.sync_service.CloudSyncClient')
+    def test_sync_command_history_success(self, mock_client_class):
+        """測試同步指令歷史 - 成功案例"""
+        mock_client = Mock()
+        mock_client.upload_command_history.return_value = {
+            'success': True,
+            'synced_count': 3,
+            'total': 10
+        }
+        mock_client_class.return_value = mock_client
+
+        service = CloudSyncService(
+            cloud_api_url=self.cloud_api_url,
+            edge_id=self.edge_id
+        )
+
+        records = [
+            {'command_id': 'cmd-001', 'status': 'succeeded'},
+            {'command_id': 'cmd-002', 'status': 'failed'},
+            {'command_id': 'cmd-003', 'status': 'succeeded'},
+        ]
+        result = service.sync_command_history(user_id='user-123', records=records)
+
+        assert result['success'] is True
+        assert result['synced_count'] == 3
+        mock_client.upload_command_history.assert_called_once_with(
+            user_id='user-123',
+            records=records,
+            edge_id=self.edge_id
+        )
+
+    @patch('Edge.cloud_sync.sync_service.CloudSyncClient')
+    def test_sync_command_history_empty(self, mock_client_class):
+        """測試同步空的指令歷史"""
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+
+        service = CloudSyncService(
+            cloud_api_url=self.cloud_api_url,
+            edge_id=self.edge_id
+        )
+
+        result = service.sync_command_history(user_id='user-123', records=[])
+
+        assert result['success'] is True
+        assert result['synced_count'] == 0
+        mock_client.upload_command_history.assert_not_called()
+
+    @patch('Edge.cloud_sync.sync_service.CloudSyncClient')
+    def test_sync_command_history_failure(self, mock_client_class):
+        """測試同步指令歷史 - 失敗案例"""
+        import requests as req
+        mock_client = Mock()
+        mock_client.upload_command_history.side_effect = req.RequestException("Timeout")
+        mock_client_class.return_value = mock_client
+
+        service = CloudSyncService(
+            cloud_api_url=self.cloud_api_url,
+            edge_id=self.edge_id
+        )
+
+        result = service.sync_command_history(
+            user_id='user-123',
+            records=[{'command_id': 'cmd-001'}]
+        )
+
+        assert result['success'] is False
+        assert 'error' in result
+
 
 if __name__ == '__main__':
     unittest.main()

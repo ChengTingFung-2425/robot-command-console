@@ -321,3 +321,127 @@ class CloudSyncClient:
             return True
         except requests.RequestException:
             return False
+
+    # ==================== 用戶設定同步 ====================
+
+    def upload_user_settings(
+        self,
+        user_id: str,
+        settings: Dict[str, Any],
+        edge_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """上傳用戶設定到雲端（備份）
+
+        Args:
+            user_id: 用戶 ID
+            settings: 用戶設定字典
+            edge_id: Edge 裝置 ID（可選）
+
+        Returns:
+            Dict[str, Any]: API 回應
+
+        Raises:
+            requests.HTTPError: API 請求失敗
+        """
+        url = f'{self.cloud_api_url}/data_sync/settings/{user_id}'
+        payload = {
+            'settings': settings,
+            'edge_id': edge_id or self.edge_id
+        }
+        try:
+            response = self.session.post(url, json=payload, timeout=30)
+            response.raise_for_status()
+            logger.info(f"Uploaded settings for user '{user_id}'")
+            return response.json()
+        except requests.RequestException as e:
+            logger.error(f"Failed to upload settings for user '{user_id}': {e}")
+            raise
+
+    def download_user_settings(self, user_id: str) -> Dict[str, Any]:
+        """從雲端下載用戶設定（還原）
+
+        Args:
+            user_id: 用戶 ID
+
+        Returns:
+            Dict[str, Any]: API 回應（含 data.settings）
+
+        Raises:
+            requests.HTTPError: API 請求失敗
+        """
+        url = f'{self.cloud_api_url}/data_sync/settings/{user_id}'
+        try:
+            response = self.session.get(url, timeout=30)
+            response.raise_for_status()
+            logger.info(f"Downloaded settings for user '{user_id}'")
+            return response.json()
+        except requests.RequestException as e:
+            logger.error(f"Failed to download settings for user '{user_id}': {e}")
+            raise
+
+    # ==================== 指令歷史同步 ====================
+
+    def upload_command_history(
+        self,
+        user_id: str,
+        records: list,
+        edge_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """上傳指令執行歷史到雲端
+
+        Args:
+            user_id: 用戶 ID
+            records: 指令歷史記錄列表（可包含 dict 或 CommandRecord.to_dict()）
+            edge_id: Edge 裝置 ID（可選）
+
+        Returns:
+            Dict[str, Any]: API 回應（含 synced_count 和 total）
+
+        Raises:
+            requests.HTTPError: API 請求失敗
+        """
+        url = f'{self.cloud_api_url}/data_sync/history/{user_id}'
+        payload = {
+            'records': records,
+            'edge_id': edge_id or self.edge_id
+        }
+        try:
+            response = self.session.post(url, json=payload, timeout=60)
+            response.raise_for_status()
+            logger.info(
+                f"Uploaded {len(records)} history records for user '{user_id}'"
+            )
+            return response.json()
+        except requests.RequestException as e:
+            logger.error(f"Failed to upload history for user '{user_id}': {e}")
+            raise
+
+    def download_command_history(
+        self,
+        user_id: str,
+        limit: int = 100,
+        offset: int = 0
+    ) -> Dict[str, Any]:
+        """從雲端下載指令執行歷史
+
+        Args:
+            user_id: 用戶 ID
+            limit: 返回記錄數上限（預設 100，最大 1000）
+            offset: 查詢偏移量（預設 0）
+
+        Returns:
+            Dict[str, Any]: API 回應（含 data.records 和 data.total）
+
+        Raises:
+            requests.HTTPError: API 請求失敗
+        """
+        url = f'{self.cloud_api_url}/data_sync/history/{user_id}'
+        params = {'limit': limit, 'offset': offset}
+        try:
+            response = self.session.get(url, params=params, timeout=30)
+            response.raise_for_status()
+            logger.info(f"Downloaded history for user '{user_id}'")
+            return response.json()
+        except requests.RequestException as e:
+            logger.error(f"Failed to download history for user '{user_id}': {e}")
+            raise

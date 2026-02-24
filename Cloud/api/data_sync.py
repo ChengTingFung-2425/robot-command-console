@@ -153,7 +153,15 @@ def _get_settings_path(user_id: str) -> Path:
 
     settings_dir = _storage_path / "user_settings"
     settings_dir.mkdir(parents=True, exist_ok=True)
-    return settings_dir / f"settings_{user_id}.json"
+
+    # 構造設定檔案路徑並以實際路徑驗證不會逃出 user_settings 目錄
+    candidate = settings_dir / f"settings_{user_id}.json"
+    resolved_dir = settings_dir.resolve()
+    resolved_file = candidate.resolve()
+    if resolved_file.parent != resolved_dir:
+        raise ValueError("Resolved settings path escapes settings directory")
+
+    return resolved_file
 
 
 def _get_history_path(user_id: str) -> Path:
@@ -167,7 +175,15 @@ def _get_history_path(user_id: str) -> Path:
 
     history_dir = _storage_path / "command_history"
     history_dir.mkdir(parents=True, exist_ok=True)
-    return history_dir / f"history_{user_id}.json"
+    # 構造歷史檔案路徑並以實際路徑驗證不會逃出 command_history 目錄
+    candidate = history_dir / f"history_{user_id}.json"
+    resolved_dir = history_dir.resolve()
+    resolved_file = candidate.resolve()
+    if resolved_file.parent != resolved_dir:
+        raise ValueError("Resolved history path escapes history directory")
+    return resolved_file
+
+
 
 
 # ==================== 用戶設定同步端點 ====================

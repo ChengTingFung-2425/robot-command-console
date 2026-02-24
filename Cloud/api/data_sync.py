@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional
 
 from flask import Blueprint, jsonify, request
+from werkzeug.utils import secure_filename
 
 from .auth import CloudAuthService
 
@@ -123,19 +124,22 @@ def _check_user_access(path_user_id: str):
 
 
 def _get_settings_path(user_id: str) -> Path:
-    """取得用戶設定檔案路徑"""
-    # 防止路徑穿越與非法字元，確保設定檔僅建立於 user_settings 目錄下
-    if "/" in user_id or "\\" in user_id or ".." in user_id:
+    """取得用戶設定檔案路徑
+
+    使用 secure_filename 截斷 user-provided value 的 taint flow，
+    再以 _SAFE_ID_PATTERN 與 resolve() 進行 defence-in-depth 驗證。
+    """
+    # secure_filename 去除路徑分隔符與危險字元（CodeQL 認可的 sanitizer）
+    safe_id = secure_filename(user_id)
+    # 再以白名單正規表達式確保格式正確（不允許點號、有長度限制）
+    if not safe_id or not _SAFE_ID_PATTERN.match(safe_id):
         raise ValueError("Invalid user_id for settings path")
-    # 僅允許常見安全字元（英數、底線、連字號）；如需支援更多字元可調整此規則
-    if not re.fullmatch(r"[A-Za-z0-9_-]+", user_id):
-        raise ValueError("Invalid user_id format for settings path")
 
     settings_dir = _storage_path / "user_settings"
     settings_dir.mkdir(parents=True, exist_ok=True)
 
-    # 構造設定檔案路徑並以實際路徑驗證不會逃出 user_settings 目錄
-    candidate = settings_dir / f"settings_{user_id}.json"
+    # 以實際路徑驗證構造後的路徑不會逃出 user_settings 目錄
+    candidate = settings_dir / f"settings_{safe_id}.json"
     resolved_dir = settings_dir.resolve()
     resolved_file = candidate.resolve()
     if resolved_file.parent != resolved_dir:

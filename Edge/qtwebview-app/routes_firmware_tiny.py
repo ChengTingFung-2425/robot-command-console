@@ -702,7 +702,7 @@ def robot_variables(robot_id):
                 'last_updated': datetime.utcnow().isoformat()
             }
             
-            with open(werkzeug.utils.secure_filename(vars_file), 'w') as f:
+            with open(vars_file, 'w') as f:
                 json.dump(storage_data, f, indent=2)
             
             result = {

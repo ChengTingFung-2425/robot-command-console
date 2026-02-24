@@ -144,6 +144,13 @@ def _check_user_access(path_user_id: str):
 
 def _get_settings_path(user_id: str) -> Path:
     """取得用戶設定檔案路徑"""
+    # 防止路徑穿越與非法字元，確保設定檔僅建立於 user_settings 目錄下
+    if "/" in user_id or "\\" in user_id or ".." in user_id:
+        raise ValueError("Invalid user_id for settings path")
+    # 僅允許常見安全字元（英數、底線、連字號）；如需支援更多字元可調整此規則
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", user_id):
+        raise ValueError("Invalid user_id format for settings path")
+
     settings_dir = _storage_path / "user_settings"
     settings_dir.mkdir(parents=True, exist_ok=True)
     return settings_dir / f"settings_{user_id}.json"
@@ -151,6 +158,13 @@ def _get_settings_path(user_id: str) -> Path:
 
 def _get_history_path(user_id: str) -> Path:
     """取得用戶指令歷史檔案路徑"""
+    # 防止路徑穿越與非法字元，確保歷史檔僅建立於 command_history 目錄下
+    if "/" in user_id or "\\" in user_id or ".." in user_id:
+        raise ValueError("Invalid user_id for history path")
+    # 與設定檔相同的格式限制，避免產生包含目錄分隔符的檔名
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", user_id):
+        raise ValueError("Invalid user_id format for history path")
+
     history_dir = _storage_path / "command_history"
     history_dir.mkdir(parents=True, exist_ok=True)
     return history_dir / f"history_{user_id}.json"

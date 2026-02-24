@@ -32,6 +32,7 @@ class CloudSyncService:
         cloud_api_url: str,
         edge_id: str,
         api_key: Optional[str] = None,
+        jwt_token: Optional[str] = None,
         auto_sync: bool = False
     ):
         """初始化同步服務
@@ -39,10 +40,11 @@ class CloudSyncService:
         Args:
             cloud_api_url: 雲端 API 基礎 URL
             edge_id: Edge 裝置 ID
-            api_key: API 金鑰
+            api_key: API 金鑰（已棄用，請使用 jwt_token）
+            jwt_token: JWT token（推薦使用）
             auto_sync: 是否自動同步
         """
-        self.client = CloudSyncClient(cloud_api_url, edge_id, api_key)
+        self.client = CloudSyncClient(cloud_api_url, edge_id, api_key=api_key, jwt_token=jwt_token)
         self.auto_sync = auto_sync
         self.edge_id = edge_id
         

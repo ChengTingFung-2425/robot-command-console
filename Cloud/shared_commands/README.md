@@ -170,6 +170,7 @@ GET /api/cloud/shared_commands/{command_id}
 
 ```
 POST /api/cloud/shared_commands/{command_id}/download
+Authorization: Bearer {JWT_TOKEN}
 Content-Type: application/json
 
 {
@@ -181,6 +182,7 @@ Content-Type: application/json
 
 ```
 POST /api/cloud/shared_commands/{command_id}/rate
+Authorization: Bearer {JWT_TOKEN}
 Content-Type: application/json
 
 {

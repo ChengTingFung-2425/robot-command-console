@@ -6,26 +6,46 @@ import requests
 logger = logging.getLogger(__name__)
 
 
+def update_jwt_token(client: 'CloudSyncClient', new_token: str) -> None:
+    """更新客戶端的 JWT token
+
+    Args:
+        client: CloudSyncClient 實例
+        new_token: 新的 JWT token
+    """
+    client.jwt_token = new_token
+    client.session.headers.update({'Authorization': f'Bearer {new_token}'})
+
+
 class CloudSyncClient:
     """Edge ↔ Cloud 同步客戶端
 
     提供 Edge 應用程式與雲端服務進行指令同步的功能。
     """
 
-    def __init__(self, cloud_api_url: str, edge_id: str, api_key: Optional[str] = None):
+    def __init__(
+        self,
+        cloud_api_url: str,
+        edge_id: str,
+        api_key: Optional[str] = None,
+        jwt_token: Optional[str] = None
+    ):
         """初始化客戶端
 
         Args:
             cloud_api_url: 雲端 API 基礎 URL（例如：https://cloud.example.com/api/cloud）
             edge_id: Edge 裝置 ID
-            api_key: API 金鑰（可選，用於認證）
+            api_key: API 金鑰（已棄用，請使用 jwt_token）
+            jwt_token: JWT token（推薦使用）
         """
         self.cloud_api_url = cloud_api_url.rstrip('/')
         self.edge_id = edge_id
-        self.api_key = api_key
+        self.jwt_token = jwt_token or api_key  # 兼容舊的 api_key 參數
         self.session = requests.Session()
-        if api_key:
-            self.session.headers.update({'Authorization': f'Bearer {api_key}'})
+        if self.jwt_token:
+            self.session.headers.update({
+                'Authorization': f'Bearer {self.jwt_token}'
+            })
 
     def upload_command(
         self,

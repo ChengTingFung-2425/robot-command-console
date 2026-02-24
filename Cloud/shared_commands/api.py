@@ -1,13 +1,71 @@
 # imports
 from flask import Blueprint, request, jsonify
+from functools import wraps
 import logging
+from typing import Optional
 
 from Cloud.shared_commands.service import SharedCommandService
+from Cloud.api.auth import CloudAuthService
 
 logger = logging.getLogger(__name__)
 
 # Blueprint
 bp = Blueprint('shared_commands_api', __name__, url_prefix='/api/cloud/shared_commands')
+
+# 服務實例（需要在初始化時設定）
+auth_service: Optional[CloudAuthService] = None
+
+
+def init_shared_commands_auth(jwt_secret: str):
+    """初始化 shared commands 認證服務
+
+    Args:
+        jwt_secret: JWT 密鑰
+    """
+    global auth_service
+    auth_service = CloudAuthService(jwt_secret)
+    logger.info("Shared commands auth service initialized")
+
+
+def require_auth(f):
+    """認證裝飾器"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # 檢查服務是否已初始化
+        if auth_service is None:
+            return jsonify({
+                "success": False,
+                "error": "Service Unavailable",
+                "message": "Auth service not initialized"
+            }), 503
+
+        # 取得 Token
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({
+                "success": False,
+                "error": "Unauthorized",
+                "message": "Missing or invalid token"
+            }), 401
+
+        token = auth_header[7:]  # 移除 "Bearer "
+
+        # 驗證 Token
+        payload = auth_service.verify_token(token)
+        if not payload:
+            return jsonify({
+                "success": False,
+                "error": "Unauthorized",
+                "message": "Invalid or expired token"
+            }), 401
+
+        # 將用戶資訊加入 request
+        request.user_id = payload.get("user_id")
+        request.username = payload.get("username")
+        request.role = payload.get("role")
+
+        return f(*args, **kwargs)
+    return decorated_function
 
 
 def get_service() -> SharedCommandService:
@@ -21,6 +79,7 @@ def get_service() -> SharedCommandService:
 
 
 @bp.route('/upload', methods=['POST'])
+@require_auth
 def upload_command():
     """上傳進階指令到雲端
 
@@ -157,6 +216,7 @@ def get_command(command_id: int):
 
 
 @bp.route('/<int:command_id>/download', methods=['POST'])
+@require_auth
 def download_command(command_id: int):
     """下載共享指令
 
@@ -193,6 +253,7 @@ def download_command(command_id: int):
 
 
 @bp.route('/<int:command_id>/rate', methods=['POST'])
+@require_auth
 def rate_command(command_id: int):
     """對指令評分
 
@@ -275,11 +336,14 @@ def command_comments(command_id: int):
         "content": "留言內容",
         "parent_comment_id": 1  # 可選，用於回覆
     }
+
+    注意：GET 為公開端點，POST 需要認證
     """
     try:
         service = get_service()
 
         if request.method == 'GET':
+            # GET 不需要認證
             limit = request.args.get('limit', 50, type=int)
             offset = request.args.get('offset', 0, type=int)
 
@@ -294,21 +358,48 @@ def command_comments(command_id: int):
                 }
             }), 200
 
-        # POST method
+        # POST method - 需要認證
+        if auth_service is None:
+            return jsonify({
+                "success": False,
+                "error": "Service Unavailable",
+                "message": "Auth service not initialized"
+            }), 503
+
+        # 檢查認證
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({
+                "success": False,
+                "error": "Unauthorized",
+                "message": "Missing or invalid token"
+            }), 401
+
+        token = auth_header[7:]
+        payload = auth_service.verify_token(token)
+        if not payload:
+            return jsonify({
+                "success": False,
+                "error": "Unauthorized",
+                "message": "Invalid or expired token"
+            }), 401
+
+        # 使用驗證通過的用戶資訊
+        username = payload.get("username")
+
         data = request.get_json()
-        user_username = data.get('user_username')
         content = data.get('content')
         parent_comment_id = data.get('parent_comment_id')
 
-        if not user_username or not content:
+        if not content:
             return jsonify({
                 'success': False,
-                'error': '缺少必要欄位: user_username 或 content'
+                'error': '缺少必要欄位: content'
             }), 400
 
         comment = service.add_comment(
             command_id=command_id,
-            user_username=user_username,
+            user_username=username,  # 使用 token 中的用戶名
             content=content,
             parent_comment_id=parent_comment_id
         )

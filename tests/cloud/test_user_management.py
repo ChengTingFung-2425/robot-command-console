@@ -105,6 +105,12 @@ class TestCloudUserService(unittest.TestCase):
         with self.assertRaises(UserAlreadyExistsError):
             self.svc.create_user("dup", "dup2@example.com")
 
+    def test_duplicate_user_id_raises(self):
+        """傳入已存在的 user_id 應拋出 UserAlreadyExistsError（防止覆蓋）"""
+        self.svc.create_user("original", "orig@example.com", user_id="fixed-id")
+        with self.assertRaises(UserAlreadyExistsError):
+            self.svc.create_user("another", "another@example.com", user_id="fixed-id")
+
     def test_invalid_role_raises(self):
         """無效角色應拋出 InvalidRoleError"""
         with self.assertRaises(InvalidRoleError):
@@ -404,6 +410,24 @@ class TestUserManagementAPI(unittest.TestCase):
         )
         self.assertEqual(resp.status_code, 400)
 
+    def test_adjust_trust_float_delta_rejected(self):
+        """float delta 應回傳 400（只接受 int）"""
+        resp = self.client.post(
+            f"/api/cloud/users/{self.viewer.user_id}/trust",
+            json={"delta": 1.9},
+            headers=self._auth_header(self.admin_token),
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_adjust_trust_bool_delta_rejected(self):
+        """bool delta 應回傳 400（bool 是 int 子類，應明確排除）"""
+        resp = self.client.post(
+            f"/api/cloud/users/{self.viewer.user_id}/trust",
+            json={"delta": True},
+            headers=self._auth_header(self.admin_token),
+        )
+        self.assertEqual(resp.status_code, 400)
+
     # --- Edge identity ---
 
     def test_link_edge_as_operator(self):
@@ -451,6 +475,33 @@ class TestUserManagementAPI(unittest.TestCase):
         payload = self.auth.verify_token(data["token"])
         self.assertIsNotNone(payload)
         self.assertEqual(payload["user_id"], self.operator.user_id)
+
+    def test_generate_token_invalid_expires_in(self):
+        """非整數 expires_in 應回傳 400"""
+        resp = self.client.post(
+            f"/api/cloud/users/{self.operator.user_id}/token",
+            json={"expires_in": "not-a-number"},
+            headers=self._auth_header(self.admin_token),
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_generate_token_zero_expires_in(self):
+        """expires_in=0 應回傳 400（必須 >= 1）"""
+        resp = self.client.post(
+            f"/api/cloud/users/{self.operator.user_id}/token",
+            json={"expires_in": 0},
+            headers=self._auth_header(self.admin_token),
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_generate_token_negative_expires_in(self):
+        """負數 expires_in 應回傳 400"""
+        resp = self.client.post(
+            f"/api/cloud/users/{self.operator.user_id}/token",
+            json={"expires_in": -100},
+            headers=self._auth_header(self.admin_token),
+        )
+        self.assertEqual(resp.status_code, 400)
 
     # --- GET / (list users) ---
 

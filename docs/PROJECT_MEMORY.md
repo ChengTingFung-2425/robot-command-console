@@ -43,7 +43,7 @@ except InvalidRoleError:
     return jsonify({"error": "Bad Request", "message": "Invalid role specified"}), 400
 
 except ValueError:
-    return jsonify({"error": "Not Found", "message": "Data not exist"}), 404
+    return jsonify({"error": "Not Found", "message": "Data not found"}), 404
 
 except Exception:
     logger.exception("Failed to ...")        # stack trace 寫入 log

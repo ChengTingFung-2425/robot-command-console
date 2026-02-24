@@ -32,7 +32,10 @@
 
 | 套件 | 版本 | 用途 | 使用位置 |
 |------|------|------|----------|
-| **Flask** | 3.1.3 | 主要 Web 框架，提供路由、Blueprint、請求/回應處理。整個 WebUI、MCP API、Cloud API 均以 Flask 為基礎。 | `Edge/WebUI/`, `Cloud/api/`, `Edge/MCP/api.py` |
+| **Flask** | 3.1.3 | 主要 Web 框架，提供路由、Blueprint、請求/回應處理。WebUI 與 Cloud API 均以 Flask 為基礎。 | `Edge/WebUI/`, `Cloud/api/` |
+| **FastAPI** | ≥0.104.0 | MCP 邊緣層 API 使用的 ASGI Web 框架，提供型別驅動路由、依賴注入與自動產生 OpenAPI 文件。 | `Edge/MCP/api.py`, `Edge/MCP/` |
+| **Uvicorn** | ≥0.24.0 | ASGI server，用於啟動 FastAPI MCP 服務（開發與部署）。支援 WebSocket 與 HTTP/2。 | `Edge/MCP/`（服務啟動命令與部署腳本） |
+| **Pydantic** | ≥2.5.0 | MCP API 的資料模型與驗證層，配合 FastAPI 定義請求/回應 Schema，提供嚴格型別驗證。 | `Edge/MCP/` |
 | **Werkzeug** | ≥3.0.1 | Flask 底層 WSGI 工具函式庫。額外使用 `secure_filename`（檔名消毒）與 `safe_join`（防路徑穿越）。**路徑安全的首選工具。** | `Cloud/api/storage.py`, `Edge/qtwebview-app/routes_firmware_tiny.py` |
 
 ### Flask 擴充套件

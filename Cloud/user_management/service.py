@@ -92,6 +92,8 @@ class CloudUserService:
                 raise UserAlreadyExistsError(f"Username '{username}' already exists")
 
         uid = user_id or str(uuid.uuid4())
+        if uid in self._users:
+            raise UserAlreadyExistsError(f"User ID '{uid}' already exists")
         user = CloudUser(
             user_id=uid,
             username=username,

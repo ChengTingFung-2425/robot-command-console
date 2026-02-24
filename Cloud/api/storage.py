@@ -20,7 +20,8 @@ from werkzeug.utils import safe_join
 logger = logging.getLogger(__name__)
 
 # 允許的 category 和 user_id 字元（防止路徑穿越）
-SAFE_PATH_PATTERN = re.compile(r'^[A-Za-z0-9._-]+$')
+# 不允許 "." 以防 ".." 繞過
+SAFE_PATH_PATTERN = re.compile(r'^[A-Za-z0-9_-]+$')
 
 # 分塊大小（8KB）
 CHUNK_SIZE = 8192
@@ -165,8 +166,12 @@ class CloudStorageService:
             logger.warning(f"Invalid file_id format for download_file: {file_id}")
             return None
 
-        # 查找檔案
-        category_path = self.storage_path / category / user_id
+        # 使用 safe_join 建立並驗證路徑（防止路徑穿越）
+        safe_cat_path = safe_join(str(self.storage_path), category, user_id)
+        if safe_cat_path is None:
+            logger.warning(f"Path traversal detected in download_file: category={category} user_id={user_id}")
+            return None
+        category_path = Path(safe_cat_path)
         if not category_path.exists():
             logger.warning(f"Category path not found: {category_path}")
             return None
@@ -219,8 +224,12 @@ class CloudStorageService:
             logger.warning(f"Invalid file_id format for delete_file: {file_id}")
             return False
 
-        # 查找檔案
-        category_path = self.storage_path / category / user_id
+        # 使用 safe_join 建立並驗證路徑（防止路徑穿越）
+        safe_cat_path = safe_join(str(self.storage_path), category, user_id)
+        if safe_cat_path is None:
+            logger.warning(f"Path traversal detected in delete_file: category={category} user_id={user_id}")
+            return False
+        category_path = Path(safe_cat_path)
         if not category_path.exists():
             logger.warning(f"Category path not found: {category_path}")
             return False
@@ -271,11 +280,21 @@ class CloudStorageService:
 
         files = []
 
-        # 決定搜尋路徑
+        # 決定搜尋路徑（使用 safe_join 防止路徑穿越）
         if category:
-            search_paths = [self.storage_path / category / user_id]
+            safe_cat_path = safe_join(str(self.storage_path), category, user_id)
+            if safe_cat_path is None:
+                logger.warning(f"Path traversal detected in list_files: category={category} user_id={user_id}")
+                return []
+            search_paths = [Path(safe_cat_path)]
         else:
-            search_paths = [p / user_id for p in self.storage_path.iterdir() if p.is_dir()]
+            search_paths = []
+            for p in self.storage_path.iterdir():
+                if not p.is_dir():
+                    continue
+                safe_user_path = safe_join(str(self.storage_path), p.name, user_id)
+                if safe_user_path is not None:
+                    search_paths.append(Path(safe_user_path))
 
         # 搜尋檔案
         for path in search_paths:

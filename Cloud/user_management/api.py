@@ -228,11 +228,11 @@ def adjust_trust(user_id: str):
     """
     data = request.get_json(silent=True) or {}
     delta = data.get("delta")
-    if delta is None or not isinstance(delta, (int, float)):
+    if delta is None or not isinstance(delta, int) or isinstance(delta, bool):
         return jsonify({"error": "Bad Request", "message": "delta (integer) is required"}), 400
 
     try:
-        user, actual_delta = _get_service().adjust_trust_score(user_id, int(delta))
+        user, actual_delta = _get_service().adjust_trust_score(user_id, delta)
         return jsonify({"user": user.to_dict(), "actual_delta": actual_delta}), 200
     except UserNotFoundError:
         return jsonify({"error": "Not Found", "message": "User not found"}), 404
@@ -309,7 +309,14 @@ def generate_token(user_id: str):
         { "token": "eyJ...", "expires_in": 86400 }
     """
     data = request.get_json(silent=True) or {}
-    expires_in = min(int(data.get("expires_in", 86400)), 7 * 24 * 3600)
+    raw_expires_in = data.get("expires_in", 86400)
+    try:
+        expires_in = int(raw_expires_in)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Bad Request", "message": "expires_in must be a positive integer"}), 400
+    if expires_in < 1:
+        return jsonify({"error": "Bad Request", "message": "expires_in must be >= 1"}), 400
+    expires_in = min(expires_in, 7 * 24 * 3600)
 
     try:
         token = _get_service().generate_token(user_id, expires_in=expires_in)

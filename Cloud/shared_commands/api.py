@@ -3,8 +3,10 @@ from flask import Blueprint, request, jsonify
 from functools import wraps
 import logging
 from typing import Optional
+from contextlib import contextmanager
 
 from Cloud.shared_commands.service import SharedCommandService
+from Cloud.shared_commands.database import session_scope, init_db, is_initialized
 from Cloud.api.auth import CloudAuthService
 
 logger = logging.getLogger(__name__)
@@ -16,12 +18,47 @@ bp = Blueprint('shared_commands_api', __name__, url_prefix='/api/cloud/shared_co
 auth_service: Optional[CloudAuthService] = None
 
 
-def init_shared_commands_auth(jwt_secret: str):
-    """初始化 shared commands 認證服務
+def init_shared_commands_api(jwt_secret: str, database_url: str, create_tables: bool = True):
+    """初始化 shared commands API（認證 + 資料庫）
 
     Args:
         jwt_secret: JWT 密鑰
+        database_url: 資料庫 URL (例如: sqlite:///commands.db 或 postgresql://...)
+        create_tables: 是否自動建立資料表
+        
+    Example:
+        >>> from Cloud.shared_commands.api import init_shared_commands_api, bp
+        >>> app.register_blueprint(bp)
+        >>> init_shared_commands_api(
+        ...     jwt_secret='your-secret-key',
+        ...     database_url='sqlite:///cloud_commands.db'
+        ... )
     """
+    global auth_service
+    
+    # 初始化認證服務
+    auth_service = CloudAuthService(jwt_secret)
+    logger.info("Shared commands auth service initialized")
+    
+    # 初始化資料庫
+    init_db(database_url, create_tables=create_tables)
+    logger.info(f"Shared commands database initialized: {database_url}")
+
+
+# 保留舊函數名稱以向後相容
+def init_shared_commands_auth(jwt_secret: str):
+    """初始化 shared commands 認證服務（已棄用，請使用 init_shared_commands_api）
+
+    Args:
+        jwt_secret: JWT 密鑰
+        
+    Deprecated:
+        使用 init_shared_commands_api() 代替，它同時初始化認證和資料庫
+    """
+    logger.warning(
+        "init_shared_commands_auth() is deprecated. "
+        "Use init_shared_commands_api() instead to initialize both auth and database."
+    )
     global auth_service
     auth_service = CloudAuthService(jwt_secret)
     logger.info("Shared commands auth service initialized")
@@ -68,14 +105,29 @@ def require_auth(f):
     return decorated_function
 
 
-def get_service() -> SharedCommandService:
-    """取得服務實例
-
-    注意：這個函數需要在實際部署時實作資料庫連接邏輯。
-    目前僅作為佔位符。
+@contextmanager
+def get_service():
+    """取得服務實例的 context manager
+    
+    自動管理資料庫 session 生命週期（commit/rollback/close）
+    
+    Yields:
+        SharedCommandService 實例
+        
+    Raises:
+        RuntimeError: 如果資料庫尚未初始化
+        
+    Example:
+        >>> with get_service() as service:
+        ...     result = service.upload_command(...)
     """
-    # TODO: 實作資料庫連接與 session 管理
-    raise NotImplementedError("Database session management not implemented yet")
+    if not is_initialized():
+        raise RuntimeError(
+            "Database not initialized. Call init_shared_commands_api() first."
+        )
+    
+    with session_scope() as session:
+        yield SharedCommandService(session)
 
 
 @bp.route('/upload', methods=['POST'])
@@ -111,18 +163,18 @@ def upload_command():
                     'error': f'缺少必要欄位: {field}'
                 }), 400
 
-        service = get_service()
-        command = service.upload_command(
-            name=data['name'],
-            description=data['description'],
-            category=data['category'],
-            content=data['content'],
-            author_username=data['author_username'],
-            author_email=data['author_email'],
-            edge_id=data['edge_id'],
-            original_command_id=data['original_command_id'],
-            version=data.get('version', 1)
-        )
+        with get_service() as service:
+            command = service.upload_command(
+                name=data['name'],
+                description=data['description'],
+                category=data['category'],
+                content=data['content'],
+                author_username=data['author_username'],
+                author_email=data['author_email'],
+                edge_id=data['edge_id'],
+                original_command_id=data['original_command_id'],
+                version=data.get('version', 1)
+            )
 
         return jsonify({
             'success': True,
@@ -162,17 +214,17 @@ def search_commands():
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
 
-        service = get_service()
-        commands, total = service.search_commands(
-            query=query,
-            category=category,
-            author=author,
-            min_rating=min_rating,
-            sort_by=sort_by,
-            order=order,
-            limit=limit,
-            offset=offset
-        )
+        with get_service() as service:
+            commands, total = service.search_commands(
+                query=query,
+                category=category,
+                author=author,
+                min_rating=min_rating,
+                sort_by=sort_by,
+                order=order,
+                limit=limit,
+                offset=offset
+            )
 
         return jsonify({
             'success': True,
@@ -196,14 +248,14 @@ def get_command(command_id: int):
     GET /api/cloud/shared_commands/<command_id>
     """
     try:
-        service = get_service()
-        command = service.get_command(command_id)
+        with get_service() as service:
+            command = service.get_command(command_id)
 
-        if not command:
-            return jsonify({
-                'success': False,
-                'error': '指令不存在或不公開'
-            }), 404
+            if not command:
+                return jsonify({
+                    'success': False,
+                    'error': '指令不存在或不公開'
+                }), 404
 
         return jsonify({
             'success': True,
@@ -235,8 +287,8 @@ def download_command(command_id: int):
                 'error': '缺少 edge_id'
             }), 400
 
-        service = get_service()
-        command = service.download_command(command_id, edge_id)
+        with get_service() as service:
+            command = service.download_command(command_id, edge_id)
 
         return jsonify({
             'success': True,
@@ -276,13 +328,13 @@ def rate_command(command_id: int):
                 'error': '缺少必要欄位: user_username 或 rating'
             }), 400
 
-        service = get_service()
-        rating_obj = service.rate_command(
-            command_id=command_id,
-            user_username=user_username,
-            rating=rating,
-            comment=comment
-        )
+        with get_service() as service:
+            rating_obj = service.rate_command(
+                command_id=command_id,
+                user_username=user_username,
+                rating=rating,
+                comment=comment
+            )
 
         return jsonify({
             'success': True,
@@ -308,8 +360,8 @@ def get_ratings(command_id: int):
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
 
-        service = get_service()
-        ratings = service.get_ratings(command_id, limit, offset)
+        with get_service() as service:
+            ratings = service.get_ratings(command_id, limit, offset)
 
         return jsonify({
             'success': True,
@@ -340,69 +392,69 @@ def command_comments(command_id: int):
     注意：GET 為公開端點，POST 需要認證
     """
     try:
-        service = get_service()
+        with get_service() as service:
 
-        if request.method == 'GET':
-            # GET 不需要認證
-            limit = request.args.get('limit', 50, type=int)
-            offset = request.args.get('offset', 0, type=int)
+            if request.method == 'GET':
+                # GET 不需要認證
+                limit = request.args.get('limit', 50, type=int)
+                offset = request.args.get('offset', 0, type=int)
 
-            comments = service.get_comments(command_id, limit, offset)
+                comments = service.get_comments(command_id, limit, offset)
 
-            return jsonify({
-                'success': True,
-                'data': {
-                    'comments': [c.to_dict(include_replies=True) for c in comments],
-                    'limit': limit,
-                    'offset': offset
-                }
-            }), 200
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'comments': [c.to_dict(include_replies=True) for c in comments],
+                        'limit': limit,
+                        'offset': offset
+                    }
+                }), 200
 
-        # POST method - 需要認證
-        if auth_service is None:
-            return jsonify({
-                "success": False,
-                "error": "Service Unavailable",
-                "message": "Auth service not initialized"
-            }), 503
+            # POST method - 需要認證
+            if auth_service is None:
+                return jsonify({
+                    "success": False,
+                    "error": "Service Unavailable",
+                    "message": "Auth service not initialized"
+                }), 503
 
-        # 檢查認證
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return jsonify({
-                "success": False,
-                "error": "Unauthorized",
-                "message": "Missing or invalid token"
-            }), 401
+            # 檢查認證
+            auth_header = request.headers.get('Authorization')
+            if not auth_header or not auth_header.startswith('Bearer '):
+                return jsonify({
+                    "success": False,
+                    "error": "Unauthorized",
+                    "message": "Missing or invalid token"
+                }), 401
 
-        token = auth_header[7:]
-        payload = auth_service.verify_token(token)
-        if not payload:
-            return jsonify({
-                "success": False,
-                "error": "Unauthorized",
-                "message": "Invalid or expired token"
-            }), 401
+            token = auth_header[7:]
+            payload = auth_service.verify_token(token)
+            if not payload:
+                return jsonify({
+                    "success": False,
+                    "error": "Unauthorized",
+                    "message": "Invalid or expired token"
+                }), 401
 
-        # 使用驗證通過的用戶資訊
-        username = payload.get("username")
+            # 使用驗證通過的用戶資訊
+            username = payload.get("username")
 
-        data = request.get_json()
-        content = data.get('content')
-        parent_comment_id = data.get('parent_comment_id')
+            data = request.get_json()
+            content = data.get('content')
+            parent_comment_id = data.get('parent_comment_id')
 
-        if not content:
-            return jsonify({
-                'success': False,
-                'error': '缺少必要欄位: content'
-            }), 400
+            if not content:
+                return jsonify({
+                    'success': False,
+                    'error': '缺少必要欄位: content'
+                }), 400
 
-        comment = service.add_comment(
-            command_id=command_id,
-            user_username=username,  # 使用 token 中的用戶名
-            content=content,
-            parent_comment_id=parent_comment_id
-        )
+            comment = service.add_comment(
+                command_id=command_id,
+                user_username=username,  # 使用 token 中的用戶名
+                content=content,
+                parent_comment_id=parent_comment_id
+            )
 
         return jsonify({
             'success': True,
@@ -427,8 +479,8 @@ def get_featured_commands():
     try:
         limit = request.args.get('limit', 10, type=int)
 
-        service = get_service()
-        commands = service.get_featured_commands(limit)
+        with get_service() as service:
+            commands = service.get_featured_commands(limit)
 
         return jsonify({
             'success': True,
@@ -451,8 +503,8 @@ def get_popular_commands():
     try:
         limit = request.args.get('limit', 10, type=int)
 
-        service = get_service()
-        commands = service.get_popular_commands(limit)
+        with get_service() as service:
+            commands = service.get_popular_commands(limit)
 
         return jsonify({
             'success': True,
@@ -473,8 +525,8 @@ def get_categories():
     GET /api/cloud/shared_commands/categories
     """
     try:
-        service = get_service()
-        categories = service.get_categories()
+        with get_service() as service:
+            categories = service.get_categories()
 
         return jsonify({
             'success': True,

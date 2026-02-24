@@ -14,6 +14,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, BinaryIO
 
+from werkzeug.utils import safe_join
+
 
 logger = logging.getLogger(__name__)
 
@@ -72,14 +74,12 @@ class CloudStorageService:
         self._validate_path_component(category, "category")
         self._validate_path_component(user_id, "user_id")
 
-        # 生成儲存路徑
-        category_path = self.storage_path / category / user_id
-        category_path.mkdir(parents=True, exist_ok=True)
-
-        # 驗證路徑仍在 storage_path 下
-        resolved_category_path = category_path.resolve()
-        if not str(resolved_category_path).startswith(str(self.storage_path.resolve())):
+        # 使用 werkzeug.safe_join 建立並驗證路徑（防止路徑穿越，含 startswith 繞過）
+        safe_path = safe_join(str(self.storage_path), category, user_id)
+        if safe_path is None:
             raise ValueError("Path traversal detected")
+        category_path = Path(safe_path)
+        category_path.mkdir(parents=True, exist_ok=True)
 
         # 建立臨時檔案並串流寫入，同時計算雜湊
         hash_obj = hashlib.sha256()

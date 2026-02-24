@@ -193,9 +193,13 @@ class CloudSyncService:
 
             # 建立本地指令
             # 從雲端下載的指令需要本地審核，預設為 pending 狀態
+            # 在 description 中記錄原始作者資訊以保持追蹤
+            original_author_note = f"\n\n[從雲端下載 - 原始作者: {data.get('author_username', 'unknown')}]"
+            description_with_source = (data['description'] or '') + original_author_note
+            
             local_cmd = AdvancedCommand(
                 name=data['name'],
-                description=data['description'],
+                description=description_with_source,
                 category=data['category'],
                 base_commands=data['content'],
                 version=data['version'],

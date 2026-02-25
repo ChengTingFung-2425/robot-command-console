@@ -10,7 +10,7 @@ WORKDIR /workspace
 # 複製 requirements.txt 並安裝 Python 依賴
 COPY requirements.txt /tmp/pip-tmp/
 RUN python3 -m pip install --no-cache-dir -r /tmp/pip-tmp/requirements.txt
-RUN rm -rf /tmp/pip-tmp
+
 
 # 安裝開發工具（linting, testing, validation）
 RUN python3 -m pip install --no-cache-dir \
@@ -30,3 +30,5 @@ RUN python3 -m pip install --no-cache-dir -r /tmp/pip-tmp/edge-requirements.txt 
 
 COPY Executor/requirements.txt /tmp/pip-tmp/executor-requirements.txt
 RUN python3 -m pip install --no-cache-dir -r /tmp/pip-tmp/executor-requirements.txt && rm -rf /tmp/pip-tmp/executor-requirements.txt
+
+RUN rm -rf /tmp/pip-tmp

@@ -1,0 +1,3 @@
+# Edge Service Starter Script
+
+...existing content from start_all_services.py...

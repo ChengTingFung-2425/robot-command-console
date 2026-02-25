@@ -1,0 +1,3 @@
+# Cloud Migration Notes
+
+...existing content from MIGRATION_NOTES.md...

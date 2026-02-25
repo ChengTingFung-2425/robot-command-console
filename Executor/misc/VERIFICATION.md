@@ -1,0 +1,3 @@
+# Executor Verification Notes
+
+...existing content from VERIFICATION.md...

@@ -32,6 +32,7 @@ DATABASE_URL = os.environ.get(
 JWT_SECRET = os.environ.get('CLOUD_JWT_SECRET', 'dev-jwt-secret-change-in-production')
 STORAGE_PATH = os.environ.get('CLOUD_STORAGE_PATH', '/tmp/cloud-storage')
 PORT = int(os.environ.get('CLOUD_PORT', '8888'))
+DEBUG = os.environ.get('CLOUD_DEBUG', 'false').lower() == 'true'
 
 app = Flask('cloud')
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
@@ -44,4 +45,4 @@ with app.app_context():
     init_shared_commands_api(JWT_SECRET, DATABASE_URL, create_tables=True)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=PORT, debug=True, use_reloader=False)
+    app.run(host='0.0.0.0', port=PORT, debug=DEBUG, use_reloader=False)

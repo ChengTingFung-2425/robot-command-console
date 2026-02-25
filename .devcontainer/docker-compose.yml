@@ -6,15 +6,18 @@ services:
       context: ..
       dockerfile: .devcontainer/Dockerfile
       args:
-        VARIANT: "3"
-        NODE_VERSION: "none"
+        VARIANT: "3.12"
     volumes:
       - ..:/workspace:cached
     command: sleep infinity
+    environment:
+      - PYTHONPATH=/workspace/src:/workspace/Edge
+      - FLASK_DEBUG=1
     networks:
       - flask_app
     ports:
-      - "5000:5000" # app port
+      - "8080:8080"   # Edge WebUI
+      - "8888:8888"   # Cloud API
 
   postgresdb:
     container_name: postgres_container
@@ -47,10 +50,10 @@ services:
   mailhog:
     image: mailhog/mailhog
     logging:
-      driver: 'none' # disable saving logs
+      driver: 'none'  # disable saving logs
     ports:
-      - 1025:1025 # smtp server
-      - 8025:8025 # web ui
+      - 1025:1025   # smtp server
+      - 8025:8025   # web ui
     networks:
       - flask_app
 
@@ -60,4 +63,3 @@ networks:
 
 volumes:
   postgres:
-  pgadmin:

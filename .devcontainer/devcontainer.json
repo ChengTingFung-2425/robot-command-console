@@ -44,16 +44,11 @@
         "python.terminal.activateEnvironment": true,
         "terminal.integrated.env.linux": {
           "PYTHONPATH": "/workspace/src:/workspace/Edge"
-        },
-        "[python]": {
-          "editor.defaultFormatter": "ms-python.black-formatter",
-          "editor.formatOnSave": true
         }
       },
       "extensions": [
         "ms-python.python",
         "ms-python.vscode-pylance",
-        "ms-python.black-formatter",
         "samuelcolvin.jinjahtml",
         "monosans.djlint",
         "ms-azuretools.vscode-docker"

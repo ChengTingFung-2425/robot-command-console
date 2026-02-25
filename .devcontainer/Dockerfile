@@ -20,5 +20,4 @@ RUN python3 -m pip install --disable-pip-version-check --no-cache-dir \
     "pytest-cov>=4.1.0" \
     "openapi-spec-validator>=0.7.1" \
     "bandit>=1.7.5" \
-    "pyyaml>=6.0" \
-    "black>=24.0.0"
+    "pyyaml>=6.0"

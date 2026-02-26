@@ -23,12 +23,10 @@ RUN python3 -m pip install --no-cache-dir \
 
 # Install dependencies for Cloud, Edge, and Executor environments
 COPY Cloud/requirements.txt /tmp/pip-tmp/cloud-requirements.txt
-RUN python3 -m pip install --no-cache-dir -r /tmp/pip-tmp/cloud-requirements.txt && rm -rf /tmp/pip-tmp/cloud-requirements.txt
+RUN python3 -m pip install --no-cache-dir -r /tmp/pip-tmp/cloud-requirements.txt
 
 COPY Edge/requirements.txt /tmp/pip-tmp/edge-requirements.txt
-RUN python3 -m pip install --no-cache-dir -r /tmp/pip-tmp/edge-requirements.txt && rm -rf /tmp/pip-tmp/edge-requirements.txt
-
+RUN python3 -m pip install --no-cache-dir -r /tmp/pip-tmp/edge-requirements.txt
 COPY Executor/requirements.txt /tmp/pip-tmp/executor-requirements.txt
-RUN python3 -m pip install --no-cache-dir -r /tmp/pip-tmp/executor-requirements.txt && rm -rf /tmp/pip-tmp/executor-requirements.txt
-
+RUN python3 -m pip install --no-cache-dir -r /tmp/pip-tmp/executor-requirements.txt
 RUN rm -rf /tmp/pip-tmp

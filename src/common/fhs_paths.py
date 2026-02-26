@@ -20,29 +20,29 @@ logger = logging.getLogger(__name__)
 
 class FHSPaths:
     """FHS 路徑管理類別
-
+    
     根據作業系統提供標準化的應用程式路徑。
     """
-
+    
     APP_NAME = "robot-command-console"
-
+    
     @classmethod
     def get_cache_dir(cls, subdir: Optional[str] = None) -> Path:
         """取得快取資料目錄
-
+        
         Args:
             subdir: 子目錄名稱（可選）
-
+            
         Returns:
             Path: 快取目錄路徑
-
+            
         Examples:
             Linux: /var/cache/robot-command-console/
             Windows: %LOCALAPPDATA%\\robot-command-console\\cache\\
             macOS: ~/Library/Caches/robot-command-console/
         """
         system = platform.system()
-
+        
         if system == "Linux":
             # FHS: /var/cache/<app>/
             base = Path("/var/cache") / cls.APP_NAME
@@ -59,29 +59,29 @@ class FHSPaths:
             # Fallback: 使用者家目錄下的 .cache
             base = Path.home() / ".cache" / cls.APP_NAME
             logger.warning(f"Unknown system {system}, using fallback cache path: {base}")
-
+        
         if subdir:
             base = base / subdir
-
+        
         return base
-
+    
     @classmethod
     def get_data_dir(cls, subdir: Optional[str] = None) -> Path:
         """取得持久性資料目錄
-
+        
         Args:
             subdir: 子目錄名稱（可選）
-
+            
         Returns:
             Path: 資料目錄路徑
-
+            
         Examples:
             Linux: /var/lib/robot-command-console/
             Windows: %APPDATA%\\robot-command-console\\
             macOS: ~/Library/Application Support/robot-command-console/
         """
         system = platform.system()
-
+        
         if system == "Linux":
             # FHS: /var/lib/<app>/
             base = Path("/var/lib") / cls.APP_NAME
@@ -98,29 +98,29 @@ class FHSPaths:
             # Fallback: 使用者家目錄下的 .local/share
             base = Path.home() / ".local" / "share" / cls.APP_NAME
             logger.warning(f"Unknown system {system}, using fallback data path: {base}")
-
+        
         if subdir:
             base = base / subdir
-
+        
         return base
-
+    
     @classmethod
     def get_log_dir(cls, subdir: Optional[str] = None) -> Path:
         """取得日誌目錄
-
+        
         Args:
             subdir: 子目錄名稱（可選）
-
+            
         Returns:
             Path: 日誌目錄路徑
-
+            
         Examples:
             Linux: /var/log/robot-command-console/
             Windows: %LOCALAPPDATA%\\robot-command-console\\logs\\
             macOS: ~/Library/Logs/robot-command-console/
         """
         system = platform.system()
-
+        
         if system == "Linux":
             # FHS: /var/log/<app>/
             # 但如果無權限則退回到 cache 目錄
@@ -143,22 +143,22 @@ class FHSPaths:
             # Fallback: 使用快取目錄下的 logs
             base = cls.get_cache_dir("logs")
             logger.warning(f"Unknown system {system}, using fallback log path: {base}")
-
+        
         if subdir:
             base = base / subdir
-
+        
         return base
-
+    
     @classmethod
     def ensure_dir(cls, path: Path) -> Path:
         """確保目錄存在
-
+        
         Args:
             path: 目錄路徑
-
+            
         Returns:
             Path: 建立後的目錄路徑
-
+            
         Raises:
             PermissionError: 無權限建立目錄
             OSError: 其他系統錯誤
@@ -173,22 +173,22 @@ class FHSPaths:
         except OSError as err:
             logger.error(f"Failed to create directory {path}: {err}")
             raise
-
+    
     @classmethod
     def get_sync_log_path(cls) -> Path:
         """取得同步日誌檔案路徑
-
+        
         Returns:
             Path: 同步日誌檔案完整路徑
         """
         log_dir = cls.get_log_dir("sync")
         cls.ensure_dir(log_dir)
         return log_dir / "sync.log"
-
+    
     @classmethod
     def get_sync_cache_dir(cls) -> Path:
         """取得同步快取目錄
-
+        
         Returns:
             Path: 同步快取目錄路徑
         """

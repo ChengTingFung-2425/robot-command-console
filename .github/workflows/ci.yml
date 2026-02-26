@@ -45,10 +45,10 @@ jobs:
 
       - name: 檢查 MCP/ 目錄
         run: |
-          flake8 Edge/MCP/ \
+          flake8 MCP/ \
             --max-line-length=120 \
             --ignore=W503,E203 \
-            --exclude=Edge/MCP/__pycache__ \
+            --exclude=MCP/__pycache__ \
             --statistics
   
   # Node.js 程式碼品質檢查
@@ -67,16 +67,16 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: Edge/electron-app/package-lock.json
+          cache-dependency-path: electron-app/package-lock.json
       
       - name: 安裝依賴
         run: |
-          cd Edge/electron-app
+          cd electron-app
           npm ci || npm install
       
       - name: 檢查 JavaScript 語法
         run: |
-          cd Edge/electron-app
+          cd electron-app
           # 使用 Node.js 內建語法檢查
           node --check main.js
           node --check preload.js
@@ -191,16 +191,16 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: Edge/electron-app/package-lock.json
+          cache-dependency-path: electron-app/package-lock.json
       
       - name: 安裝 Electron 依賴
         run: |
-          cd Edge/electron-app
+          cd electron-app
           npm ci || npm install
       
       - name: 測試 Electron 打包配置
         run: |
-          cd Edge/electron-app
+          cd electron-app
           # 驗證 package.json 配置
           node -e "
           const pkg = require('./package.json');
@@ -222,7 +222,7 @@ jobs:
       
       - name: 驗證主程序
         run: |
-          cd Edge/electron-app
+          cd electron-app
           node --check main.js
           node --check preload.js
           echo "✓ 主程序語法驗證通過"

@@ -1,7 +1,2 @@
 # Cloud-specific dependencies
-Flask-Babel>=3.0.0
-Flask-Mail==0.9.1
-Babel>=2.12
-PyJWT==2.6.0
-prometheus_client>=0.19.0
-python-json-logger>=2.0.7
+# All common dependencies are inherited from the root requirements.txt

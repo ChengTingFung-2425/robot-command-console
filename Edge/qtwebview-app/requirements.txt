@@ -6,11 +6,8 @@ PyQt6-WebEngine>=6.6.0
 pyinstaller>=6.0.0
 
 # HTTP 請求
-requests>=2.31.0
+# Note: requests and cryptography are in root requirements.txt
 urllib3>=2.6.3  # 修復 Dependabot 安全警告：解壓縮炸彈保護繞過漏洞
-
-# 加密與安全
-cryptography>=41.0.0
 
 # SSH/SFTP 支援
 paramiko>=3.3.0

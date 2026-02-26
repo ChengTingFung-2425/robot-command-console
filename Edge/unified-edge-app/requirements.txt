@@ -1,21 +1,15 @@
 # Unified Edge App Requirements
 # 統一 Edge 應用程式依賴
+# Note: Flask, PyYAML, aiohttp, pytest, pytest-asyncio are in root requirements.txt
 
-# Core dependencies
-Flask>=2.3.0
+# API frameworks (not in root)
 flask-cors>=4.0.0
-PyYAML>=6.0
-
-# MCP dependencies (subset)
 fastapi>=0.104.0
 uvicorn>=0.24.0
 pydantic>=2.5.0
 httpx>=0.25.0
 
-# Robot service dependencies
-aiohttp>=3.9.0
-
-# Common utilities
+# Utilities
 python-dateutil>=2.8.2
 
 # Database
@@ -29,7 +23,3 @@ alembic>=1.13.0
 # Optional: MQTT support  
 # paho-mqtt>=1.6.0
 # awsiotsdk>=1.20.0
-
-# Development
-pytest>=7.4.0
-pytest-asyncio>=0.21.0

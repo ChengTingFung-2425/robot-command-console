@@ -1,14 +1,8 @@
 # Edge-specific dependencies
-Flask-Bootstrap==3.3.7.1
-Flask-Login>=0.6.3
-Flask-Moment==1.0.5
-Flask-WTF>=1.2.0
-bcrypt>=4.0.0,<4.1.0
-passlib[bcrypt]>=1.7.4
-psutil>=5.9.0
-aiohttp>=3.9.0
+# Note: common deps (Flask, Werkzeug, Flask-Login, Flask-Bootstrap, Flask-Moment,
+# Flask-WTF, bcrypt, passlib, psutil, aiohttp, pytest, pytest-asyncio) are in root requirements.txt
 
-# Unified Edge App Requirements
+# API frameworks (not in root)
 flask-cors>=4.0.0
 fastapi>=0.104.0
 uvicorn>=0.24.0
@@ -17,8 +11,6 @@ httpx>=0.25.0
 python-dateutil>=2.8.2
 SQLAlchemy>=2.0.0
 alembic>=1.13.0
-pytest>=7.4.0
-pytest-asyncio>=0.21.0
 
 # PyQt6 核心
 PyQt6>=6.6.0

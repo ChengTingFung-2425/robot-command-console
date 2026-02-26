@@ -9,6 +9,20 @@
   date: 2025-12-17
   summary: 操作與排障步驟、TokenIntegration 測試與常見故障排除。
 
+- title: RabbitMQ & AWS SQS 佇列整合經驗
+  path: docs/memory/rabbitmq-sqs-lessons.md
+  tags: [rabbitmq, sqs, queue, performance, testing]
+  author: copilot
+  date: 2026-01-05
+  summary: QueueInterface 設計、RabbitMQ/SQS Best Practices、效能比較、測試策略。
+
+- title: 雲端同步 UI 狀態提示實作經驗
+  path: docs/memory/cloud-sync-ui-lessons.md
+  tags: [cloud-sync, ui, edge, polling, javascript]
+  author: copilot
+  date: 2026-02-11
+  summary: 雲端同步狀態面板、雙頻率更新策略、漸進式功能實作。
+
 - title: (placeholder)
   path: docs/memory/TEMPLATE.md
   tags: [template]

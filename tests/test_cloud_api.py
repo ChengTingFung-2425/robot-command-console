@@ -231,6 +231,30 @@ class TestCloudStorageService(unittest.TestCase):
         self.assertEqual(stats["total_size"], len(file_content))
         self.assertGreaterEqual(stats["total_size_mb"], 0)  # 允許等於 0（小檔案）
 
+    def test_get_storage_stats_valid_user_id(self):
+        """測試合法 user_id 被接受"""
+        stats = self.storage_service.get_storage_stats(user_id="user-123")
+        self.assertIsNotNone(stats)
+        self.assertEqual(stats["user_id"], "user-123")
+
+    def test_get_storage_stats_rejects_path_traversal(self):
+        """測試路徑穿越嘗試被拒絕"""
+        for bad_id in ["../admin", "../../etc/passwd", "user/../admin"]:
+            with self.assertRaises(ValueError):
+                self.storage_service.get_storage_stats(user_id=bad_id)
+
+    def test_get_storage_stats_rejects_special_chars(self):
+        """測試含特殊字元的 user_id 被拒絕"""
+        for bad_id in ["user name", "user@domain", "user/dir", "user\x00id"]:
+            with self.assertRaises(ValueError):
+                self.storage_service.get_storage_stats(user_id=bad_id)
+
+    def test_get_storage_stats_none_user_id(self):
+        """測試 user_id=None 時返回全系統統計"""
+        stats = self.storage_service.get_storage_stats(user_id=None)
+        self.assertIsNone(stats["user_id"])
+        self.assertIn("total_files", stats)
+
 
 if __name__ == '__main__':
     unittest.main()

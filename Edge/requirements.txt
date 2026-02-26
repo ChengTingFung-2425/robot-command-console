@@ -1,0 +1,41 @@
+# Edge-specific dependencies
+# Note: common deps (Flask, Werkzeug, Flask-Login, Flask-Bootstrap, Flask-Moment,
+# Flask-WTF, bcrypt, passlib, psutil, aiohttp, pytest, pytest-asyncio) are in root requirements.txt
+
+# API frameworks (not in root)
+flask-cors>=4.0.0
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+websockets>=12.0
+pydantic>=2.5.0
+httpx>=0.25.0
+python-dateutil>=2.8.2
+SQLAlchemy>=2.0.0
+alembic>=1.13.0
+
+# Redis (MCP)
+redis>=5.0.0
+aioredis>=2.0.1
+
+# Environment / config (MCP)
+python-dotenv>=1.0.0
+
+# PyQt6 核心
+PyQt6>=6.6.0
+PyQt6-WebEngine>=6.6.0
+
+# 打包工具
+pyinstaller>=6.0.0
+
+# HTTP 请求
+urllib3>=2.6.3
+
+# SSH/SFTP 支持
+paramiko>=3.3.0
+scp>=0.14.5
+
+# WiFi 管理（跨平台）
+pywifi>=1.1.12
+
+# 进度条显示
+tqdm>=4.66.0

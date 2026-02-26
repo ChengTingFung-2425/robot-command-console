@@ -1,0 +1,2 @@
+# Cloud-specific dependencies
+# All common dependencies are inherited from the root requirements.txt

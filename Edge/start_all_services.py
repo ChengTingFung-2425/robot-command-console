@@ -22,9 +22,11 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 # Replace local logging setup with common logging utility
-from src.common.logging_utils import setup_logging
+from src.common.logging_utils import setup_json_logging
 
-setup_logging()
+setup_json_logging(service_name="start-all-services")
+logger = logging.getLogger(__name__)
+
 
 # Replace local ServiceType with the common ServiceType
 class ServiceType(Enum):
@@ -188,7 +190,7 @@ class ServiceManager:
                         if resp.status == 200:
                             return True
             except Exception as e:
-                logger.debug(f"健康檢查嘗試 {i+1}/{max_retries}: {e}")
+                logger.debug(f"健康檢查嘗試 {i + 1}/{max_retries}: {e}")
 
             if i < max_retries - 1:
                 await asyncio.sleep(1)
@@ -217,9 +219,9 @@ class ServiceManager:
             if success:
                 success_count += 1
 
-        logger.info(f"\n{'='*60}")
+        logger.info(f"\n{'=' * 60}")
         logger.info(f"✅ 成功啟動 {success_count}/{len(service_ids)} 個服務")
-        logger.info(f"{'='*60}\n")
+        logger.info(f"{'=' * 60}\n")
 
         # 顯示存取資訊
         self._show_access_info(service_ids, configs)

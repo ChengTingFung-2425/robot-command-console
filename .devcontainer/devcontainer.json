@@ -1,49 +1,50 @@
 {
-  "name": "Flask & PostgreSQL",
+  "name": "Robot Command Console (Edge + Cloud)",
   "dockerComposeFile": "docker-compose.yml",
-  "service": "app", 
+  "service": "app",
   "hostRequirements": {
     "cpus": 2
   },
   "waitFor": "onCreateCommand",
   "workspaceFolder": "/workspace",
-  "postCreateCommand": "cd /workspace/WebUI && flask --debug run --host=0.0.0.0 --port=5000 & ",
+  "postCreateCommand": "pip install -r /workspace/requirements.txt -q && PYTHONPATH=/workspace/src:/workspace/Edge FLASK_DEBUG=1 FLASK_APP=WebUI.app flask run --host=0.0.0.0 --port=8080 & PYTHONPATH=/workspace/src:/workspace/Edge python /workspace/.devcontainer/run_cloud.py &",
   "portsAttributes": {
-    "5000": {
-      "label": "Flask Apps",
+    "8080": {
+      "label": "Edge WebUI",
       "protocol": "http",
       "onAutoForward": "openPreview"
     },
-    "5050": {
-      "label": "pgadmin",
-      "onAutoForward": "openPreview"
+    "8888": {
+      "label": "Cloud API",
+      "protocol": "http",
+      "onAutoForward": "notify"
     },
     "8025": {
-      "label": "mailhog",
-      "onAutoForward": "openPreview"
+      "label": "Mailhog",
+      "onAutoForward": "ignore"
+    },
+    "15672": {
+      "label": "RabbitMQ Management",
+      "onAutoForward": "ignore"
     }
   },
   "customizations": {
     "codespaces": {
       "openFiles": [
-        "templates/index.html"
+        "Edge/WebUI/app/__init__.py"
       ]
     },
     "vscode": {
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
-        "python.linting.enabled": true,
-        "python.linting.pylintEnabled": true,
-        "python.formatting.autopep8Path": "/usr/local/py-utils/bin/autopep8",
-        "python.formatting.blackPath": "/usr/local/py-utils/bin/black",
-        "python.formatting.yapfPath": "/usr/local/py-utils/bin/yapf",
-        "python.linting.banditPath": "/usr/local/py-utils/bin/bandit",
-        "python.linting.flake8Path": "/usr/local/py-utils/bin/flake8",
-        "python.linting.mypyPath": "/usr/local/py-utils/bin/mypy",
-        "python.linting.pycodestylePath": "/usr/local/py-utils/bin/pycodestyle",
-        "python.linting.pydocstylePath": "/usr/local/py-utils/bin/pydocstyle",
-        "python.linting.pylintPath": "/usr/local/py-utils/bin/pylint",
-        "python.testing.pytestPath": "/usr/local/py-utils/bin/pytest"
+        "python.analysis.extraPaths": [
+          "/workspace/src",
+          "/workspace/Edge"
+        ],
+        "python.terminal.activateEnvironment": true,
+        "terminal.integrated.env.linux": {
+          "PYTHONPATH": "/workspace/src:/workspace/Edge"
+        }
       },
       "extensions": [
         "ms-python.python",
@@ -55,11 +56,9 @@
     }
   },
   "forwardPorts": [
-    5000,
+    8080,
+    8888,
     8025,
     15672
-  ],
-  "features": {
-    "ghcr.io/devcontainers/features/docker-from-docker:1": {}
-  }
+  ]
 }

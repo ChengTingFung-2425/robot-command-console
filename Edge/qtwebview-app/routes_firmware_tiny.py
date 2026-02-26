@@ -124,6 +124,54 @@ def _validate_and_sanitize_identifier(identifier: str) -> Optional[str]:
     return identifier
 
 
+def _validate_remote_path(remote_path: str) -> Optional[str]:
+    """
+    Validate a remote SFTP path to prevent path traversal.
+
+    Only allows Unix absolute paths composed of safe characters.
+    Rejects paths containing '..', null bytes, or shell-special characters.
+
+    Args:
+        remote_path: The remote path string supplied by the caller.
+
+    Returns:
+        The original path if it is safe, None otherwise.
+    """
+    if not remote_path:
+        return None
+
+    # Must be an absolute path on the remote host
+    if not remote_path.startswith('/'):
+        logger.warning(f"Remote path is not absolute: {remote_path}")
+        return None
+
+    # Reject null bytes and path-traversal sequences
+    if '\0' in remote_path or '..' in remote_path:
+        logger.warning(f"Remote path contains dangerous sequence: {remote_path}")
+        return None
+
+    # Reject single-dot path components (e.g. /path/./etc or /path/.)
+    # but allow legitimate hidden entries such as /.config or /opt/.hidden/firmware
+    if '/./' in remote_path or remote_path.endswith('/.'):
+        logger.warning(f"Remote path contains dot-component: {remote_path}")
+        return None
+
+    # Allowlist:
+    #   - directories: slash + alphanumeric + dash + underscore
+    #   - final filename: may additionally contain dots for file extensions
+    if not re.match(r'^[a-zA-Z0-9/_\-]+(\.[a-zA-Z0-9_\-]+)*$', remote_path):
+        logger.warning(f"Remote path contains unsafe characters: {remote_path}")
+        return None
+
+    # Final check: normalise and confirm no traversal survived
+    normalised = os.path.normpath(remote_path)
+    if '..' in normalised.split(os.sep):
+        logger.warning(f"Remote path traversal detected after normalisation: {remote_path}")
+        return None
+
+    return remote_path
+
+
 # Ensure firmware and vars directories exist
 def _ensure_directories():
     """Ensure firmware and robot vars directories exist"""
@@ -134,6 +182,44 @@ def _ensure_directories():
     Path(vars_dir).mkdir(parents=True, exist_ok=True)
     
     return firmware_dir, vars_dir
+
+
+def _build_remote_firmware_path(safe_remote_path: str, local_firmware_path: str) -> str:
+    """Construct the remote destination path for a firmware file.
+
+    Args:
+        safe_remote_path: Validated remote directory (from _validate_remote_path).
+        local_firmware_path: Local firmware file path (basename is used).
+
+    Returns:
+        Full remote path string.
+
+    Raises:
+        ValueError: If the remote path or local firmware path is invalid or unsafe.
+    """
+    if not safe_remote_path:
+        raise ValueError("Remote path must not be empty")
+
+    # Disallow null bytes in any path component
+    if "\x00" in safe_remote_path or "\x00" in local_firmware_path:
+        raise ValueError("Paths must not contain null bytes")
+
+    filename = os.path.basename(local_firmware_path)
+
+    # Ensure we actually have a file name
+    if not filename:
+        raise ValueError("Local firmware path must contain a file name")
+
+    # Disallow path traversal and embedded separators in the file name
+    if filename in (".", "..") or "/" in filename or "\\" in filename:
+        raise ValueError("Invalid firmware file name")
+
+    # Restrict to a conservative set of safe characters for the remote file name
+    if not re.match(r"^[A-Za-z0-9._-]+$", filename):
+        raise ValueError("Invalid characters in firmware file name")
+
+    remote = safe_remote_path.rstrip("/")
+    return (remote or "") + "/" + filename
 
 
 def _get_firmware_metadata(firmware_path):
@@ -392,8 +478,12 @@ def deploy_via_sftp():
         firmware_dir, _ = _ensure_directories()
         firmware_path = Path(firmware_dir)
         
-        # Sanitize firmware_id to prevent path traversal
-        safe_firmware_id = os.path.basename(data['firmware_id'])
+        # Validate firmware_id with strict allowlist (no path traversal via os.path.basename)
+        safe_firmware_id = _validate_and_sanitize_identifier(data['firmware_id'])
+        if not safe_firmware_id:
+            sftp.close()
+            transport.close()
+            return jsonify({'error': 'Invalid firmware_id'}), 400
         
         # Find the firmware file (check multiple extensions)
         local_firmware_path = None
@@ -408,7 +498,13 @@ def deploy_via_sftp():
             transport.close()
             return jsonify({'error': f'Firmware file not found: {safe_firmware_id}'}), 404
         
-        remote_firmware_path = os.path.join(data['remote_path'], os.path.basename(local_firmware_path))
+        # Validate remote_path before using it in path expression
+        safe_remote_path = _validate_remote_path(data['remote_path'])
+        if not safe_remote_path:
+            sftp.close()
+            transport.close()
+            return jsonify({'error': 'Invalid remote_path'}), 400
+        remote_firmware_path = _build_remote_firmware_path(safe_remote_path, local_firmware_path)
         
         # Upload firmware
         sftp.put(local_firmware_path, remote_firmware_path)
@@ -497,8 +593,12 @@ def deploy_and_execute_via_ssh():
         firmware_dir, _ = _ensure_directories()
         firmware_path = Path(firmware_dir)
         
-        # Sanitize firmware_id to prevent path traversal
-        safe_firmware_id = os.path.basename(data['firmware_id'])
+        # Validate firmware_id with strict allowlist (no path traversal via os.path.basename)
+        safe_firmware_id = _validate_and_sanitize_identifier(data['firmware_id'])
+        if not safe_firmware_id:
+            sftp.close()
+            transport.close()
+            return jsonify({'error': 'Invalid firmware_id'}), 400
         
         # Find the firmware file (check multiple extensions)
         local_firmware_path = None
@@ -513,7 +613,13 @@ def deploy_and_execute_via_ssh():
             transport.close()
             return jsonify({'error': f'Firmware file not found: {safe_firmware_id}'}), 404
         
-        remote_firmware_path = os.path.join(data['remote_path'], os.path.basename(local_firmware_path))
+        # Validate remote_path before using it in path expression
+        safe_remote_path = _validate_remote_path(data['remote_path'])
+        if not safe_remote_path:
+            sftp.close()
+            transport.close()
+            return jsonify({'error': 'Invalid remote_path'}), 400
+        remote_firmware_path = _build_remote_firmware_path(safe_remote_path, local_firmware_path)
         sftp.put(local_firmware_path, remote_firmware_path)
         
         sftp.close()

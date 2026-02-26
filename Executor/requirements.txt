@@ -1,9 +1,3 @@
+# Executor-specific dependencies
+# Note: jsonschema, toml, textual, email-validator are in root requirements.txt
 awsiotsdk
-pyyaml
-requests
-# pyaudio
-# rx
-# smithy-aws-core
-# pytz
-# aws_sdk_bedrock_runtime
-# boto3 

@@ -64,7 +64,12 @@ def create_app(config_name='default'):
     mail.init_app(flask_app)
     bootstrap.init_app(flask_app)
     moment.init_app(flask_app)
-    babel.init_app(flask_app)
+
+    def get_locale():
+        """Return the best matching locale for the current request."""
+        return request.accept_languages.best_match(flask_app.config['LANGUAGES'])
+
+    babel.init_app(flask_app, locale_selector=get_locale)
 
     # Configure logging (only for non-testing)
     if not flask_app.testing and not flask_app.debug:
@@ -94,10 +99,6 @@ def create_app(config_name='default'):
         root.addHandler(file_handler)
         root.setLevel(logging.INFO)
         root.info('Microblog startup')
-
-    @babel.localeselector
-    def get_locale():
-        return request.accept_languages.best_match(flask_app.config['LANGUAGES'])
 
     # Register blueprint for WebUI routes
     from WebUI.app.routes import bp as webui_bp

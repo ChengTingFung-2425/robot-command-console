@@ -330,11 +330,20 @@ class CloudStorageService:
         total_size = 0
 
         if user_id:
+            # 驗證 user_id 安全性（防止路徑穿越）
+            try:
+                self._validate_path_component(user_id, "user_id")
+            except ValueError:
+                logger.warning(f"get_storage_stats: invalid user_id rejected: {user_id!r}")
+                raise
             # 特定使用者統計
             for category_path in self.storage_path.iterdir():
                 if not category_path.is_dir():
                     continue
-                user_path = category_path / user_id
+                safe_user_path = safe_join(str(category_path), user_id)
+                if safe_user_path is None:
+                    continue
+                user_path = Path(safe_user_path)
                 if user_path.exists():
                     for file_path in user_path.glob("*"):
                         if file_path.is_file():

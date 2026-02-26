@@ -203,6 +203,35 @@ python3 -m flake8 src/ MCP/ --select=E,F,W --exclude=.venv,node_modules,__pycach
 | [code_quality_lessons.md](memory/code_quality_lessons.md) | 程式碼品質 | Linting、型別提示、測試策略 |
 | [cli_batch_lessons.md](memory/cli_batch_lessons.md) | CLI/批次操作 | TDD 流程、錯誤處理、重複計數防護、async fixtures |
 
+### 🤖 llm-helper — AI Agent 工具包
+
+AI Agent 在開發流程中使用的輔助腳本統一存放於 **`llm-helper/`** 目錄：
+
+| 腳本 | 根目錄 shim | 說明 |
+|------|------------|------|
+| `llm-helper/check_lint.py` | `check_lint.py` | Python + JS 靜態分析（flake8 E/F + node --check） |
+| `llm-helper/run_tests.py` | `run_tests.py` | 統一測試入口（unit/integration/all/specific/lint） |
+
+> **重要**：根目錄的 `check_lint.py` 與 `run_tests.py` 均為 **shim**，
+> 真正的程式碼在 `llm-helper/`。修改規則請直接編輯 `llm-helper/` 內的正本。
+
+**使用快速參考**：
+```bash
+# Lint 檢查（E/F 級別，修改後必跑）
+python llm-helper/check_lint.py
+
+# 跑指定測試
+python llm-helper/run_tests.py specific --test-path tests/path/to/test.py
+
+# 跑所有單元測試
+python llm-helper/run_tests.py unit
+
+# CI 完整流程
+python llm-helper/run_tests.py all --coverage
+```
+
+> 📖 詳細說明見 [`llm-helper/README.md`](../llm-helper/README.md)
+
 ### 🖥️ UI/UX 系列
 
 | 文件 | 主題 | 重點內容 |

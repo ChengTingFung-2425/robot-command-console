@@ -64,12 +64,12 @@ def create_app(config_name='default'):
     mail.init_app(flask_app)
     bootstrap.init_app(flask_app)
     moment.init_app(flask_app)
-
-    def get_locale():
-        """Select the best matching language based on client preferences."""
-        return request.accept_languages.best_match(flask_app.config['LANGUAGES'])
-
-    babel.init_app(flask_app, locale_selector=get_locale)
+    babel.init_app(
+        flask_app,
+        locale_selector=lambda: request.accept_languages.best_match(
+            flask_app.config['LANGUAGES']
+        )
+    )
 
     # Configure logging (only for non-testing)
     if not flask_app.testing and not flask_app.debug:

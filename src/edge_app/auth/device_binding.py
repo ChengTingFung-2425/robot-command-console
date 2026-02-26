@@ -158,8 +158,8 @@ class DeviceBindingClient:
         return response.json()
 
     def update_device(self, access_token: str, device_id: int,
-                     device_name: Optional[str] = None,
-                     is_trusted: Optional[bool] = None) -> Dict:
+                      device_name: Optional[str] = None,
+                      is_trusted: Optional[bool] = None) -> Dict:
         """
         Update device information.
 

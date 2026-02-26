@@ -1,9 +1,6 @@
+# Executor-specific dependencies
 awsiotsdk
-pyyaml
-requests
-# pyaudio
-# rx
-# smithy-aws-core
-# pytz
-# aws_sdk_bedrock_runtime
-# boto3 
+jsonschema==4.21.1
+toml==0.10.2
+textual>=0.47.0
+email-validator>=2.0.0

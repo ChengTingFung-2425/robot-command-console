@@ -331,7 +331,11 @@ class CloudStorageService:
 
         if user_id:
             # 驗證 user_id 安全性（防止路徑穿越）
-            self._validate_path_component(user_id, "user_id")
+            try:
+                self._validate_path_component(user_id, "user_id")
+            except ValueError:
+                logger.warning(f"get_storage_stats: invalid user_id rejected: {user_id!r}")
+                raise
             # 特定使用者統計
             for category_path in self.storage_path.iterdir():
                 if not category_path.is_dir():

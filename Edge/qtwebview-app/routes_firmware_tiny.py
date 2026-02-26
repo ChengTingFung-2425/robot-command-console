@@ -150,13 +150,16 @@ def _validate_remote_path(remote_path: str) -> Optional[str]:
         logger.warning(f"Remote path contains dangerous sequence: {remote_path}")
         return None
 
-    # Reject single-dot path components (e.g. /path/./etc) and hidden-entry tricks
-    if '/.' in remote_path:
+    # Reject single-dot path components (e.g. /path/./etc or /path/.)
+    # but allow legitimate hidden entries such as /.config or /opt/.hidden/firmware
+    if '/./' in remote_path or remote_path.endswith('/.'):
         logger.warning(f"Remote path contains dot-component: {remote_path}")
         return None
 
-    # Allowlist: slash, alphanumeric, dash, underscore, dot (for file extensions / hidden dirs)
-    if not re.match(r'^[a-zA-Z0-9/_.\-]+$', remote_path):
+    # Allowlist:
+    #   - directories: slash + alphanumeric + dash + underscore
+    #   - final filename: may additionally contain dots for file extensions
+    if not re.match(r'^[a-zA-Z0-9/_\-]+(\.[a-zA-Z0-9_\-]+)*$', remote_path):
         logger.warning(f"Remote path contains unsafe characters: {remote_path}")
         return None
 
@@ -190,8 +193,33 @@ def _build_remote_firmware_path(safe_remote_path: str, local_firmware_path: str)
 
     Returns:
         Full remote path string.
+
+    Raises:
+        ValueError: If the remote path or local firmware path is invalid or unsafe.
     """
-    return safe_remote_path.rstrip('/') + '/' + os.path.basename(local_firmware_path)
+    if not safe_remote_path:
+        raise ValueError("Remote path must not be empty")
+
+    # Disallow null bytes in any path component
+    if "\x00" in safe_remote_path or "\x00" in local_firmware_path:
+        raise ValueError("Paths must not contain null bytes")
+
+    filename = os.path.basename(local_firmware_path)
+
+    # Ensure we actually have a file name
+    if not filename:
+        raise ValueError("Local firmware path must contain a file name")
+
+    # Disallow path traversal and embedded separators in the file name
+    if filename in (".", "..") or "/" in filename or "\\" in filename:
+        raise ValueError("Invalid firmware file name")
+
+    # Restrict to a conservative set of safe characters for the remote file name
+    if not re.match(r"^[A-Za-z0-9._-]+$", filename):
+        raise ValueError("Invalid characters in firmware file name")
+
+    remote = safe_remote_path.rstrip("/")
+    return (remote or "") + "/" + filename
 
 
 def _get_firmware_metadata(firmware_path):

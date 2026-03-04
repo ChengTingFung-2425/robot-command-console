@@ -86,17 +86,34 @@ def require_auth(f):
     return decorated_function
 
 
-def _get_authenticated_username() -> Optional[str]:
-    """從請求 Header 中取得已驗證的用戶名稱（用於同時支援 GET/POST 的端點）"""
+def _get_authenticated_username():
+    """從請求 Header 中取得已驗證的用戶名稱（用於同時支援 GET/POST 的端點）
+
+    Returns:
+        (username, None) 驗證成功
+        (None, response_tuple) 驗證失敗，回傳對應的 Flask response tuple
+    """
     if auth_service is None:
-        return None
+        return None, (jsonify({
+            "success": False,
+            "error": "Service Unavailable",
+            "message": "Auth service not initialized",
+        }), 503)
     auth_header = request.headers.get('Authorization')
     if not auth_header or not auth_header.startswith('Bearer '):
-        return None
+        return None, (jsonify({
+            "success": False,
+            "error": "Unauthorized",
+            "message": "Missing or invalid token",
+        }), 401)
     payload = auth_service.verify_token(auth_header[7:])
     if not payload:
-        return None
-    return payload.get("username")
+        return None, (jsonify({
+            "success": False,
+            "error": "Unauthorized",
+            "message": "Invalid or expired token",
+        }), 401)
+    return payload.get("username"), None
 
 
 # ──────────────────────────────
@@ -192,13 +209,9 @@ def posts():
             }), 200
 
         # POST - 需要認證
-        username = _get_authenticated_username()
-        if not username:
-            return jsonify({
-                "success": False,
-                "error": "Unauthorized",
-                "message": "Missing or invalid token",
-            }), 401
+        username, err = _get_authenticated_username()
+        if err:
+            return err
 
         data = request.get_json(silent=True) or {}
         title = data.get('title')
@@ -248,13 +261,9 @@ def post_detail(post_id: int):
             return jsonify({'success': True, 'data': post.to_dict()}), 200
 
         # DELETE - 需要認證
-        username = _get_authenticated_username()
-        if not username:
-            return jsonify({
-                "success": False,
-                "error": "Unauthorized",
-                "message": "Missing or invalid token",
-            }), 401
+        username, err = _get_authenticated_username()
+        if err:
+            return err
 
         with get_service() as service:
             service.delete_post(post_id, username)
@@ -288,36 +297,43 @@ def post_comments(post_id: int):
     }
     """
     try:
-        with get_service() as service:
-            if request.method == 'GET':
+        if request.method == 'GET':
+            with get_service() as service:
                 limit = request.args.get('limit', 50, type=int)
                 offset = request.args.get('offset', 0, type=int)
                 comments = service.get_comments(post_id, limit, offset)
+            return jsonify({
+                'success': True,
+                'data': {
+                    'comments': [c.to_dict(include_replies=True) for c in comments],
+                    'limit': limit,
+                    'offset': offset,
+                },
+            }), 200
+
+        # POST - 需要認證（在取得 service 前先驗證，確保語意一致）
+        username, err = _get_authenticated_username()
+        if err:
+            return err
+
+        data = request.get_json(silent=True) or {}
+        content = data.get('content')
+        parent_comment_id_raw = data.get('parent_comment_id')
+        parent_comment_id: Optional[int] = None
+        if parent_comment_id_raw is not None:
+            try:
+                parent_comment_id = int(parent_comment_id_raw)
+            except (TypeError, ValueError):
                 return jsonify({
-                    'success': True,
-                    'data': {
-                        'comments': [c.to_dict(include_replies=True) for c in comments],
-                        'limit': limit,
-                        'offset': offset,
-                    },
-                }), 200
+                    'success': False,
+                    'error': '請求參數錯誤',
+                    'message': 'parent_comment_id 必須為整數或 null',
+                }), 400
 
-            # POST - 需要認證
-            username = _get_authenticated_username()
-            if not username:
-                return jsonify({
-                    "success": False,
-                    "error": "Unauthorized",
-                    "message": "Missing or invalid token",
-                }), 401
+        if not content:
+            return jsonify({'success': False, 'error': '缺少必要欄位: content'}), 400
 
-            data = request.get_json(silent=True) or {}
-            content = data.get('content')
-            parent_comment_id = data.get('parent_comment_id')
-
-            if not content:
-                return jsonify({'success': False, 'error': '缺少必要欄位: content'}), 400
-
+        with get_service() as service:
             comment = service.add_comment(
                 post_id=post_id,
                 author_username=username,

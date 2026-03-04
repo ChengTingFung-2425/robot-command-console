@@ -377,6 +377,8 @@ class EngagementService:
         Returns:
             List[PostComment]
         """
+        limit = min(max(limit, 0), 100)
+        offset = max(offset, 0)
         return self.db.query(PostComment).filter_by(
             post_id=post_id,
             parent_comment_id=None,
@@ -472,6 +474,7 @@ class EngagementService:
         Returns:
             List[PointsLog]
         """
+        limit = min(max(limit, 0), 100)
         return self.db.query(PointsLog).filter_by(
             user_username=user_username
         ).order_by(

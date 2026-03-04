@@ -73,13 +73,13 @@ class CloudLLMProvider(LLMProviderBase):
         Returns:
             健康狀態資訊
         """
-        start_time = time.time()
-
         if not self._api_key:
             return ProviderHealth(
                 status=ProviderStatus.UNAVAILABLE,
                 error_message="未設定 API 金鑰",
             )
+
+        start_time = time.time()
 
         try:
             async with aiohttp.ClientSession() as session:

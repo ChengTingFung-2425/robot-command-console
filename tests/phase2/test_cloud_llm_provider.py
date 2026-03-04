@@ -339,12 +339,17 @@ class TestGCPGeminiProvider:
         assert provider.default_port == 443
 
     def test_generate_url_format(self):
-        """生成 URL 應包含模型名稱與 API 金鑰"""
+        """生成 URL 應包含模型名稱與端點路徑，API 金鑰應透過標頭傳遞而非嵌入 URL"""
         provider = GCPGeminiProvider(_make_gcp_config())
         url = provider._generate_url("gemini-1.5-flash")
         assert "gemini-1.5-flash" in url
-        assert "gcp-key-test" in url
         assert "generateContent" in url
+        # API 金鑰不應出現在 URL 中（應改用 x-goog-api-key 標頭傳遞）
+        assert "gcp-key-test" not in url
+        assert "key=" not in url
+        # 驗證標頭包含 API 金鑰
+        headers = provider._make_api_headers()
+        assert headers["x-goog-api-key"] == "gcp-key-test"
 
     @pytest.mark.asyncio
     async def test_check_health_no_api_key(self):
@@ -527,6 +532,51 @@ class TestAWSBedrockProvider:
         assert health.status == ProviderStatus.AVAILABLE
         assert len(health.available_models) >= 2
 
+    @pytest.mark.asyncio
+    async def test_generate_success(self):
+        """模擬 aioboto3 正常回應，應正確呼叫 Bedrock 並回傳生成文字"""
+        import json
+
+        provider = AWSBedrockProvider(_make_aws_config())
+        model_id = "anthropic.claude-3-haiku-20240307-v1:0"
+
+        # 模擬 Claude Messages API 回應格式
+        mock_response_body = {
+            "content": [{"type": "text", "text": "向前移動完成"}],
+            "stop_reason": "end_turn",
+        }
+
+        mock_body_stream = AsyncMock()
+        mock_body_stream.read = AsyncMock(
+            return_value=json.dumps(mock_response_body).encode()
+        )
+
+        mock_client = AsyncMock()
+        mock_client.invoke_model = AsyncMock(return_value={"body": mock_body_stream})
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        mock_session = MagicMock()
+        mock_session.client.return_value = mock_client
+
+        mock_aioboto3 = MagicMock()
+        mock_aioboto3.Session.return_value = mock_session
+
+        with patch.dict("sys.modules", {"aioboto3": mock_aioboto3}):
+            text, confidence = await provider.generate(
+                prompt="請向前移動",
+                model=model_id,
+                temperature=0.7,
+                max_tokens=512,
+            )
+
+        assert text == "向前移動完成"
+        assert confidence == 0.92
+        # 確認呼叫了正確的 Bedrock 模型
+        mock_client.invoke_model.assert_called_once()
+        call_kwargs = mock_client.invoke_model.call_args[1]
+        assert call_kwargs["modelId"] == model_id
+
 
 # ------------------------------------------------------------------ #
 #  RoutingMode 與 LLMProviderManager 路由測試                          #
@@ -572,7 +622,7 @@ class TestLLMProviderManagerRouting:
         """is_cloud_provider 應正確識別雲端提供商"""
         manager = LLMProviderManager()
 
-        # 未登録のプロバイダーは名前ホワイトリストで判定
+        # 未註冊的提供商透過名稱白名單判定
         assert manager.is_cloud_provider("cloud") is True
         assert manager.is_cloud_provider("azure_openai") is True
         assert manager.is_cloud_provider("gcp_gemini") is True
@@ -580,7 +630,7 @@ class TestLLMProviderManagerRouting:
         assert manager.is_cloud_provider("ollama") is False
         assert manager.is_cloud_provider("lmstudio") is False
 
-        # 登録済みプロバイダーは is_cloud 属性で判定
+        # 已註冊的提供商透過 is_cloud 屬性判定
         local_config = ProviderConfig(name="ollama", port=11434, timeout=1)
         local_provider = OllamaProvider(local_config)
         cloud_provider = CloudLLMProvider(_make_cloud_config())

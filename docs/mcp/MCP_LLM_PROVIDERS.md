@@ -467,6 +467,7 @@ from Edge.MCP.llm_provider_base import ProviderConfig
 
 config = ProviderConfig(
     name="cloud",
+    port=443,
     api_base="https://api.openai.com",
     api_key="sk-...",
 )
@@ -480,6 +481,7 @@ from Edge.MCP.providers import AzureOpenAIProvider
 
 config = ProviderConfig(
     name="azure_openai",
+    port=443,
     api_base="https://my-resource.openai.azure.com",
     api_key="<azure-api-key>",
     custom_headers={
@@ -496,6 +498,7 @@ from Edge.MCP.providers import GCPGeminiProvider
 
 config = ProviderConfig(
     name="gcp_gemini",
+    port=443,
     api_key="<google-api-key>",
     custom_headers={"default_model": "gemini-1.5-flash"},
 )
@@ -514,6 +517,7 @@ from Edge.MCP.providers import AWSBedrockProvider
 
 config = ProviderConfig(
     name="aws_bedrock",
+    port=443,
     custom_headers={
         "region": "us-east-1",
         "model_id": "anthropic.claude-3-haiku-20240307-v1:0",

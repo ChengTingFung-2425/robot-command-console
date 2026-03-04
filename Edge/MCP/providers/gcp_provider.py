@@ -7,7 +7,7 @@ GCP Vertex AI / Gemini 提供商插件
 import asyncio
 import logging
 import time
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import aiohttp
 
@@ -69,15 +69,16 @@ class GCPGeminiProvider(LLMProviderBase):
         return f"{base}/{path.lstrip('/')}" if path else base
 
     def _generate_url(self, model: str) -> str:
-        """建構生成端點 URL"""
-        return (
-            f"{self.GEMINI_BASE_URL}/v1beta/models/{model}"
-            f":generateContent?key={self._api_key}"
-        )
+        """建構生成端點 URL（API 金鑰透過 x-goog-api-key 標頭傳遞）"""
+        return f"{self.GEMINI_BASE_URL}/v1beta/models/{model}:generateContent"
 
     def _list_models_url(self) -> str:
-        """建構模型列表端點 URL"""
-        return f"{self.GEMINI_BASE_URL}/v1beta/models?key={self._api_key}"
+        """建構模型列表端點 URL（API 金鑰透過 x-goog-api-key 標頭傳遞）"""
+        return f"{self.GEMINI_BASE_URL}/v1beta/models"
+
+    def _make_api_headers(self) -> Dict[str, str]:
+        """建構包含認證金鑰的請求標頭（使用 x-goog-api-key 避免金鑰出現在 URL）"""
+        return {"x-goog-api-key": self._api_key, "Content-Type": "application/json"}
 
     async def check_health(self) -> ProviderHealth:
         """
@@ -99,6 +100,7 @@ class GCPGeminiProvider(LLMProviderBase):
                 url = self._list_models_url()
                 async with session.get(
                     url,
+                    headers=self._make_api_headers(),
                     timeout=aiohttp.ClientTimeout(total=self.config.timeout),
                 ) as response:
                     response_time_ms = (time.time() - start_time) * 1000
@@ -160,6 +162,7 @@ class GCPGeminiProvider(LLMProviderBase):
                 url = self._list_models_url()
                 async with session.get(
                     url,
+                    headers=self._make_api_headers(),
                     timeout=aiohttp.ClientTimeout(total=self.config.timeout),
                 ) as response:
                     response.raise_for_status()
@@ -241,7 +244,7 @@ class GCPGeminiProvider(LLMProviderBase):
                 async with session.post(
                     url,
                     json=payload,
-                    headers={"Content-Type": "application/json"},
+                    headers=self._make_api_headers(),
                     timeout=aiohttp.ClientTimeout(total=self.config.timeout),
                 ) as response:
                     response.raise_for_status()

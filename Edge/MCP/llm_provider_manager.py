@@ -542,12 +542,19 @@ class LLMProviderManager:
             return None, None, 0.0
 
         # 建構候選列表：首選在最前，其餘已註冊提供商作為備援（使用 set 去重）
+        # CLOUD_ONLY / LOCAL_ONLY 模式：備援候選也必須符合路由模式的限制
         seen: set = {primary}
         candidates: List[LLMProviderBase] = [primary]
-        for p in self.providers.values():
-            if p not in seen:
-                candidates.append(p)
-                seen.add(p)
+        mode = self.routing_mode
+        for candidate in self.providers.values():
+            if candidate in seen:
+                continue
+            if mode == RoutingMode.CLOUD_ONLY and not getattr(candidate, "is_cloud", False):
+                continue
+            if mode == RoutingMode.LOCAL_ONLY and getattr(candidate, "is_cloud", False):
+                continue
+            candidates.append(candidate)
+            seen.add(candidate)
 
         for provider in candidates:
             # 若未指定模型，嘗試取得該提供商第一個可用模型

@@ -451,7 +451,7 @@ pagination = query.order_by(AuditLog.timestamp.desc()).paginate(page=page, per_p
 - 新增 `generate_with_routing()` 一站式生成方法（含即時健康檢查備援）
 - 修復 `src/common/llm_manager.py` `Edge.llm_discovery` ImportError（try/except fallback）
 - 47 個單元測試（100% 通過）、CodeQL 零警告
-- 詳見：[docs/mcp/MCP_LLM_PROVIDERS.md](mcp/MCP_LLM_PROVIDERS.md)
+- 詳見：[docs/mcp/MCP_LLM_PROVIDERS.md](docs/mcp/MCP_LLM_PROVIDERS.md)
 
 ### 2026-02-26: 雲端同步異常處理測試 + 啟動修復 + Codespace 模板
 

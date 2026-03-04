@@ -32,8 +32,8 @@ def check_python_lint():
     print("PYTHON LINTING CHECK")
     print("=" * 80)
     
-    # Critical errors only (E and F)
-    cmd = """python3 -m flake8 . --select=E,F --max-line-length=120 \
+    # Critical errors only (E, F and W)
+    cmd = """python3 -m flake8 . --select=E,F,W --max-line-length=120 \
 --exclude=.venv,node_modules,__pycache__,*.pyc,dist,build,htmlcov,.pytest_cache,.git,Edge/electron-app \
 --count --statistics"""
     

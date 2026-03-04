@@ -443,6 +443,16 @@ pagination = query.order_by(AuditLog.timestamp.desc()).paginate(page=page, per_p
 
 ## 🔄 最近更新
 
+### 2026-03-04: 討論區與用戶社群互動功能（Cloud/engagement）
+
+- 實作 `Cloud/engagement/` 模組，提供完整的討論區與社群互動功能
+- 新增資料模型（`models.py`）：`UserEngagementProfile`、`Post`、`PostComment`、`PostLike`、`PointsLog`
+- 新增 `service.py`（`EngagementService`）：貼文 CRUD、評論、點讚切換、積分/等級/稱號、排行榜
+- 新增 `api.py`：Flask Blueprint REST API（`/api/cloud/engagement/*`，JWT 認證保護寫入操作）
+- 更新 `engagement.py`：從 `NotImplementedError` 佔位符改為委派 `EngagementService` 的實作
+- 29 個單元測試（全數通過），Lint 零錯誤，CodeQL 零告警
+- 所有文字輸入使用 `bleach.clean()` 防止 XSS；不暴露例外細節於 API 回應
+
 ### 2026-02-26: 雲端同步異常處理測試 + 啟動修復 + Codespace 模板
 
 - 新增 59 個雲端同步異常處理測試（48 → 107 → 139 after review fixes）

@@ -108,9 +108,19 @@ class CloudStorageService:
             file_hash = hash_obj.hexdigest()
 
             # 使用雜湊作為檔名，避免衝突
-            ext = Path(filename).suffix
-            storage_filename = f"{file_hash}{ext}"
-            file_path = category_path / storage_filename
+            # 僅保留單一英數副檔名（最多 10 字元），拒絕含路徑分隔符的副檔名
+            raw_ext = Path(filename).suffix
+            if raw_ext and re.match(r'^\.[A-Za-z0-9]{1,10}$', raw_ext):
+                safe_ext = raw_ext.lower()
+            else:
+                safe_ext = ''
+            storage_filename = f"{file_hash}{safe_ext}"
+
+            # 使用 safe_join 構建最終路徑（防止路徑穿越）
+            safe_file_path = safe_join(str(category_path), storage_filename)
+            if safe_file_path is None:
+                raise ValueError("Path traversal detected in storage filename")
+            file_path = Path(safe_file_path)
 
             # 如果檔案已存在（相同雜湊），刪除臨時檔案
             if file_path.exists():
@@ -176,11 +186,11 @@ class CloudStorageService:
             logger.warning(f"Category path not found: {category_path}")
             return None
 
-        # 尋找匹配的檔案（精確匹配前綴）
+        # 尋找匹配的檔案：使用 iterdir() 列舉目錄後比對 stem，
+        # 避免將用戶提供的 file_id 直接嵌入 glob 模式（斷開 CodeQL 污染流）
         matches = [
-            file_path
-            for file_path in category_path.glob(f"{file_id}*")
-            if file_path.is_file()
+            fp for fp in category_path.iterdir()
+            if fp.is_file() and fp.stem == file_id
         ]
 
         if not matches:
@@ -191,7 +201,7 @@ class CloudStorageService:
             logger.error(f"Multiple files matched for file_id={file_id}: {matches}")
             return None
 
-        # 讀取唯一匹配的檔案
+        # 讀取唯一匹配的檔案（路徑來自 iterdir()，非用戶資料）
         file_path = matches[0]
         with open(file_path, "rb") as f:
             content = f.read()
@@ -234,11 +244,11 @@ class CloudStorageService:
             logger.warning(f"Category path not found: {category_path}")
             return False
 
-        # 尋找匹配的檔案
+        # 尋找匹配的檔案：使用 iterdir() 列舉目錄後比對 stem，
+        # 避免將用戶提供的 file_id 直接嵌入 glob 模式（斷開 CodeQL 污染流）
         matches = [
-            file_path
-            for file_path in category_path.glob(f"{file_id}*")
-            if file_path.is_file()
+            fp for fp in category_path.iterdir()
+            if fp.is_file() and fp.stem == file_id
         ]
 
         if not matches:

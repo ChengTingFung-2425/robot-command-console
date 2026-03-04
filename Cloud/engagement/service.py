@@ -208,10 +208,14 @@ class EngagementService:
         # 確保用戶有積分檔案
         self.get_or_create_profile(author_username)
 
+        category = _sanitize(category) or 'general'
+        # 限制 category 長度符合欄位定義（64 字元）
+        category = category[:64].strip() or 'general'
+
         post = Post(
             title=title.strip(),
             body=body.strip(),
-            category=category or 'general',
+            category=category,
             author_username=author_username,
         )
         self.db.add(post)

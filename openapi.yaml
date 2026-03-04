@@ -356,6 +356,74 @@ components:
           description: 事件上下文
           additionalProperties: true
 
+    # Engagement 模型
+    EngagementProfile:
+      type: object
+      properties:
+        username:
+          type: string
+        points:
+          type: integer
+        level:
+          type: integer
+        title:
+          type: string
+        reputation:
+          type: integer
+        total_commands:
+          type: integer
+        total_posts:
+          type: integer
+        total_comments:
+          type: integer
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    Post:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        body:
+          type: string
+        category:
+          type: string
+        author_username:
+          type: string
+        like_count:
+          type: integer
+        comment_count:
+          type: integer
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    PostComment:
+      type: object
+      properties:
+        id:
+          type: integer
+        post_id:
+          type: integer
+        author_username:
+          type: string
+        content:
+          type: string
+        parent_comment_id:
+          type: integer
+          nullable: true
+        replies:
+          type: array
+          items:
+            $ref: '#/components/schemas/PostComment'
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+
   responses:
     Unauthorized:
       description: 未授權 - Token 無效或已過期
@@ -799,6 +867,409 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Engagement（討論區 + 社群互動）端點
+# ──────────────────────────────────────────────────────────────────────────────
+
+  /api/cloud/engagement/profile/{username}:
+    get:
+      summary: 取得用戶積分檔案
+      operationId: getEngagementProfile
+      tags:
+        - Engagement
+      security: []
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 用戶名稱
+      responses:
+        '200':
+          description: 用戶積分檔案
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/EngagementProfile'
+        '404':
+          description: 用戶檔案不存在
+        '500':
+          description: 伺服器錯誤
+
+  /api/cloud/engagement/leaderboard:
+    get:
+      summary: 取得排行榜
+      operationId: getEngagementLeaderboard
+      tags:
+        - Engagement
+      security: []
+      parameters:
+        - name: sort_by
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [points, level, reputation, commands]
+            default: points
+          description: 排序依據
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+          description: 回傳筆數
+      responses:
+        '200':
+          description: 排行榜列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EngagementProfile'
+        '500':
+          description: 伺服器錯誤
+
+  /api/cloud/engagement/posts:
+    get:
+      summary: 列出討論區貼文
+      operationId: listEngagementPosts
+      tags:
+        - Engagement
+      security: []
+      parameters:
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 分類篩選
+        - name: author
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 作者篩選
+        - name: sort_by
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [created_at, like_count, comment_count]
+            default: created_at
+          description: 排序欄位
+        - name: order
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+          description: 排序方向
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+          description: 每頁筆數
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: 分頁偏移量
+      responses:
+        '200':
+          description: 貼文列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      posts:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Post'
+                      total:
+                        type: integer
+                      limit:
+                        type: integer
+                      offset:
+                        type: integer
+        '500':
+          description: 伺服器錯誤
+    post:
+      summary: 建立討論區貼文
+      operationId: createEngagementPost
+      tags:
+        - Engagement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - body
+              properties:
+                title:
+                  type: string
+                  maxLength: 200
+                  description: 貼文標題
+                body:
+                  type: string
+                  description: 貼文內容
+                category:
+                  type: string
+                  maxLength: 64
+                  default: general
+                  description: 貼文分類
+      responses:
+        '201':
+          description: 貼文已建立
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Post'
+        '400':
+          description: 請求參數錯誤
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          description: 認證服務未初始化
+        '500':
+          description: 伺服器錯誤
+
+  /api/cloud/engagement/posts/{post_id}:
+    get:
+      summary: 取得指定貼文
+      operationId: getEngagementPost
+      tags:
+        - Engagement
+      security: []
+      parameters:
+        - name: post_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: 貼文 ID
+      responses:
+        '200':
+          description: 貼文詳情
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Post'
+        '404':
+          description: 貼文不存在
+        '500':
+          description: 伺服器錯誤
+    delete:
+      summary: 刪除貼文（僅作者可執行）
+      operationId: deleteEngagementPost
+      tags:
+        - Engagement
+      parameters:
+        - name: post_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: 貼文 ID
+      responses:
+        '200':
+          description: 貼文已刪除
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: 無權限刪除此貼文
+        '404':
+          description: 貼文不存在
+        '503':
+          description: 認證服務未初始化
+        '500':
+          description: 伺服器錯誤
+
+  /api/cloud/engagement/posts/{post_id}/comments:
+    get:
+      summary: 取得貼文評論列表
+      operationId: getEngagementPostComments
+      tags:
+        - Engagement
+      security: []
+      parameters:
+        - name: post_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: 貼文 ID
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 100
+            default: 50
+          description: 每頁筆數
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: 分頁偏移量
+      responses:
+        '200':
+          description: 評論列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      comments:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/PostComment'
+                      limit:
+                        type: integer
+                      offset:
+                        type: integer
+        '500':
+          description: 伺服器錯誤
+    post:
+      summary: 新增貼文評論
+      operationId: createEngagementPostComment
+      tags:
+        - Engagement
+      parameters:
+        - name: post_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: 貼文 ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - content
+              properties:
+                content:
+                  type: string
+                  description: 評論內容
+                parent_comment_id:
+                  type: integer
+                  nullable: true
+                  description: 父評論 ID（巢狀回覆）
+      responses:
+        '201':
+          description: 評論已提交
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/PostComment'
+        '400':
+          description: 請求參數錯誤
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: 貼文不存在
+        '503':
+          description: 認證服務未初始化
+        '500':
+          description: 伺服器錯誤
+
+  /api/cloud/engagement/posts/{post_id}/like:
+    post:
+      summary: 點讚或取消點讚貼文（切換）
+      operationId: toggleEngagementPostLike
+      tags:
+        - Engagement
+      parameters:
+        - name: post_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: 貼文 ID
+      responses:
+        '200':
+          description: 點讚狀態已切換
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      liked:
+                        type: boolean
+                      like_count:
+                        type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: 貼文不存在
+        '503':
+          description: 認證服務未初始化
+        '500':
+          description: 伺服器錯誤
+
 tags:
   - name: Health
     description: 健康檢查和狀態監控
@@ -812,3 +1283,5 @@ tags:
     description: 機器人註冊和管理
   - name: Events
     description: 系統事件記錄
+  - name: Engagement
+    description: 討論區與用戶社群互動（貼文、評論、點讚、積分、排行榜）

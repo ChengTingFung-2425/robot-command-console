@@ -1,7 +1,7 @@
 """
-雲端 LLM 提供商插件
-支援 OpenAI 相容 API 的雲端 LLM 服務（如 OpenAI、Azure OpenAI 等）
-實作雲端優先/本地備援策略的雲端端
+Azure OpenAI 提供商插件
+支援 Microsoft Azure OpenAI Service
+使用部署專屬端點與 api-key 標頭認證
 """
 
 import asyncio
@@ -23,66 +23,80 @@ from ..llm_provider_base import (
 logger = logging.getLogger(__name__)
 
 
-class CloudLLMProvider(LLMProviderBase):
+class AzureOpenAIProvider(LLMProviderBase):
     """
-    雲端 LLM 提供商
+    Azure OpenAI Service 提供商
 
-    支援任何 OpenAI 相容 API 的雲端服務，包括：
-    - OpenAI API (api.openai.com)
-    - Azure OpenAI
-    - 自架共享 LLM 服務
+    Azure OpenAI 使用部署（Deployment）而非直接的模型名稱。
+    端點格式：
+        https://{resource_name}.openai.azure.com/openai/deployments/{deployment}/chat/completions
+        ?api-version={api_version}
 
-    用於雲端優先/本地備援（cloud-first/local-fallback）策略的雲端端。
+    認證方式：api-key 標頭。
+
+    ProviderConfig 欄位用途：
+        - api_base  : 完整資源 URL，如 https://my-resource.openai.azure.com
+        - api_key   : Azure OpenAI API 金鑰
+        - custom_headers["deployment"] : 部署名稱（預設 "gpt-4o-mini"）
+        - custom_headers["api_version"]: API 版本（預設 "2024-02-01"）
     """
 
-    DEFAULT_HOST = "api.openai.com"
+    DEFAULT_API_VERSION = "2024-02-01"
+    DEFAULT_DEPLOYMENT = "gpt-4o-mini"
     DEFAULT_PORT = 443
 
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
         self._api_key = config.api_key
-        self._default_model: Optional[str] = None
-
-    def set_default_model(self, model: str) -> None:
-        """設定預設使用的模型"""
-        self._default_model = model
+        self._deployment = config.custom_headers.get("deployment", self.DEFAULT_DEPLOYMENT)
+        self._api_version = config.custom_headers.get("api_version", self.DEFAULT_API_VERSION)
 
     @property
     def provider_name(self) -> str:
-        return "cloud"
+        return "azure_openai"
 
     @property
     def default_port(self) -> int:
         return self.DEFAULT_PORT
 
+    def _get_chat_url(self) -> str:
+        """建構 Azure OpenAI Chat Completions 端點 URL"""
+        base = (self.config.api_base or "").rstrip("/")
+        return (
+            f"{base}/openai/deployments/{self._deployment}"
+            f"/chat/completions?api-version={self._api_version}"
+        )
+
+    def _get_models_url(self) -> str:
+        """建構 Azure OpenAI 模型列表端點 URL"""
+        base = (self.config.api_base or "").rstrip("/")
+        return f"{base}/openai/models?api-version={self._api_version}"
+
     def _make_headers(self) -> dict:
-        """建構 HTTP 請求標頭，包含授權資訊"""
+        """建構請求標頭，使用 api-key 認證"""
         headers = {"Content-Type": "application/json"}
-        headers.update(self.config.custom_headers)
         if self._api_key:
-            headers["Authorization"] = f"Bearer {self._api_key}"
+            headers["api-key"] = self._api_key
         return headers
 
     async def check_health(self) -> ProviderHealth:
         """
-        檢查雲端服務健康狀態
-
-        透過呼叫 /v1/models 端點確認服務可用性。
+        檢查 Azure OpenAI 服務健康狀態
 
         Returns:
             健康狀態資訊
         """
-        start_time = time.time()
-
-        if not self._api_key:
+        if not self._api_key or not self.config.api_base:
             return ProviderHealth(
                 status=ProviderStatus.UNAVAILABLE,
-                error_message="未設定 API 金鑰",
+                error_message="未設定 Azure OpenAI 資源 URL 或 API 金鑰",
             )
+
+        start_time = time.time()
 
         try:
             async with aiohttp.ClientSession() as session:
-                url = self.get_api_endpoint("v1/models")
+                url = self._get_models_url()
                 async with session.get(
                     url,
                     headers=self._make_headers(),
@@ -99,13 +113,13 @@ class CloudLLMProvider(LLMProviderBase):
                         ]
                         return ProviderHealth(
                             status=ProviderStatus.AVAILABLE,
-                            available_models=available_models,
+                            available_models=available_models or [self._deployment],
                             response_time_ms=response_time_ms,
                         )
                     elif response.status in (401, 403):
                         return ProviderHealth(
                             status=ProviderStatus.ERROR,
-                            error_message="API 金鑰無效或權限不足",
+                            error_message="Azure API 金鑰無效或權限不足",
                             response_time_ms=response_time_ms,
                         )
                     else:
@@ -126,7 +140,7 @@ class CloudLLMProvider(LLMProviderBase):
                 error_message=f"連線錯誤: {str(e)}",
             )
         except Exception as e:
-            self.logger.error(f"雲端健康檢查失敗: {e}", exc_info=True)
+            self.logger.error(f"Azure OpenAI 健康檢查失敗: {e}", exc_info=True)
             return ProviderHealth(
                 status=ProviderStatus.ERROR,
                 error_message="健康檢查失敗",
@@ -134,17 +148,17 @@ class CloudLLMProvider(LLMProviderBase):
 
     async def list_models(self) -> List[LLMModel]:
         """
-        列出雲端可用的模型
+        列出 Azure OpenAI 可用的部署（模型）
 
         Returns:
-            模型列表
+            模型列表（以部署名稱作為模型 ID）
         """
-        if not self._api_key:
+        if not self._api_key or not self.config.api_base:
             return []
 
         try:
             async with aiohttp.ClientSession() as session:
-                url = self.get_api_endpoint("v1/models")
+                url = self._get_models_url()
                 async with session.get(
                     url,
                     headers=self._make_headers(),
@@ -169,19 +183,26 @@ class CloudLLMProvider(LLMProviderBase):
                                 id=model_id,
                                 name=model_id,
                                 capabilities=capabilities,
-                                metadata={
-                                    "owned_by": item.get("owned_by", ""),
-                                    "object": item.get("object", "model"),
-                                },
+                                metadata={"deployment": self._deployment},
                             )
                         )
                     return models
 
         except aiohttp.ClientError as e:
-            self.logger.error(f"無法列出雲端模型: {e}")
-            return []
+            self.logger.error(f"無法列出 Azure OpenAI 模型: {e}")
+            # 回傳目前設定的部署名稱作為預設
+            return [
+                LLMModel(
+                    id=self._deployment,
+                    name=self._deployment,
+                    capabilities=ModelCapability(
+                        supports_streaming=True,
+                        supports_function_calling=True,
+                    ),
+                )
+            ]
         except Exception as e:
-            self.logger.error(f"列出雲端模型時發生錯誤: {e}", exc_info=True)
+            self.logger.error(f"列出 Azure OpenAI 模型時發生錯誤: {e}", exc_info=True)
             return []
 
     async def generate(
@@ -193,11 +214,11 @@ class CloudLLMProvider(LLMProviderBase):
         **kwargs,
     ) -> Tuple[str, float]:
         """
-        使用雲端 LLM 生成文字
+        使用 Azure OpenAI 生成文字
 
         Args:
             prompt: 輸入提示
-            model: 使用的模型 ID（如 gpt-4o-mini）
+            model: 忽略（Azure 固定使用初始化時指定的部署名稱；如需切換部署請建立新實例）
             temperature: 溫度參數
             max_tokens: 最大生成 token 數
             **kwargs: 其他參數（system: 系統提示）
@@ -205,16 +226,9 @@ class CloudLLMProvider(LLMProviderBase):
         Returns:
             (生成的文字, 信心度) 元組
         """
-        effective_model = model or self._default_model
-        if not effective_model:
-            raise ValueError(
-                "未指定模型名稱：請在 generate() 呼叫時傳入 model 參數，"
-                "或在初始化後呼叫 set_default_model() 設定預設模型"
-            )
-
         try:
             async with aiohttp.ClientSession() as session:
-                url = self.get_api_endpoint("v1/chat/completions")
+                url = self._get_chat_url()
 
                 messages = []
                 if "system" in kwargs:
@@ -222,7 +236,6 @@ class CloudLLMProvider(LLMProviderBase):
                 messages.append({"role": "user", "content": prompt})
 
                 payload: dict = {
-                    "model": effective_model,
                     "messages": messages,
                     "temperature": temperature,
                     "stream": False,
@@ -257,8 +270,8 @@ class CloudLLMProvider(LLMProviderBase):
                     return generated_text, confidence
 
         except aiohttp.ClientError as e:
-            self.logger.error(f"雲端 LLM 生成失敗: {e}")
+            self.logger.error(f"Azure OpenAI 生成失敗: {e}")
             raise
         except Exception as e:
-            self.logger.error(f"雲端 LLM 生成時發生錯誤: {e}", exc_info=True)
+            self.logger.error(f"Azure OpenAI 生成時發生錯誤: {e}", exc_info=True)
             raise

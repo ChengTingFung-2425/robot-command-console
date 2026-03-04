@@ -1,7 +1,7 @@
 """
-雲端 LLM 提供商插件
-支援 OpenAI 相容 API 的雲端 LLM 服務（如 OpenAI、Azure OpenAI 等）
-實作雲端優先/本地備援策略的雲端端
+GCP Vertex AI / Gemini 提供商插件
+支援 Google Cloud 的 Gemini API（Generative Language API）
+使用 API 金鑰認證（適用於 Gemini API）
 """
 
 import asyncio
@@ -22,70 +22,82 @@ from ..llm_provider_base import (
 
 logger = logging.getLogger(__name__)
 
+# Gemini API 支援的常見模型（用於無法列表時的預設值）
+GEMINI_DEFAULT_MODELS = [
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
+    "gemini-2.0-flash",
+]
 
-class CloudLLMProvider(LLMProviderBase):
+
+class GCPGeminiProvider(LLMProviderBase):
     """
-    雲端 LLM 提供商
+    GCP Gemini 提供商（Generative Language API）
 
-    支援任何 OpenAI 相容 API 的雲端服務，包括：
-    - OpenAI API (api.openai.com)
-    - Azure OpenAI
-    - 自架共享 LLM 服務
+    端點格式：
+        https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}
 
-    用於雲端優先/本地備援（cloud-first/local-fallback）策略的雲端端。
+    認證方式：API 金鑰附加於查詢參數 key=
+
+    ProviderConfig 欄位用途：
+        - api_key   : Google AI Studio / GCP API 金鑰
+        - custom_headers["default_model"]: 預設模型（預設 "gemini-1.5-flash"）
     """
 
-    DEFAULT_HOST = "api.openai.com"
+    GEMINI_BASE_URL = "https://generativelanguage.googleapis.com"
     DEFAULT_PORT = 443
 
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
         self._api_key = config.api_key
-        self._default_model: Optional[str] = None
-
-    def set_default_model(self, model: str) -> None:
-        """設定預設使用的模型"""
-        self._default_model = model
+        self._default_model = config.custom_headers.get(
+            "default_model", GEMINI_DEFAULT_MODELS[0]
+        )
 
     @property
     def provider_name(self) -> str:
-        return "cloud"
+        return "gcp_gemini"
 
     @property
     def default_port(self) -> int:
         return self.DEFAULT_PORT
 
-    def _make_headers(self) -> dict:
-        """建構 HTTP 請求標頭，包含授權資訊"""
-        headers = {"Content-Type": "application/json"}
-        headers.update(self.config.custom_headers)
-        if self._api_key:
-            headers["Authorization"] = f"Bearer {self._api_key}"
-        return headers
+    def get_api_endpoint(self, path: str = "") -> str:
+        """覆寫端點建構，固定使用 Gemini API base URL"""
+        base = self.GEMINI_BASE_URL.rstrip("/")
+        return f"{base}/{path.lstrip('/')}" if path else base
+
+    def _generate_url(self, model: str) -> str:
+        """建構生成端點 URL"""
+        return (
+            f"{self.GEMINI_BASE_URL}/v1beta/models/{model}"
+            f":generateContent?key={self._api_key}"
+        )
+
+    def _list_models_url(self) -> str:
+        """建構模型列表端點 URL"""
+        return f"{self.GEMINI_BASE_URL}/v1beta/models?key={self._api_key}"
 
     async def check_health(self) -> ProviderHealth:
         """
-        檢查雲端服務健康狀態
-
-        透過呼叫 /v1/models 端點確認服務可用性。
+        檢查 GCP Gemini 服務健康狀態
 
         Returns:
             健康狀態資訊
         """
-        start_time = time.time()
-
         if not self._api_key:
             return ProviderHealth(
                 status=ProviderStatus.UNAVAILABLE,
-                error_message="未設定 API 金鑰",
+                error_message="未設定 GCP API 金鑰",
             )
+
+        start_time = time.time()
 
         try:
             async with aiohttp.ClientSession() as session:
-                url = self.get_api_endpoint("v1/models")
+                url = self._list_models_url()
                 async with session.get(
                     url,
-                    headers=self._make_headers(),
                     timeout=aiohttp.ClientTimeout(total=self.config.timeout),
                 ) as response:
                     response_time_ms = (time.time() - start_time) * 1000
@@ -93,19 +105,19 @@ class CloudLLMProvider(LLMProviderBase):
                     if response.status == 200:
                         data = await response.json()
                         available_models = [
-                            item.get("id", "")
-                            for item in data.get("data", [])
-                            if item.get("id")
+                            item.get("name", "").split("/")[-1]
+                            for item in data.get("models", [])
+                            if "generateContent" in item.get("supportedGenerationMethods", [])
                         ]
                         return ProviderHealth(
                             status=ProviderStatus.AVAILABLE,
-                            available_models=available_models,
+                            available_models=available_models or GEMINI_DEFAULT_MODELS,
                             response_time_ms=response_time_ms,
                         )
-                    elif response.status in (401, 403):
+                    elif response.status in (400, 401, 403):
                         return ProviderHealth(
                             status=ProviderStatus.ERROR,
-                            error_message="API 金鑰無效或權限不足",
+                            error_message="GCP API 金鑰無效或權限不足",
                             response_time_ms=response_time_ms,
                         )
                     else:
@@ -126,7 +138,7 @@ class CloudLLMProvider(LLMProviderBase):
                 error_message=f"連線錯誤: {str(e)}",
             )
         except Exception as e:
-            self.logger.error(f"雲端健康檢查失敗: {e}", exc_info=True)
+            self.logger.error(f"GCP Gemini 健康檢查失敗: {e}", exc_info=True)
             return ProviderHealth(
                 status=ProviderStatus.ERROR,
                 error_message="健康檢查失敗",
@@ -134,54 +146,52 @@ class CloudLLMProvider(LLMProviderBase):
 
     async def list_models(self) -> List[LLMModel]:
         """
-        列出雲端可用的模型
+        列出 GCP Gemini 可用的模型
 
         Returns:
-            模型列表
+            支援 generateContent 的模型列表
         """
         if not self._api_key:
             return []
 
         try:
             async with aiohttp.ClientSession() as session:
-                url = self.get_api_endpoint("v1/models")
+                url = self._list_models_url()
                 async with session.get(
                     url,
-                    headers=self._make_headers(),
                     timeout=aiohttp.ClientTimeout(total=self.config.timeout),
                 ) as response:
                     response.raise_for_status()
                     data = await response.json()
 
                     models = []
-                    for item in data.get("data", []):
-                        model_id = item.get("id", "")
+                    for item in data.get("models", []):
+                        if "generateContent" not in item.get("supportedGenerationMethods", []):
+                            continue
+                        model_id = item.get("name", "").split("/")[-1]
                         if not model_id:
                             continue
                         capabilities = ModelCapability(
                             supports_streaming=True,
-                            supports_function_calling=True,
-                            context_length=item.get("context_length", 4096),
-                            max_tokens=item.get("max_tokens", 4096),
+                            supports_vision="vision" in model_id.lower(),
+                            context_length=item.get("inputTokenLimit", 8192),
+                            max_tokens=item.get("outputTokenLimit", 2048),
                         )
                         models.append(
                             LLMModel(
                                 id=model_id,
-                                name=model_id,
+                                name=item.get("displayName", model_id),
                                 capabilities=capabilities,
-                                metadata={
-                                    "owned_by": item.get("owned_by", ""),
-                                    "object": item.get("object", "model"),
-                                },
+                                metadata={"full_name": item.get("name", "")},
                             )
                         )
                     return models
 
         except aiohttp.ClientError as e:
-            self.logger.error(f"無法列出雲端模型: {e}")
+            self.logger.error(f"無法列出 GCP Gemini 模型: {e}")
             return []
         except Exception as e:
-            self.logger.error(f"列出雲端模型時發生錯誤: {e}", exc_info=True)
+            self.logger.error(f"列出 GCP Gemini 模型時發生錯誤: {e}", exc_info=True)
             return []
 
     async def generate(
@@ -193,63 +203,64 @@ class CloudLLMProvider(LLMProviderBase):
         **kwargs,
     ) -> Tuple[str, float]:
         """
-        使用雲端 LLM 生成文字
+        使用 GCP Gemini 生成文字
 
         Args:
             prompt: 輸入提示
-            model: 使用的模型 ID（如 gpt-4o-mini）
+            model: 模型 ID（如 gemini-1.5-flash）
             temperature: 溫度參數
             max_tokens: 最大生成 token 數
-            **kwargs: 其他參數（system: 系統提示）
+            **kwargs: 其他參數（system: 系統提示，合併至使用者訊息）
 
         Returns:
             (生成的文字, 信心度) 元組
         """
         effective_model = model or self._default_model
-        if not effective_model:
-            raise ValueError(
-                "未指定模型名稱：請在 generate() 呼叫時傳入 model 參數，"
-                "或在初始化後呼叫 set_default_model() 設定預設模型"
-            )
 
         try:
             async with aiohttp.ClientSession() as session:
-                url = self.get_api_endpoint("v1/chat/completions")
+                url = self._generate_url(effective_model)
 
-                messages = []
+                # Gemini API 使用不同的請求格式
+                user_content = prompt
                 if "system" in kwargs:
-                    messages.append({"role": "system", "content": kwargs["system"]})
-                messages.append({"role": "user", "content": prompt})
+                    user_content = f"{kwargs['system']}\n\n{prompt}"
 
                 payload: dict = {
-                    "model": effective_model,
-                    "messages": messages,
-                    "temperature": temperature,
-                    "stream": False,
+                    "contents": [
+                        {"role": "user", "parts": [{"text": user_content}]}
+                    ],
+                    "generationConfig": {
+                        "temperature": temperature,
+                    },
                 }
                 if max_tokens:
-                    payload["max_tokens"] = max_tokens
+                    payload["generationConfig"]["maxOutputTokens"] = max_tokens
 
                 async with session.post(
                     url,
                     json=payload,
-                    headers=self._make_headers(),
+                    headers={"Content-Type": "application/json"},
                     timeout=aiohttp.ClientTimeout(total=self.config.timeout),
                 ) as response:
                     response.raise_for_status()
                     data = await response.json()
 
-                    choices = data.get("choices", [])
-                    if not choices:
+                    candidates = data.get("candidates", [])
+                    if not candidates:
                         return "", 0.0
 
-                    message = choices[0].get("message", {})
-                    generated_text = message.get("content", "")
+                    candidate = candidates[0]
+                    content = candidate.get("content", {})
+                    parts = content.get("parts", [])
+                    generated_text = "".join(
+                        part.get("text", "") for part in parts
+                    )
 
-                    finish_reason = choices[0].get("finish_reason")
-                    if finish_reason == "stop":
+                    finish_reason = candidate.get("finishReason", "")
+                    if finish_reason == "STOP":
                         confidence = 0.92
-                    elif finish_reason == "length":
+                    elif finish_reason == "MAX_TOKENS":
                         confidence = 0.70
                     else:
                         confidence = 0.85
@@ -257,8 +268,8 @@ class CloudLLMProvider(LLMProviderBase):
                     return generated_text, confidence
 
         except aiohttp.ClientError as e:
-            self.logger.error(f"雲端 LLM 生成失敗: {e}")
+            self.logger.error(f"GCP Gemini 生成失敗: {e}")
             raise
         except Exception as e:
-            self.logger.error(f"雲端 LLM 生成時發生錯誤: {e}", exc_info=True)
+            self.logger.error(f"GCP Gemini 生成時發生錯誤: {e}", exc_info=True)
             raise

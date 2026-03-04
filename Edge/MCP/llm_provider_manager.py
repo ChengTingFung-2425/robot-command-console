@@ -388,6 +388,13 @@ class LLMProviderManager:
         Returns:
             True 表示雲端提供商，False 表示本地提供商
         """
+        # 優先依據 provider 實例上的 is_cloud 屬性判斷，若未定義則回退至名稱白名單
+        provider = self.providers.get(provider_name) if hasattr(self, "providers") else None
+
+        if provider is not None:
+            is_cloud_attr = getattr(provider, "is_cloud", None)
+            if isinstance(is_cloud_attr, bool):
+                return is_cloud_attr
         provider = self.providers.get(provider_name)
         if provider is not None:
             return bool(getattr(provider, "is_cloud", False))

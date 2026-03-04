@@ -3,7 +3,7 @@
 """
 
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, MagicMock
 
 from Cloud.api.auth import CloudAuthService
 from Cloud.shared_commands.api import (
@@ -98,7 +98,9 @@ class TestSharedCommandsAuth(unittest.TestCase):
 
         mock_service = Mock()
         mock_service.upload_command.return_value = mock_command
-        mock_get_service.return_value = mock_service
+        mock_ctx = MagicMock()
+        mock_ctx.__enter__.return_value = mock_service
+        mock_get_service.return_value = mock_ctx
 
         # 生成有效的 token
         token = self.auth_service.generate_token(
@@ -152,7 +154,9 @@ class TestSharedCommandsAuth(unittest.TestCase):
 
         mock_service = Mock()
         mock_service.rate_command.return_value = mock_rating
-        mock_get_service.return_value = mock_service
+        mock_ctx = MagicMock()
+        mock_ctx.__enter__.return_value = mock_service
+        mock_get_service.return_value = mock_ctx
 
         with app.test_client() as client:
             # 測試沒有 token 的請求
@@ -188,7 +192,9 @@ class TestSharedCommandsAuth(unittest.TestCase):
 
         mock_service = Mock()
         mock_service.download_command.return_value = mock_command
-        mock_get_service.return_value = mock_service
+        mock_ctx = MagicMock()
+        mock_ctx.__enter__.return_value = mock_service
+        mock_get_service.return_value = mock_ctx
 
         with app.test_client() as client:
             # 測試沒有 token 的請求
@@ -207,7 +213,9 @@ class TestSharedCommandsAuth(unittest.TestCase):
 
         mock_service = Mock()
         mock_service.search_commands.return_value = ([], 0)
-        mock_get_service.return_value = mock_service
+        mock_ctx = MagicMock()
+        mock_ctx.__enter__.return_value = mock_service
+        mock_get_service.return_value = mock_ctx
 
         with app.test_client() as client:
             # 測試沒有 token 也可以搜尋
@@ -224,7 +232,9 @@ class TestSharedCommandsAuth(unittest.TestCase):
 
         mock_service = Mock()
         mock_service.get_featured_commands.return_value = []
-        mock_get_service.return_value = mock_service
+        mock_ctx = MagicMock()
+        mock_ctx.__enter__.return_value = mock_service
+        mock_get_service.return_value = mock_ctx
 
         with app.test_client() as client:
             # 測試沒有 token 也可以取得精選指令

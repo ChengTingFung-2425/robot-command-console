@@ -1,7 +1,7 @@
 # imports
 import logging
 from contextlib import contextmanager
-from typing import Optional, Generator
+from typing import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session, scoped_session
 from sqlalchemy.pool import StaticPool

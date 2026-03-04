@@ -4,6 +4,8 @@ from unittest.mock import Mock, patch, MagicMock
 import tempfile
 import os
 
+from sqlalchemy import text
+
 from Cloud.shared_commands.database import (
     init_db,
     get_db_session,
@@ -69,7 +71,7 @@ class TestDatabaseSessionManagement(unittest.TestCase):
         with session_scope() as session:
             self.assertIsNotNone(session)
             # Session 應該是可用的
-            result = session.execute("SELECT 1").fetchone()
+            result = session.execute(text("SELECT 1")).fetchone()
             self.assertEqual(result[0], 1)
         
         # Context manager 退出後 session 應該被關閉
@@ -87,7 +89,7 @@ class TestDatabaseSessionManagement(unittest.TestCase):
         
         # Session 應該被 rollback 和關閉，不應影響後續操作
         with session_scope() as session:
-            result = session.execute("SELECT 1").fetchone()
+            result = session.execute(text("SELECT 1")).fetchone()
             self.assertEqual(result[0], 1)
 
     def test_close_db(self):

@@ -445,16 +445,128 @@ MCP 的 Prometheus metrics 端點包含 LLM 提供商相關指標：
 - [MCP 模組設計](../MCP/Module.md)
 - [API 參考](../MCP/README.md)
 
+## 雲端 LLM 提供商（Cloud-First / Local-Fallback）
+
+除本地提供商外，系統支援三大雲端平台，可透過 `RoutingMode` 實現雲端優先/本地備援的混合策略。
+
+### 支援的雲端提供商
+
+| 提供商 | 類別 | 認證方式 | 主要模型 |
+|--------|------|----------|----------|
+| 通用 OpenAI 相容 | `CloudLLMProvider` | API 金鑰（Bearer） | gpt-4o、gpt-4o-mini 等 |
+| Azure OpenAI | `AzureOpenAIProvider` | `api-key` 標頭 | 由部署名稱決定 |
+| GCP Gemini | `GCPGeminiProvider` | API 金鑰（查詢參數） | gemini-1.5-flash、gemini-1.5-pro 等 |
+| Amazon Bedrock | `AWSBedrockProvider` | AWS 標準認證鏈 | Claude、Titan 等 |
+
+### 快速設定
+
+#### 通用 OpenAI 相容端點
+```python
+from Edge.MCP.providers import CloudLLMProvider
+from Edge.MCP.llm_provider_base import ProviderConfig
+
+config = ProviderConfig(
+    name="cloud",
+    api_base="https://api.openai.com",
+    api_key="sk-...",
+)
+provider = CloudLLMProvider(config)
+provider.set_default_model("gpt-4o-mini")
+```
+
+#### Azure OpenAI Service
+```python
+from Edge.MCP.providers import AzureOpenAIProvider
+
+config = ProviderConfig(
+    name="azure_openai",
+    api_base="https://my-resource.openai.azure.com",
+    api_key="<azure-api-key>",
+    custom_headers={
+        "deployment": "gpt-4o-mini",
+        "api_version": "2024-02-01",
+    },
+)
+provider = AzureOpenAIProvider(config)
+```
+
+#### GCP Gemini API
+```python
+from Edge.MCP.providers import GCPGeminiProvider
+
+config = ProviderConfig(
+    name="gcp_gemini",
+    api_key="<google-api-key>",
+    custom_headers={"default_model": "gemini-1.5-flash"},
+)
+provider = GCPGeminiProvider(config)
+```
+
+#### Amazon Bedrock（AWS 標準認證鏈）
+```bash
+# 設定環境變數（推薦）
+export AWS_ACCESS_KEY_ID=AKIA...
+export AWS_SECRET_ACCESS_KEY=...
+export AWS_DEFAULT_REGION=us-east-1
+```
+```python
+from Edge.MCP.providers import AWSBedrockProvider
+
+config = ProviderConfig(
+    name="aws_bedrock",
+    custom_headers={
+        "region": "us-east-1",
+        "model_id": "anthropic.claude-3-haiku-20240307-v1:0",
+    },
+)
+provider = AWSBedrockProvider(config)
+```
+
+> **注意**：AWS 認證應透過環境變數（`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`）或 IAM Role 提供，**不應**放入 `ProviderConfig` 的欄位中。
+
+### 路由策略（RoutingMode）
+
+```python
+from Edge.MCP.llm_provider_manager import LLMProviderManager, RoutingMode
+
+manager = LLMProviderManager(routing_mode=RoutingMode.CLOUD_FIRST)
+manager.register_provider(AzureOpenAIProvider(azure_config))
+manager.register_provider(OllamaProvider(local_config))
+
+# 自動選擇雲端，雲端不可用或生成失敗時備援到本地
+text, used_provider, confidence = await manager.generate_with_routing(
+    prompt="向前移動三秒"
+)
+```
+
+| 模式 | 說明 |
+|------|------|
+| `CLOUD_FIRST` | 優先使用雲端，不可用時自動切換本地 |
+| `LOCAL_FIRST` | 優先使用本地（預設），不可用時切換雲端 |
+| `CLOUD_ONLY` | 僅使用雲端，無雲端時回傳 None |
+| `LOCAL_ONLY` | 僅使用本地，無本地時回傳 None |
+
+### 自訂雲端提供商
+
+繼承 `LLMProviderBase` 時設定 `is_cloud = True`，路由器即可正確識別：
+
+```python
+class MyCloudProvider(LLMProviderBase):
+    is_cloud: bool = True
+    # ...
+```
+
 ## 貢獻
 
 歡迎貢獻新的提供商插件！請遵循以下步驟：
 
 1. Fork 專案
 2. 建立提供商類別（繼承 `LLMProviderBase`）
-3. 實作所有必要方法
-4. 新增測試
-5. 更新文件
-6. 提交 Pull Request
+3. 設定 `is_cloud = True`（若為雲端提供商）
+4. 實作所有必要方法
+5. 新增測試
+6. 更新文件
+7. 提交 Pull Request
 
 ## 授權
 

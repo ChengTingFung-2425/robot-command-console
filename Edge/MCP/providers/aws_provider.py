@@ -6,6 +6,7 @@ Amazon Bedrock 提供商插件
 
 import json
 import logging
+import os
 from typing import List, Optional, Tuple
 
 from ..llm_provider_base import (
@@ -36,23 +37,29 @@ class AWSBedrockProvider(LLMProviderBase):
     - Amazon Titan 系列
     - 其他 Bedrock 支援的模型
 
+    AWS 認證優先順序（boto3 標準鏈）：
+        1. 環境變數 AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
+        2. ~/.aws/credentials 設定檔
+        3. EC2/ECS/Lambda IAM Role
+
     ProviderConfig 欄位用途：
-        - custom_headers["region"]     : AWS 區域（預設 "us-east-1"）
-        - custom_headers["model_id"]   : 預設 Bedrock 模型 ID
-        - custom_headers["aws_access_key_id"]    : AWS Access Key（若未設定則從環境變數讀取）
-        - custom_headers["aws_secret_access_key"]: AWS Secret Key（若未設定則從環境變數讀取）
+        - custom_headers["region"]  : AWS 區域（預設讀取 AWS_DEFAULT_REGION，否則 "us-east-1"）
+        - custom_headers["model_id"]: 預設 Bedrock 模型 ID
     """
 
     DEFAULT_PORT = 443
+    is_cloud: bool = True
 
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
-        self._region = config.custom_headers.get("region", "us-east-1")
+        self._region = (
+            config.custom_headers.get("region")
+            or os.environ.get("AWS_DEFAULT_REGION")
+            or "us-east-1"
+        )
         self._model_id = config.custom_headers.get(
             "model_id", BEDROCK_DEFAULT_MODELS[0]
         )
-        self._aws_access_key_id = config.custom_headers.get("aws_access_key_id") or None
-        self._aws_secret_access_key = config.custom_headers.get("aws_secret_access_key") or None
 
     @property
     def provider_name(self) -> str:
@@ -63,12 +70,8 @@ class AWSBedrockProvider(LLMProviderBase):
         return self.DEFAULT_PORT
 
     def _make_boto3_kwargs(self) -> dict:
-        """建構 boto3 客戶端參數（支援顯式憑證或環境變數）"""
-        kwargs: dict = {"region_name": self._region}
-        if self._aws_access_key_id and self._aws_secret_access_key:
-            kwargs["aws_access_key_id"] = self._aws_access_key_id
-            kwargs["aws_secret_access_key"] = self._aws_secret_access_key
-        return kwargs
+        """建構 boto3 客戶端參數，使用標準 AWS 認證鏈（環境變數 / ~/.aws / IAM Role）"""
+        return {"region_name": self._region}
 
     async def check_health(self) -> ProviderHealth:
         """
@@ -147,7 +150,7 @@ class AWSBedrockProvider(LLMProviderBase):
                     if not model_id:
                         continue
                     capabilities = ModelCapability(
-                        supports_streaming="STREAMING" in item.get("responseStreamingSupported", []),
+                        supports_streaming=bool(item.get("responseStreamingSupported", False)),
                         context_length=8192,
                         max_tokens=4096,
                     )

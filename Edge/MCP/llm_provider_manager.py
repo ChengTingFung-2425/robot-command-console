@@ -378,12 +378,19 @@ class LLMProviderManager:
         """
         判斷提供商是否為雲端提供商
 
+        優先依據已註冊提供商實例上的 `is_cloud` 屬性判斷，
+        允許任何自訂提供商透過設定 `is_cloud = True` 宣告自己為雲端提供商。
+        若提供商尚未註冊，則回退至名稱白名單（_CLOUD_PROVIDER_NAMES）。
+
         Args:
             provider_name: 提供商名稱
 
         Returns:
             True 表示雲端提供商，False 表示本地提供商
         """
+        provider = self.providers.get(provider_name)
+        if provider is not None:
+            return bool(getattr(provider, "is_cloud", False))
         return provider_name in _CLOUD_PROVIDER_NAMES
 
     def set_routing_mode(self, mode: RoutingMode) -> None:
@@ -504,7 +511,11 @@ class LLMProviderManager:
         **kwargs,
     ) -> Tuple[Optional[str], Optional[str], float]:
         """
-        依照路由模式生成文字，自動備援
+        依照路由模式生成文字，含真正的多提供商自動備援
+
+        首先依路由模式與健康檢查選出首選提供商。若該提供商生成時
+        發生錯誤（如 rate-limit、暫時性伺服器錯誤），會依順序嘗試
+        其他已註冊的提供商，直到成功或全部失敗為止。
 
         Args:
             prompt: 輸入提示
@@ -517,41 +528,55 @@ class LLMProviderManager:
             (生成文字, 使用的提供商名稱, 信心度) 元組；
             若所有提供商都失敗則回傳 (None, None, 0.0)
         """
-        provider = await self.get_provider_with_routing_and_health()
-        if provider is None:
+        # 取得首選提供商（已通過健康檢查）
+        primary = await self.get_provider_with_routing_and_health()
+        if primary is None:
             self.logger.error("generate_with_routing: 沒有可用提供商")
             return None, None, 0.0
 
-        # 若未指定模型，嘗試取得提供商第一個可用模型
-        effective_model = model
-        if not effective_model:
+        # 建構候選列表：首選在最前，其餘已註冊提供商作為備援（使用 set 去重）
+        seen: set = {primary}
+        candidates: List[LLMProviderBase] = [primary]
+        for p in self.providers.values():
+            if p not in seen:
+                candidates.append(p)
+                seen.add(p)
+
+        for provider in candidates:
+            # 若未指定模型，嘗試取得該提供商第一個可用模型
+            effective_model = model
+            if not effective_model:
+                try:
+                    models = await provider.list_models()
+                    if models:
+                        effective_model = models[0].id
+                except Exception as e:
+                    self.logger.debug(f"無法列出 {provider.provider_name} 模型: {e}")
+
+            if not effective_model:
+                self.logger.warning(
+                    f"提供商 {provider.provider_name} 無可用模型，嘗試下一個提供商"
+                )
+                continue
+
             try:
-                models = await provider.list_models()
-                if models:
-                    effective_model = models[0].id
+                text, confidence = await provider.generate(
+                    prompt=prompt,
+                    model=effective_model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    **kwargs,
+                )
+                self.logger.info(
+                    f"generate_with_routing 成功: provider={provider.provider_name}, "
+                    f"model={effective_model}"
+                )
+                return text, provider.provider_name, confidence
             except Exception as e:
-                self.logger.debug(f"無法列出 {provider.provider_name} 模型: {e}")
+                self.logger.error(
+                    f"提供商 {provider.provider_name} 生成失敗，嘗試下一個備援: {e}",
+                    exc_info=True,
+                )
 
-        if not effective_model:
-            self.logger.error(f"提供商 {provider.provider_name} 無可用模型")
-            return None, provider.provider_name, 0.0
-
-        try:
-            text, confidence = await provider.generate(
-                prompt=prompt,
-                model=effective_model,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                **kwargs,
-            )
-            self.logger.info(
-                f"generate_with_routing 成功: provider={provider.provider_name}, "
-                f"model={effective_model}"
-            )
-            return text, provider.provider_name, confidence
-        except Exception as e:
-            self.logger.error(
-                f"提供商 {provider.provider_name} 生成失敗: {e}",
-                exc_info=True,
-            )
-            return None, provider.provider_name, 0.0
+        self.logger.error("generate_with_routing: 所有候選提供商皆生成失敗")
+        return None, None, 0.0

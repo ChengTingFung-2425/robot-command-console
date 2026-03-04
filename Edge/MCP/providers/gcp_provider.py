@@ -46,6 +46,7 @@ class GCPGeminiProvider(LLMProviderBase):
 
     GEMINI_BASE_URL = "https://generativelanguage.googleapis.com"
     DEFAULT_PORT = 443
+    is_cloud: bool = True
 
     def __init__(self, config: ProviderConfig):
         super().__init__(config)

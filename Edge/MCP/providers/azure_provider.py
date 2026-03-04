@@ -44,6 +44,7 @@ class AzureOpenAIProvider(LLMProviderBase):
     DEFAULT_API_VERSION = "2024-02-01"
     DEFAULT_DEPLOYMENT = "gpt-4o-mini"
     DEFAULT_PORT = 443
+    is_cloud: bool = True
 
     def __init__(self, config: ProviderConfig):
         super().__init__(config)

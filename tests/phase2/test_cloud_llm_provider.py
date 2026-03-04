@@ -82,7 +82,7 @@ def _make_gcp_config(**overrides) -> ProviderConfig:
 
 
 def _make_aws_config(**overrides) -> ProviderConfig:
-    """建立 AWS Bedrock 提供商設定"""
+    """建立 AWS Bedrock 提供商設定（認證透過環境變數，不放入 custom_headers）"""
     defaults = dict(
         name="aws_bedrock",
         host="bedrock-runtime.us-east-1.amazonaws.com",
@@ -91,8 +91,6 @@ def _make_aws_config(**overrides) -> ProviderConfig:
         custom_headers={
             "region": "us-east-1",
             "model_id": "anthropic.claude-3-haiku-20240307-v1:0",
-            "aws_access_key_id": "AKIATEST",
-            "aws_secret_access_key": "secret-test",
         },
     )
     defaults.update(overrides)
@@ -573,12 +571,23 @@ class TestLLMProviderManagerRouting:
     def test_is_cloud_provider(self):
         """is_cloud_provider 應正確識別雲端提供商"""
         manager = LLMProviderManager()
+
+        # 未登録のプロバイダーは名前ホワイトリストで判定
         assert manager.is_cloud_provider("cloud") is True
         assert manager.is_cloud_provider("azure_openai") is True
         assert manager.is_cloud_provider("gcp_gemini") is True
         assert manager.is_cloud_provider("aws_bedrock") is True
         assert manager.is_cloud_provider("ollama") is False
         assert manager.is_cloud_provider("lmstudio") is False
+
+        # 登録済みプロバイダーは is_cloud 属性で判定
+        local_config = ProviderConfig(name="ollama", port=11434, timeout=1)
+        local_provider = OllamaProvider(local_config)
+        cloud_provider = CloudLLMProvider(_make_cloud_config())
+        manager.register_provider(local_provider)
+        manager.register_provider(cloud_provider)
+        assert manager.is_cloud_provider("ollama") is False
+        assert manager.is_cloud_provider("cloud") is True
 
     def test_list_cloud_and_local_providers(self):
         """list_cloud_providers / list_local_providers 應正確分類"""
@@ -707,6 +716,65 @@ class TestLLMProviderManagerRouting:
         """無可用提供商時 generate_with_routing 應回傳 (None, None, 0.0)"""
         manager = LLMProviderManager(routing_mode=RoutingMode.LOCAL_ONLY)
         # 未註冊任何提供商
+
+        text, provider_name, confidence = await manager.generate_with_routing(
+            prompt="Hello"
+        )
+
+        assert text is None
+        assert provider_name is None
+        assert confidence == 0.0
+
+    @pytest.mark.asyncio
+    async def test_generate_with_routing_fallback_on_generate_error(self):
+        """雲端提供商生成失敗時應自動備援到本地提供商"""
+        manager = LLMProviderManager(routing_mode=RoutingMode.CLOUD_FIRST)
+
+        # 雲端提供商：健康但生成時拋例外（如 rate-limit）
+        cloud_provider = CloudLLMProvider(_make_cloud_config())
+        cloud_provider.check_health = AsyncMock(
+            return_value=ProviderHealth(
+                status=ProviderStatus.AVAILABLE,
+                available_models=["gpt-4o-mini"],
+            )
+        )
+        cloud_provider.list_models = AsyncMock(return_value=[MagicMock(id="gpt-4o-mini")])
+        cloud_provider.generate = AsyncMock(side_effect=RuntimeError("rate limited"))
+
+        # 本地提供商：可用且生成成功
+        local_config = ProviderConfig(name="ollama", port=11434, timeout=1)
+        local_provider = OllamaProvider(local_config)
+        local_provider.list_models = AsyncMock(return_value=[MagicMock(id="llama2")])
+        local_provider.generate = AsyncMock(return_value=("本地生成成功", 0.85))
+
+        manager.register_provider(cloud_provider)
+        manager.register_provider(local_provider)
+
+        text, provider_name, confidence = await manager.generate_with_routing(
+            prompt="請向前移動"
+        )
+
+        # 雲端失敗後應備援到本地
+        assert text == "本地生成成功"
+        assert provider_name == "ollama"
+        assert confidence == 0.85
+
+    @pytest.mark.asyncio
+    async def test_generate_with_routing_all_fail(self):
+        """所有提供商生成都失敗時應回傳 (None, None, 0.0)"""
+        manager = LLMProviderManager(routing_mode=RoutingMode.CLOUD_FIRST)
+
+        cloud_provider = CloudLLMProvider(_make_cloud_config())
+        cloud_provider.check_health = AsyncMock(
+            return_value=ProviderHealth(
+                status=ProviderStatus.AVAILABLE,
+                available_models=["gpt-4o-mini"],
+            )
+        )
+        cloud_provider.list_models = AsyncMock(return_value=[MagicMock(id="gpt-4o-mini")])
+        cloud_provider.generate = AsyncMock(side_effect=RuntimeError("server error"))
+
+        manager.register_provider(cloud_provider)
 
         text, provider_name, confidence = await manager.generate_with_routing(
             prompt="Hello"

@@ -37,6 +37,7 @@ class CloudLLMProvider(LLMProviderBase):
 
     DEFAULT_HOST = "api.openai.com"
     DEFAULT_PORT = 443
+    is_cloud: bool = True
 
     def __init__(self, config: ProviderConfig):
         super().__init__(config)

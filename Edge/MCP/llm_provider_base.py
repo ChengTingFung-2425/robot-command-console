@@ -65,6 +65,9 @@ class LLMProviderBase(ABC):
     所有本地 LLM 提供商插件必須繼承此類別
     """
 
+    # 子類別覆寫此屬性以宣告自己是雲端提供商
+    is_cloud: bool = False
+
     def __init__(self, config: ProviderConfig):
         """
         初始化提供商

@@ -6,13 +6,33 @@ This module consolidates shared functionality between MCP and llm_discovery.
 
 import logging
 import os
-from typing import Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type
 from pathlib import Path
 import platform
 
-# Shared models
-from Edge.llm_discovery.models import ProviderManifest, ProviderHealth, Skill
-from Edge.MCP.llm_provider_base import LLMProviderBase
+# Shared models — llm_discovery may not be present in all deployments
+try:
+    from Edge.llm_discovery.models import ProviderManifest, ProviderHealth, Skill
+except ImportError:
+    # Provide lightweight fallback types when llm_discovery is not installed
+    class ProviderManifest:  # type: ignore[no-redef]
+        """Fallback manifest type when Edge.llm_discovery is unavailable."""
+        def __init__(self, name: str = "", skills: Optional[List[Any]] = None, **kwargs):
+            self.name = name
+            self.skills = skills or []
+
+    class ProviderHealth:  # type: ignore[no-redef]
+        """Fallback health type when Edge.llm_discovery is unavailable."""
+        def __init__(self, status: str = "unknown", details: Optional[Dict[str, Any]] = None):
+            self.status = status
+            self.details = details or {}
+
+    class Skill:  # type: ignore[no-redef]
+        """Fallback skill type when Edge.llm_discovery is unavailable."""
+        def __init__(self, skill_id: str = "", **kwargs):
+            self.skill_id = skill_id
+
+from Edge.MCP.llm_provider_base import LLMProviderBase  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

@@ -452,6 +452,16 @@ pagination = query.order_by(AuditLog.timestamp.desc()).paginate(page=page, per_p
 - 更新 `engagement.py`：從 `NotImplementedError` 佔位符改為委派 `EngagementService` 的實作
 - 29 個單元測試（全數通過），Lint 零錯誤，CodeQL 零告警
 - 所有文字輸入使用 `bleach.clean()` 防止 XSS；不暴露例外細節於 API 回應
+- 
+### 2026-03-04: 共享雲端 LLM 切換與混合（雲端優先/本地備援）
+
+- 新增三大雲端 LLM 提供商：Azure OpenAI、GCP Gemini、Amazon Bedrock（aioboto3）
+- 新增通用 OpenAI 相容雲端提供商 `CloudLLMProvider`
+- `LLMProviderManager` 新增 `RoutingMode` 枚舉（CLOUD_FIRST/LOCAL_FIRST/CLOUD_ONLY/LOCAL_ONLY）
+- 新增 `generate_with_routing()` 一站式生成方法（含即時健康檢查備援）
+- 修復 `src/common/llm_manager.py` `Edge.llm_discovery` ImportError（try/except fallback）
+- 49 個單元測試（100% 通過）、CodeQL 零警告
+- 詳見：[docs/mcp/MCP_LLM_PROVIDERS.md](docs/mcp/MCP_LLM_PROVIDERS.md)
 
 ### 2026-02-26: 雲端同步異常處理測試 + 啟動修復 + Codespace 模板
 
@@ -511,4 +521,4 @@ pagination = query.order_by(AuditLog.timestamp.desc()).paginate(page=page, per_p
 ---
 
 **原始行數**：1,293 行 → **整理後**：~500 行（重組於使用頻率，長篇內容移至 `memory/`）
-**最後更新**：2026-02-26
+**最後更新**：2026-03-04

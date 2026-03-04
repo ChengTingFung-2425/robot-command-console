@@ -27,8 +27,9 @@
 ```
 Edge/cloud_sync/
 ├── __init__.py       # 模組初始化
-├── client.py         # 雲端 API 客戶端
-├── sync_service.py   # 同步服務
+├── client.py         # CloudSyncClient：雲端 API 客戶端（進階指令、設定、歷史）
+├── sync_queue.py     # CloudSyncQueue：先後發送佇列 + 本地快取（SQLite FIFO）
+├── sync_service.py   # CloudSyncService：同步業務邏輯（整合佇列）
 └── README.md         # 本文件
 ```
 
@@ -141,6 +142,40 @@ result = sync_service.sync_command_history(
 
 print(f"Synced {result.get('synced_count', 0)} history records")
 ```
+
+### 離線快取與補發（先後發送佇列）
+
+當雲端不可用時，`sync_user_settings` 與 `sync_command_history` 會自動將資料寫入本地 SQLite 佇列（`CloudSyncQueue`），等到雲端恢復後再依 FIFO 順序補發。
+
+```python
+# 雲端不可用時自動快取
+result = sync_service.sync_user_settings(
+    user_id='user-123',
+    settings={'theme': 'dark'}
+)
+
+if result.get('queued'):
+    print(f"已快取（op_id={result['op_id']}），待雲端恢復後補發")
+
+# 雲端恢復後：補發所有快取操作
+sync_service.set_cloud_available(True)
+flush_result = sync_service.flush_queue()
+print(f"補發完成：sent={flush_result['sent']}, remaining={flush_result['remaining']}")
+
+# 查詢佇列統計
+stats = sync_service.get_queue_statistics()
+print(f"佇列狀態：{stats}")
+```
+
+| 特性 | 說明 |
+|------|------|
+| **FIFO 順序** | SQLite `seq` 整數欄位確保先進先出 |
+| **持久化** | 程式重啟後佇列仍保留，資料不遺失 |
+| **批次發送** | `batch_size`（預設 20）批次取出後依序送出 |
+| **自動重試** | 單次失敗保留 PENDING，超出 `max_retry_count` 後標記 FAILED |
+| **執行緒安全** | `threading.RLock` 保護所有資料庫操作 |
+
+---
 
 ## 配置選項
 

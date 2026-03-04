@@ -133,6 +133,15 @@ python llm-helper/run_tests.py all --coverage                # CI 完整流程
 | [device-binding-lessons.md](memory/device-binding-lessons.md) | 設備綁定 | 跨平台設備識別 |
 | [step1~step5 lessons](memory/step1-device-id-generator-lessons.md) | Edge Token 系列 | UUID、加密、平台存儲、快取、整合測試 |
 
+### 開發指南索引（development/）
+
+| 文件 | 主題 |
+|------|------|
+| [CLOUD_SYNC_GUIDE.md](development/CLOUD_SYNC_GUIDE.md) | **雲端同步開發指南**：先後發送佇列、離線快取、API 認證 |
+| [TUI_LLM_INTEGRATION_GUIDE.md](development/TUI_LLM_INTEGRATION_GUIDE.md) | TUI + LLM 整合 |
+| [UNIFIED_LAUNCHER_GUIDE.md](development/UNIFIED_LAUNCHER_GUIDE.md) | 統一啟動器 |
+| [PYTHON_LINT_GUIDE.md](development/PYTHON_LINT_GUIDE.md) | Python Linting 指南 |
+
 **快速查找**：
 - 開發新功能前 → `phase3_2_lessons.md §1`「不重造輪子原則」
 - 安全問題修復 → `phase3_2_lessons.md §3`「CodeQL 安全修復模式」
@@ -442,6 +451,13 @@ pagination = query.order_by(AuditLog.timestamp.desc()).paginate(page=page, per_p
 ---
 
 ## 🔄 最近更新
+
+### 2026-03-04: 文件與同步策略說明
+
+- 更新 `Edge/cloud_sync/README.md`：補充 `sync_queue.py` 模組說明、離線佇列使用範例與 FIFO 特性表格
+- 新增 `docs/development/CLOUD_SYNC_GUIDE.md`：整合開發者指南（同步策略一覽、先後發送設計、測試指南、設定參考）
+- 更新 `docs/PROJECT_MEMORY.md`：新增開發指南索引表格與 `CLOUD_SYNC_GUIDE.md` 參考連結
+- 詳見：[docs/development/CLOUD_SYNC_GUIDE.md](development/CLOUD_SYNC_GUIDE.md)
 
 ### 2026-03-04: 討論區與用戶社群互動功能（Cloud/engagement）
 

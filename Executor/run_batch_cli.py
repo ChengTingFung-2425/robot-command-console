@@ -3,7 +3,9 @@
 Executor Batch CLI
 
 對 Executor (Robot-Console) 層的批次動作執行 CLI 入口。
-讀取 JSON 批次檔案，透過 ActionExecutor 依序執行每個機器人動作。
+讀取 JSON 批次檔案，以 JSON-RPC POST 到本地機器人控制器
+（`http://localhost:9030/`），與 ActionExecutor._send_request 採用
+相同的請求格式（jsonrpc 2.0）與連線逾時設定。
 
 使用方式：
     python3 Executor/run_batch_cli.py --file batch.json
@@ -17,12 +19,19 @@ import logging
 import sys
 from pathlib import Path
 
+import requests
+
 # 將 Executor 目錄加入路徑
 sys.path.insert(0, str(Path(__file__).parent))
 
+from action_executor import actions as ACTION_MAP  # noqa: E402
 from config import ExecutorConfig  # noqa: E402
 
 logger = logging.getLogger(__name__)
+
+# 本地控制器端點（與 ActionExecutor._send_request 一致）
+_CONTROLLER_URL = "http://localhost:9030/"
+_CONTROLLER_HEADERS = {"deviceid": "1732853986186"}
 
 
 def setup_logging(level: str = 'INFO') -> None:
@@ -66,49 +75,77 @@ def load_batch(file_path: str) -> list:
     sys.exit(1)
 
 
-def run_batch(actions: list, dry_run: bool = False) -> int:
+def _send_action(name: str) -> bool:
+    """以 JSON-RPC 2.0 格式呼叫本地機器人控制器
+
+    採用與 ActionExecutor._send_request 相同的端點、header 和請求格式。
+
+    Args:
+        name: 動作名稱（必須存在於 ACTION_MAP 中）
+
+    Returns:
+        True 表示成功，False 表示失敗
+    """
+    if name not in ACTION_MAP:
+        logger.error("Unknown action '%s' — not found in ACTION_MAP", name)
+        return False
+
+    action_cfg = ACTION_MAP[name]
+    method, count = action_cfg["action"][0], action_cfg["action"][1]
+
+    payload = {
+        "id": "1732853986186",
+        "jsonrpc": "2.0",
+        "method": method,
+        "params": [count],
+    }
+
+    try:
+        resp = requests.post(
+            _CONTROLLER_URL,
+            headers=_CONTROLLER_HEADERS,
+            json=payload,
+            timeout=ExecutorConfig.EXECUTION_TIMEOUT,
+        )
+        resp.raise_for_status()
+        logger.debug("Controller response: %s", resp.json())
+        return True
+    except requests.exceptions.HTTPError as exc:
+        logger.error("HTTP error for action '%s': %s", name, exc)
+    except requests.exceptions.ConnectionError as exc:
+        logger.error("Connection error for action '%s': %s", name, exc)
+    except requests.exceptions.Timeout:
+        logger.error("Timeout after %ss for action '%s'", ExecutorConfig.EXECUTION_TIMEOUT, name)
+    except requests.exceptions.RequestException as exc:
+        logger.error("Request failed for action '%s': %s", name, exc)
+    return False
+
+
+def run_batch(action_list: list, dry_run: bool = False) -> int:
     """執行批次動作
 
     Args:
-        actions: 動作清單
+        action_list: 動作清單
         dry_run: 若為 True，僅列印動作而不實際執行
 
     Returns:
         失敗動作數量（0 表示全部成功）
     """
     failed = 0
-    total = len(actions)
+    total = len(action_list)
     logger.info("Starting batch: %d action(s), dry_run=%s", total, dry_run)
 
-    for idx, action in enumerate(actions, 1):
+    for idx, action in enumerate(action_list, 1):
         name = action if isinstance(action, str) else action.get('action', str(action))
         if dry_run:
             logger.info("[%d/%d] DRY-RUN: %s", idx, total, name)
             continue
 
-        try:
-            logger.info("[%d/%d] Executing: %s", idx, total, name)
-            # 呼叫本地機器人控制器
-            import urllib.request
-            import urllib.error
-            url = f"http://localhost:9030/action?name={name}"
-            req = urllib.request.Request(url, method='POST')
-            try:
-                with urllib.request.urlopen(req, timeout=ExecutorConfig.EXECUTION_TIMEOUT) as resp:
-                    status = resp.status
-                if status == 200:
-                    logger.info("[%d/%d] OK: %s", idx, total, name)
-                else:
-                    logger.warning("[%d/%d] Unexpected status %d for: %s", idx, total, status, name)
-                    failed += 1
-            except urllib.error.HTTPError as http_err:
-                logger.error("[%d/%d] HTTP %d for: %s — %s", idx, total, http_err.code, name, http_err.reason)
-                failed += 1
-            except urllib.error.URLError as url_err:
-                logger.error("[%d/%d] Network error for: %s — %s", idx, total, name, url_err.reason)
-                failed += 1
-        except Exception as exc:
-            logger.error("[%d/%d] FAILED: %s — %s", idx, total, name, exc)
+        logger.info("[%d/%d] Executing: %s", idx, total, name)
+        if _send_action(name):
+            logger.info("[%d/%d] OK: %s", idx, total, name)
+        else:
+            logger.error("[%d/%d] FAILED: %s", idx, total, name)
             failed += 1
 
     logger.info("Batch complete: %d/%d succeeded", total - failed, total)
@@ -146,10 +183,11 @@ def main() -> None:
     args = parse_args()
     setup_logging(args.log_level)
 
-    actions = load_batch(args.file)
-    failed = run_batch(actions, dry_run=args.dry_run)
+    action_list = load_batch(args.file)
+    failed = run_batch(action_list, dry_run=args.dry_run)
     sys.exit(1 if failed else 0)
 
 
 if __name__ == '__main__':
     main()
+

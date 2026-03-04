@@ -100,6 +100,7 @@ class TestSharedCommandsAuth(unittest.TestCase):
         mock_service.upload_command.return_value = mock_command
         mock_ctx = MagicMock()
         mock_ctx.__enter__.return_value = mock_service
+        mock_ctx.__exit__.return_value = False
         mock_get_service.return_value = mock_ctx
 
         # 生成有效的 token
@@ -156,6 +157,7 @@ class TestSharedCommandsAuth(unittest.TestCase):
         mock_service.rate_command.return_value = mock_rating
         mock_ctx = MagicMock()
         mock_ctx.__enter__.return_value = mock_service
+        mock_ctx.__exit__.return_value = False
         mock_get_service.return_value = mock_ctx
 
         with app.test_client() as client:
@@ -194,6 +196,7 @@ class TestSharedCommandsAuth(unittest.TestCase):
         mock_service.download_command.return_value = mock_command
         mock_ctx = MagicMock()
         mock_ctx.__enter__.return_value = mock_service
+        mock_ctx.__exit__.return_value = False
         mock_get_service.return_value = mock_ctx
 
         with app.test_client() as client:
@@ -215,6 +218,7 @@ class TestSharedCommandsAuth(unittest.TestCase):
         mock_service.search_commands.return_value = ([], 0)
         mock_ctx = MagicMock()
         mock_ctx.__enter__.return_value = mock_service
+        mock_ctx.__exit__.return_value = False
         mock_get_service.return_value = mock_ctx
 
         with app.test_client() as client:
@@ -234,6 +238,7 @@ class TestSharedCommandsAuth(unittest.TestCase):
         mock_service.get_featured_commands.return_value = []
         mock_ctx = MagicMock()
         mock_ctx.__enter__.return_value = mock_service
+        mock_ctx.__exit__.return_value = False
         mock_get_service.return_value = mock_ctx
 
         with app.test_client() as client:

@@ -40,12 +40,21 @@ def create_app(
     """
     app = Flask(__name__)
 
-    # 讀取設定（優先使用參數，其次讀取環境變數，最後使用預設值）
+    # 讀取設定（優先使用參數，其次讀取環境變數，最後依環境決定是否允許預設值）
     jwt_secret = jwt_secret or os.environ.get('CLOUD_JWT_SECRET', '')
     if not jwt_secret:
+        flask_env = os.environ.get('FLASK_ENV', '').lower()
+        cloud_env = os.environ.get('CLOUD_ENV', '').lower()
+        is_dev_mode = flask_env in {'development', 'dev'} or cloud_env in {'development', 'dev'}
+        if not is_dev_mode:
+            raise RuntimeError(
+                'CLOUD_JWT_SECRET is not set. For security reasons, a JWT secret must be provided '
+                'via the jwt_secret argument or the CLOUD_JWT_SECRET environment variable in '
+                'non-development environments.'
+            )
         logger.warning(
-            "CLOUD_JWT_SECRET is not set. Using an insecure default — "
-            "set the environment variable before deploying to production."
+            "CLOUD_JWT_SECRET is not set. Using a built-in insecure default intended only for "
+            "local development. Do NOT use this configuration in production."
         )
         jwt_secret = 'change-me-in-production'
 

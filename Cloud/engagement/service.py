@@ -371,8 +371,8 @@ class EngagementService:
 
         Args:
             post_id: 貼文 ID
-            limit: 每頁筆數
-            offset: 分頁偏移量
+            limit: 每頁筆數（自動限制為 0-100；負數視為 0）
+            offset: 分頁偏移量（負數視為 0）
 
         Returns:
             List[PostComment]
@@ -469,7 +469,7 @@ class EngagementService:
 
         Args:
             user_username: 用戶名稱
-            limit: 筆數
+            limit: 筆數（自動限制為 0-100；負數視為 0）
 
         Returns:
             List[PointsLog]

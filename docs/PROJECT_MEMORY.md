@@ -141,6 +141,7 @@ python llm-helper/run_tests.py all --coverage                # CI 完整流程
 | [TUI_LLM_INTEGRATION_GUIDE.md](development/TUI_LLM_INTEGRATION_GUIDE.md) | TUI + LLM 整合 |
 | [UNIFIED_LAUNCHER_GUIDE.md](development/UNIFIED_LAUNCHER_GUIDE.md) | 統一啟動器 |
 | [PYTHON_LINT_GUIDE.md](development/PYTHON_LINT_GUIDE.md) | Python Linting 指南 |
+| [LESSONS_MANAGEMENT_GUIDE.md](development/LESSONS_MANAGEMENT_GUIDE.md) | **經驗教訓管理**：標籤系統、優先級分類、搜尋工具、清理機制 |
 
 **快速查找**：
 - 開發新功能前 → `phase3_2_lessons.md §1`「不重造輪子原則」
@@ -451,6 +452,16 @@ pagination = query.order_by(AuditLog.timestamp.desc()).paginate(page=page, per_p
 ---
 
 ## 🔄 最近更新
+
+### 2026-03-04: 經驗教訓標籤系統與搜尋管理工具
+
+- 建立三級優先級制度（`high`/`medium`/`low`）與標準標籤庫（35+ 標籤）
+- 更新 `docs/memory/TEMPLATE.md`：加入 `priority`、標準 `tags` 清單與 `review_date` 欄位
+- 更新 `docs/memory/INDEX.md`：為所有現有條目補充 `priority`、`review_date`，並補全缺失的條目（`phase3_lessons`、`security_lessons` 等）
+- 新增 `scripts/lessons_search.py`：CLI 搜尋工具，支援 `--tag`、`--priority`、`--keyword`、`--stale-days`、`--list-tags`
+- 新增 `tests/test_lessons_search.py`：42 個單元測試（100% 通過）
+- 新增 `docs/development/LESSONS_MANAGEMENT_GUIDE.md`：完整管理流程說明
+- 詳見：[docs/development/LESSONS_MANAGEMENT_GUIDE.md](development/LESSONS_MANAGEMENT_GUIDE.md)
 
 ### 2026-03-04: 文件與同步策略說明
 

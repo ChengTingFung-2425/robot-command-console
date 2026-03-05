@@ -66,6 +66,37 @@ python flask_service.py
 
 ## 打包應用程式
 
+### Linux 快速打包（推薦）
+
+使用 `scripts/build-linux.sh` 可一鍵完成兩種 Linux 打包格式：
+
+```bash
+# 打包所有格式（AppImage + Binary tar.gz）
+./scripts/build-linux.sh
+
+# 僅打包 Electron AppImage
+./scripts/build-linux.sh --appimage
+
+# 僅打包 PyInstaller Binary tar.gz
+./scripts/build-linux.sh --binary
+
+# 顯示幫助
+./scripts/build-linux.sh --help
+```
+
+**輸出檔案：**
+
+| 檔案 | 說明 |
+|------|------|
+| `dist/RobotConsole-linux.AppImage` | Electron 應用，支援大多數 Linux 發行版，無需安裝 |
+| `dist/RobotConsole-linux.tar.gz` | PyQt6 應用二進位包，解壓後直接執行 |
+
+**前置需求：**
+- AppImage：Node.js >= 18、npm
+- Binary tar.gz：Python >= 3.11、pip
+
+---
+
 ### PyQt6 應用（Tiny版本）
 
 #### 前置準備

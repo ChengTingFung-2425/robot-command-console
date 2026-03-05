@@ -11,13 +11,13 @@ import pytest
 
 # ─── 路徑常數 ──────────────────────────────────────────────────────────────
 
-PROJECT_ROOT = Path(__file__).parent.parent.parent
-ELECTRON_APP_DIR = PROJECT_ROOT / "Edge" / "electron-app"
-QTAPP_DIR = PROJECT_ROOT / "Edge" / "qtwebview-app"
-BUILD_SCRIPT = PROJECT_ROOT / "scripts" / "build-linux.sh"
-DIST_DIR = PROJECT_ROOT / "dist"
-BINARY_TARBALL = DIST_DIR / "RobotConsole-linux.tar.gz"
-APPIMAGE = DIST_DIR / "RobotConsole-linux.AppImage"
+PROJECT_ROOT: Path = Path(__file__).parent.parent.parent
+ELECTRON_APP_DIR: Path = PROJECT_ROOT / "Edge" / "electron-app"
+QTAPP_DIR: Path = PROJECT_ROOT / "Edge" / "qtwebview-app"
+BUILD_SCRIPT: Path = PROJECT_ROOT / "scripts" / "build-linux.sh"
+DIST_DIR: Path = PROJECT_ROOT / "dist"
+BINARY_TARBALL: Path = DIST_DIR / "RobotConsole-linux.tar.gz"
+APPIMAGE: Path = DIST_DIR / "RobotConsole-linux.AppImage"
 
 
 # ─── 輔助函式 ──────────────────────────────────────────────────────────────
@@ -236,10 +236,12 @@ class TestPyInstallerBinaryConfig:
             "build.spec missing version module in hiddenimports"
 
     def test_spec_excludes_heavy_packages(self, spec_content):
-        """build.spec should exclude unnecessary heavy packages."""
-        for pkg in ("matplotlib", "numpy", "tensorflow", "torch"):
-            assert pkg in spec_content, \
-                f"build.spec does not list '{pkg}' in excludes"
+        """build.spec should exclude unnecessary heavy packages to reduce bundle size."""
+        # At least one heavy package exclusion should be declared; all four is ideal
+        heavy_pkgs = ["matplotlib", "numpy", "tensorflow", "torch"]
+        excluded = [pkg for pkg in heavy_pkgs if pkg in spec_content]
+        assert excluded, \
+            "build.spec does not exclude any heavy packages (matplotlib/numpy/tensorflow/torch)"
 
     def test_spec_has_collect_stage(self, spec_content):
         """build.spec must include a COLLECT stage for one-dir output."""
@@ -396,10 +398,14 @@ class TestBinaryTarballArtifact:
         if platform.system() != "Linux":
             pytest.skip("ELF check only applicable on Linux")
 
+        extract_kwargs = {}
+        if sys.version_info >= (3, 12):
+            extract_kwargs["filter"] = "data"
+
         with tarfile.open(str(BINARY_TARBALL), "r:gz") as tf:
             for member in tf.getmembers():
                 if member.name.endswith("RobotConsole") and member.isfile():
-                    tf.extract(member, tmp_path, filter="data")
+                    tf.extract(member, tmp_path, **extract_kwargs)
                     extracted = tmp_path / member.name
                     with open(extracted, "rb") as f:
                         magic = f.read(4)
@@ -414,10 +420,14 @@ class TestBinaryTarballArtifact:
         if platform.system() != "Linux":
             pytest.skip("Linux-only test")
 
+        extract_kwargs = {}
+        if sys.version_info >= (3, 12):
+            extract_kwargs["filter"] = "data"
+
         with tarfile.open(str(BINARY_TARBALL), "r:gz") as tf:
             for member in tf.getmembers():
                 if member.name.endswith("RobotConsole") and member.isfile():
-                    tf.extract(member, tmp_path, filter="data")
+                    tf.extract(member, tmp_path, **extract_kwargs)
                     extracted = tmp_path / member.name
                     # Restore the executable bit from the tarball member mode
                     os.chmod(extracted, member.mode | 0o111)

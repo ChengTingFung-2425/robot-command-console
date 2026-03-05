@@ -118,7 +118,8 @@ def filter_entries(
     for entry in entries:
         if tag:
             entry_tags = entry.get("tags", [])
-            if tag not in entry_tags:
+            entry_tags_lower = [t.lower() for t in entry_tags]
+            if tag.lower() not in entry_tags_lower:
                 continue
         if priority:
             if entry.get("priority", "").lower() != priority.lower():
@@ -137,12 +138,17 @@ def filter_entries(
 
 
 def find_stale_entries(entries: list[dict], stale_days: int) -> list[dict]:
-    """找出 review_date 已超過 stale_days 天的條目（需要複查）。"""
+    """找出 review_date 已超過 stale_days 天的條目（需要複查）。
+
+    若條目缺少 review_date，視為無論 stale_days 為何均需複查（永遠納入結果）。
+    若 review_date 格式錯誤，會印出警告至 stderr 並略過該條目。
+    """
     today = date.today()
     stale = []
     for entry in entries:
         review_str = entry.get("review_date", "")
         if not review_str:
+            # 缺少 review_date 一律視為需複查
             stale.append(entry)
             continue
         try:
@@ -150,7 +156,11 @@ def find_stale_entries(entries: list[dict], stale_days: int) -> list[dict]:
             if (today - review_date).days >= stale_days:
                 stale.append(entry)
         except ValueError:
-            pass
+            print(
+                "⚠️  無效的 review_date 格式（應為 YYYY-MM-DD）: "
+                f"{review_str!r}，條目：{entry.get('title', '(no title)')}",
+                file=sys.stderr,
+            )
     return stale
 
 
@@ -202,6 +212,20 @@ def list_all_tags(entries: list[dict]) -> None:
         print(f"  {tag}: {count} 筆{nonstandard}")
 
 
+def list_all_priorities(entries: list[dict]) -> None:
+    """列出索引中所有使用的優先級及出現次數，並警告非標準值。"""
+    priority_count: dict[str, int] = {}
+    for entry in entries:
+        p = entry.get("priority", "").strip()
+        if p:
+            priority_count[p] = priority_count.get(p, 0) + 1
+    print("\n📊 優先級統計")
+    print("=" * 40)
+    for priority, count in sorted(priority_count.items()):
+        invalid = "" if priority in VALID_PRIORITIES else "  ⚠️ (非標準，應為 high/medium/low)"
+        print(f"  {priority}: {count} 筆{invalid}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     """建立命令列解析器。"""
     parser = argparse.ArgumentParser(
@@ -231,6 +255,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="列出 review_date 已超過 N 天的條目（需複查）",
     )
     parser.add_argument("--list-tags", action="store_true", help="列出所有標籤及統計")
+    parser.add_argument("--list-priorities", action="store_true", help="列出所有優先級及統計（含非標準值警告）")
     parser.add_argument(
         "--index",
         default=str(INDEX_PATH),
@@ -255,9 +280,16 @@ def main(args: list[str] | None = None) -> int:
         list_all_tags(entries)
         return 0
 
+    if opts.list_priorities:
+        list_all_priorities(entries)
+        return 0
+
     if opts.stale_days is not None:
         stale = find_stale_entries(entries, opts.stale_days)
-        print_results(stale, f"⏰ review_date 已過期的條目（今日：{date.today()}）")
+        print_results(
+            stale,
+            f"⏰ review_date 已超過 {opts.stale_days} 天的條目（今日：{date.today()}）",
+        )
         return 0
 
     # 一般搜尋

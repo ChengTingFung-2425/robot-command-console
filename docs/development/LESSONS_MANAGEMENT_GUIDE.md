@@ -15,9 +15,9 @@
 | 類別 | 標籤 |
 |------|------|
 | **安全** | `security`, `auth`, `token`, `rbac`, `audit`, `firmware` |
-| **架構** | `architecture`, `edge`, `cloud`, `sync`, `api` |
+| **架構** | `architecture`, `edge`, `cloud`, `cloud-sync`, `sync`, `api` |
 | **程式碼品質** | `linting`, `testing`, `tdd`, `async`, `performance`, `dataclass`, `datetime` |
-| **功能模組** | `cli`, `batch`, `ui`, `tui`, `llm`, `queue`, `database`, `migration` |
+| **功能模組** | `cli`, `batch`, `ui`, `tui`, `llm`, `queue`, `database`, `migration`, `polling` |
 | **框架** | `flask`, `fastapi`, `rabbitmq`, `sqs`, `javascript` |
 | **維運** | `ops`, `launcher`, `playbook`, `device`, `platform` |
 | **文件** | `template` |
@@ -161,7 +161,7 @@ python scripts/lessons_search.py --list-tags
 # 執行搜尋工具單元測試
 python -m pytest tests/test_lessons_search.py -v
 
-# 預期結果：40 個測試全數通過
+# 預期結果：42 個測試全數通過
 ```
 
 ---

@@ -19,6 +19,7 @@ from lessons_search import (  # noqa: E402
     find_stale_entries,
     format_entry,
     list_all_tags,
+    list_all_priorities,
     parse_index,
     main,
     STANDARD_TAGS,
@@ -223,6 +224,18 @@ class TestFilterEntries:
         result = filter_entries(entries, tag="nonexistent_tag_xyz")
         assert result == []
 
+    def test_filter_tag_case_insensitive(self, entries):
+        """tag 過濾不分大小寫（Security 應等同 security）"""
+        result = filter_entries(entries, tag="Security")
+        assert len(result) == 1
+        assert result[0]["title"] == "Security Best Practices"
+
+    def test_filter_tag_case_insensitive_upper(self, entries):
+        """tag 過濾大寫 CLI 應能匹配小寫 cli"""
+        result = filter_entries(entries, tag="CLI")
+        assert len(result) == 1
+        assert "CLI" in result[0]["title"]
+
 
 # ---------------------------------------------------------------------------
 # find_stale_entries 測試
@@ -272,6 +285,21 @@ class TestFindStaleEntries:
     def test_empty_entries(self):
         """空清單回傳空清單"""
         assert find_stale_entries([], stale_days=90) == []
+
+    def test_invalid_review_date_prints_warning(self, capsys):
+        """無效 review_date 格式應印出 stderr 警告（含格式字串與條目 title）並略過該條目"""
+        entries = [{"title": "Bad Date Entry", "review_date": "not-a-date"}]
+        stale = find_stale_entries(entries, stale_days=0)
+        assert stale == []
+        captured = capsys.readouterr()
+        assert "⚠️" in captured.err
+        assert "not-a-date" in captured.err
+        assert "Bad Date Entry" in captured.err
+
+    def test_no_review_date_always_stale_regardless_of_threshold(self):
+        """缺少 review_date 的條目無論 stale_days 為何都應納入結果"""
+        entries = [{"title": "No Review", "summary": "test"}]
+        assert len(find_stale_entries(entries, stale_days=9999)) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -335,6 +363,36 @@ class TestListAllTags:
 
 
 # ---------------------------------------------------------------------------
+# list_all_priorities 測試
+# ---------------------------------------------------------------------------
+
+class TestListAllPriorities:
+    """測試優先級統計功能"""
+
+    def test_list_priorities_output(self, entries, capsys):
+        """輸出應包含所有使用的優先級"""
+        list_all_priorities(entries)
+        captured = capsys.readouterr()
+        assert "high" in captured.out
+        assert "medium" in captured.out
+        assert "low" in captured.out
+
+    def test_nonstandard_priority_warning(self, capsys):
+        """非標準優先級應顯示警告"""
+        entries = [{"priority": "critical"}]
+        list_all_priorities(entries)
+        captured = capsys.readouterr()
+        assert "⚠️" in captured.out
+
+    def test_standard_priority_no_warning(self, capsys):
+        """標準優先級不應顯示警告"""
+        entries = [{"priority": "high"}]
+        list_all_priorities(entries)
+        captured = capsys.readouterr()
+        assert "⚠️" not in captured.out
+
+
+# ---------------------------------------------------------------------------
 # main() CLI 整合測試
 # ---------------------------------------------------------------------------
 
@@ -368,9 +426,20 @@ class TestMainCLI:
         assert "Security Best Practices" in captured.out
 
     def test_main_stale_days(self, tmp_index, capsys):
-        """--stale-days 應列出需複查的條目"""
+        """--stale-days 應在 header 顯示天數門檻"""
         rc = main(["--index", str(tmp_index), "--stale-days", "99999"])
         assert rc == 0
+        captured = capsys.readouterr()
+        assert "99999" in captured.out
+
+    def test_main_list_priorities(self, tmp_index, capsys):
+        """--list-priorities 應列出優先級統計"""
+        rc = main(["--index", str(tmp_index), "--list-priorities"])
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert "high" in captured.out
+        assert "medium" in captured.out
+        assert "low" in captured.out
 
     def test_main_returns_one_on_missing_index(self, tmp_path, capsys):
         """索引不存在應回傳 1"""

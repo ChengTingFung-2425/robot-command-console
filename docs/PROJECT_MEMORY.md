@@ -459,7 +459,7 @@ pagination = query.order_by(AuditLog.timestamp.desc()).paginate(page=page, per_p
 - 更新 `docs/memory/TEMPLATE.md`：加入 `priority`、標準 `tags` 清單與 `review_date` 欄位
 - 更新 `docs/memory/INDEX.md`：為所有現有條目補充 `priority`、`review_date`，並補全缺失的條目（`phase3_lessons`、`security_lessons` 等）
 - 新增 `scripts/lessons_search.py`：CLI 搜尋工具，支援 `--tag`、`--priority`、`--keyword`、`--stale-days`、`--list-tags`
-- 新增 `tests/test_lessons_search.py`：40 個單元測試（100% 通過）
+- 新增 `tests/test_lessons_search.py`：42 個單元測試（100% 通過）
 - 新增 `docs/development/LESSONS_MANAGEMENT_GUIDE.md`：完整管理流程說明
 - 詳見：[docs/development/LESSONS_MANAGEMENT_GUIDE.md](development/LESSONS_MANAGEMENT_GUIDE.md)
 

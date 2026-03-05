@@ -97,6 +97,37 @@ python flask_service.py
 
 ---
 
+### Windows 快速打包（推薦）
+
+使用 `scripts/build-windows.ps1` 可一鍵完成 Windows 打包（需安裝 [NSIS 3.x](https://nsis.sourceforge.io/)）：
+
+```powershell
+# 打包所有格式（PyInstaller NSIS + Electron NSIS）
+.\scripts\build-windows.ps1
+
+# 只打包 PyInstaller NSIS 安裝程式
+.\scripts\build-windows.ps1 -Target nsis
+
+# 只打包 Electron NSIS 安裝程式
+.\scripts\build-windows.ps1 -Target electron
+
+# 顯示幫助
+.\scripts\build-windows.ps1 -Help
+```
+
+**輸出檔案：**
+
+| 檔案 | 說明 |
+|------|------|
+| `dist\RobotConsole-Setup-3.2.0.exe` | PyQt6 應用 NSIS 安裝程式（建議使用） |
+| `dist\RobotConsole-Electron-Setup-*.exe` | Electron 應用 NSIS 安裝程式 |
+
+**前置需求：**
+- NSIS Installer：[NSIS 3.x](https://nsis.sourceforge.io/)、Python >= 3.11、pip
+- Electron NSIS：Node.js >= 18、npm
+
+---
+
 ### PyQt6 應用（Tiny版本）
 
 #### 前置準備
@@ -141,10 +172,38 @@ tar -czf RobotConsole-linux.tar.gz RobotConsole/
 # 打包
 pyinstaller Edge/qtwebview-app/build.spec
 
-# 建立 ZIP
+# 建立 NSIS 安裝程式（需安裝 NSIS 3.x）
+# 下載：https://nsis.sourceforge.io/
+Push-Location Edge\qtwebview-app
+makensis installer.nsi
+Pop-Location
+# 輸出：dist\RobotConsole-Setup-3.2.0.exe
+
+# 或建立 ZIP（不需 NSIS）
 cd dist
-7z a -tzip RobotConsole-windows.zip RobotConsole\
+Compress-Archive -Path 'RobotConsole' -DestinationPath 'RobotConsole-windows.zip' -Force
 ```
+
+#### Windows 一鍵打包腳本
+
+```powershell
+# 同時打包 PyInstaller NSIS 和 Electron NSIS
+.\scripts\build-windows.ps1
+
+# 只打包 PyInstaller NSIS 安裝程式
+.\scripts\build-windows.ps1 -Target nsis
+
+# 只打包 Electron NSIS 安裝程式
+.\scripts\build-windows.ps1 -Target electron
+```
+
+**輸出檔案：**
+
+| 檔案 | 說明 |
+|------|------|
+| `dist\RobotConsole-Setup-3.2.0.exe` | PyQt6 應用 NSIS 安裝程式（建議使用） |
+| `dist\RobotConsole-windows.zip` | PyQt6 應用 ZIP（免安裝） |
+| `dist\RobotConsole-Electron-Setup-*.exe` | Electron 應用 NSIS 安裝程式 |
 
 **macOS:**
 ```bash

@@ -151,7 +151,6 @@ jobs:
             artifact_name: RobotConsole-macos
             asset_name: RobotConsole-macos.tar.gz
             asset_content_type: application/gzip
-    
     steps:
       - name: Checkout 程式碼
         uses: actions/checkout@v4
@@ -199,11 +198,37 @@ jobs:
           cd dist
           Compress-Archive -Path 'RobotConsole' -DestinationPath '${{ matrix.asset_name }}' -Force
           Get-ChildItem ${{ matrix.asset_name }}
-      
-      - name: 上傳 Release Asset
+
+      - name: 建立 NSIS 安裝程式 (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          $env:PATH = "C:\Program Files (x86)\NSIS;$env:PATH"
+          Push-Location Edge\qtwebview-app
+          makensis /V2 installer.nsi
+          Pop-Location
+          $installer = Get-ChildItem dist -Filter "RobotConsole-Setup-*.exe"
+          if ($installer) {
+            Write-Host "✓ NSIS 安裝程式建立成功：$($installer.Name)"
+          } else {
+            Write-Error "✗ NSIS 安裝程式建立失敗"
+            exit 1
+          }
+
+      - name: 上傳 Release Asset (壓縮檔)
         uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ needs.create-release.outputs.version }}
           files: ./dist/${{ matrix.asset_name }}
+
+      - name: 上傳 Release Asset (NSIS 安裝程式)
+        if: matrix.platform == 'windows'
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ needs.create-release.outputs.version }}
+          files: ./dist/RobotConsole-Setup-*.exe

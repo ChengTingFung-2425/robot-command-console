@@ -8,6 +8,9 @@
     "start:dev": "NODE_ENV=development electron .",
     "build": "electron-builder --linux",
     "build:appimage": "electron-builder --linux AppImage",
+    "build:win": "electron-builder --win",
+    "build:win:nsis": "electron-builder --win nsis",
+    "build:win:portable": "electron-builder --win portable",
     "test": "node ../test_integration.js"
   },
   "keywords": [
@@ -30,6 +33,29 @@
         "AppImage"
       ],
       "category": "Development"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "resources/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Robot Command Console",
+      "artifactName": "RobotConsole-Electron-Setup-${version}.exe",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true
     },
     "files": [
       "main.js",

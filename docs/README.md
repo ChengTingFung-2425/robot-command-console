@@ -44,6 +44,16 @@
 
 ---
 
+## Deployment & Validation
+
+| Document | Description |
+|----------|-------------|
+| [`RABBITMQ_DEPLOYMENT.md`](deployment/RABBITMQ_DEPLOYMENT.md) | RabbitMQ deployment guide |
+| [`TEST_EXECUTION.md`](deployment/TEST_EXECUTION.md) | Test execution guide |
+| [`INSTALLATION_VALIDATION_LOG.md`](deployment/INSTALLATION_VALIDATION_LOG.md) | Installation test & environment verification log (2026-03-09) |
+
+---
+
 ## Phase 1 (Electron POC)
 
 | Document | Description |

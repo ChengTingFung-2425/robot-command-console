@@ -47,6 +47,7 @@ jobs:
           cache: 'pip'
 
       - name: 設定 Node.js
+        # macOS 僅使用 scripts/build-macos.sh 的 PyInstaller 流程，不需 electron-builder。
         if: matrix.platform != 'macos'
         uses: actions/setup-node@v4
         with:
@@ -86,6 +87,7 @@ jobs:
           python src/common/version.py
       
       - name: 驗證打包腳本與設定
+        # 這裡只執行聚焦的打包驗證；完整測試仍由 ci.yml / coverage job 負責。
         shell: bash
         run: |
           case "${{ matrix.platform }}" in
@@ -144,16 +146,34 @@ jobs:
               ;;
           esac
 
-      - name: 上傳構建產物
+      - name: 上傳 Linux 構建產物
+        if: matrix.platform == 'linux'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
           path: |
             dist/RobotConsole-linux.AppImage
             dist/RobotConsole-linux.tar.gz
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: 上傳 Windows 構建產物
+        if: matrix.platform == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
             dist/RobotConsole-Setup-*.exe
             dist/RobotConsole-Electron-Setup-*.exe
-            dist/RobotConsole-macos.tar.gz
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: 上傳 macOS 構建產物
+        if: matrix.platform == 'macos'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: dist/RobotConsole-macos.tar.gz
           if-no-files-found: ignore
           retention-days: 7
   

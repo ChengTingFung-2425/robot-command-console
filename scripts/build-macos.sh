@@ -154,6 +154,8 @@ build_macos_tarball() {
     }
 
     local bundle_name
+    # macOS spec 通常會產生 RobotConsole.app；若當前 PyInstaller/執行環境只輸出
+    # RobotConsole 目錄，則保留 fallback 以確保 CI 仍能建立 tar.gz 產物。
     if [[ -d "${DIST_DIR}/RobotConsole.app" ]]; then
         bundle_name="RobotConsole.app"
     elif [[ -d "${DIST_DIR}/RobotConsole" ]]; then

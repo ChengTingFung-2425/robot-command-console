@@ -163,6 +163,7 @@ jobs:
           cache: 'pip'
 
       - name: 設定 Node.js
+        # macOS 僅使用 scripts/build-macos.sh 的 PyInstaller 流程，不需 electron-builder。
         if: matrix.platform != 'macos'
         uses: actions/setup-node@v4
         with:
@@ -199,7 +200,8 @@ jobs:
               ;;
           esac
 
-      - name: 上傳 Release Assets
+      - name: 上傳 Linux Release Assets
+        if: matrix.platform == 'linux'
         uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -208,6 +210,23 @@ jobs:
           files: |
             ./dist/RobotConsole-linux.AppImage
             ./dist/RobotConsole-linux.tar.gz
+
+      - name: 上傳 Windows Release Assets
+        if: matrix.platform == 'windows'
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ needs.create-release.outputs.version }}
+          files: |
             ./dist/RobotConsole-Setup-*.exe
             ./dist/RobotConsole-Electron-Setup-*.exe
-            ./dist/RobotConsole-macos.tar.gz
+
+      - name: 上傳 macOS Release Assets
+        if: matrix.platform == 'macos'
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ needs.create-release.outputs.version }}
+          files: ./dist/RobotConsole-macos.tar.gz

@@ -257,6 +257,18 @@ docker-compose up -d
 | Windows | `scripts/build-windows.ps1` | `dist/RobotConsole-Setup-*.exe`、`dist/RobotConsole-Electron-Setup-*.exe` |
 | macOS | `scripts/build-macos.sh` | `dist/RobotConsole-macos.tar.gz` |
 
+如需在本地驗證 CI/CD 打包腳本與 workflow 設定，可執行：
+
+```bash
+PYTHONPATH="${PWD}/src" python -m pytest \
+  tests/edge/test_edge_packaging.py \
+  tests/edge/test_windows_installer.py \
+  tests/edge/test_macos_packaging.py \
+  tests/edge/test_packaging_workflows.py -q
+```
+
+> 此指令用於跨平台打包設定驗證；若只需驗證單一平台，可比照 `build.yml` 僅執行對應的測試檔。
+
 ### 觸發構建
 
 ```bash

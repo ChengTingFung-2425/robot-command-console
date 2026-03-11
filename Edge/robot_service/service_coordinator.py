@@ -1,19 +1,18 @@
 """
 Service Coordinator
 服務協調器，負責啟動、停止、健康檢查多個服務
+
+導入前提：
+- 執行環境需可解析專案根目錄，讓 `src.common` 可被正確導入
 """
 
 import asyncio
 import logging
-import os
-import sys
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Any, Callable, Coroutine, Dict, Optional
 
-# 從 common 模組導入共用服務類型
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from common.service_types import ServiceStatus, ServiceConfig, ServiceState  # noqa: E402
+from src.common.service_types import ServiceStatus, ServiceConfig, ServiceState  # noqa: E402
 
 from .service_manager import ServiceManager  # noqa: E402
 

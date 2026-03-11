@@ -453,6 +453,12 @@ pagination = query.order_by(AuditLog.timestamp.desc()).paginate(page=page, per_p
 
 ## 🔄 最近更新
 
+### 2026-03-09: 安裝測試與環境驗證紀錄
+
+- 新增 `docs/deployment/INSTALLATION_VALIDATION_LOG.md`，記錄 Ubuntu 24.04 + Python 3.12 環境下的安裝與測試嘗試。
+- 已改為由 `Cloud/requirements.txt`、`Edge/requirements.txt`、`Executor/requirements.txt` 各自攜帶共用依賴，移除 root `requirements.txt`，讓各 package / environment 直接對應自己的依賴來源。
+- 更新 `docs/README.md` 與 `docs/user_guide/USER_GUIDE_INDEX.md` 以便快速索引本次驗證紀錄。
+
 ### 2026-03-04: 經驗教訓標籤系統與搜尋管理工具
 
 - 建立三級優先級制度（`high`/`medium`/`low`）與標準標籤庫（35+ 標籤）

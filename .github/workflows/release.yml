@@ -172,7 +172,7 @@ jobs:
       - name: 安裝 Python 依賴
         run: |
           pip install --upgrade pip setuptools wheel
-          pip install -r requirements.txt
+          pip install -r Edge/requirements.txt
           pip install pyinstaller pillow
       
       - name: 建立啟動畫面

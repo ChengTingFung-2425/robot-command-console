@@ -5,25 +5,33 @@ Phase 2 結構驗證測試
 import sys
 from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+SRC_PATH = str(PROJECT_ROOT / "src")
+EDGE_PATH = str(PROJECT_ROOT / "Edge")
+
+for path in [EDGE_PATH, SRC_PATH]:
+    if path not in sys.path:
+        sys.path.insert(0, path)
+
 
 def test_project_root_structure():
     """驗證專案根目錄結構"""
-    project_root = Path(__file__).parent.parent.parent
+    project_root = PROJECT_ROOT
 
     # 必須存在的目錄
     required_dirs = [
-        "electron-app",
-        "src/robot_service",
+        "Cloud",
+        "Edge",
+        "Executor",
+        "Edge/electron-app",
+        "Edge/robot_service",
+        "Edge/MCP",
+        "Edge/WebUI",
         "src/common",           # 新增：共用模組
-        "MCP",
-        "Robot-Console",
-        "WebUI",
         "tests",
-        "config",
         "docs",
         "docs/plans",           # 已從根目錄移動到 docs/plans
         "docs/phase1",          # 新增：Phase 1 文檔
-        "examples",
     ]
 
     for dir_path in required_dirs:
@@ -34,8 +42,7 @@ def test_project_root_structure():
 
 def test_electron_app_structure():
     """驗證 Electron 應用目錄結構"""
-    project_root = Path(__file__).parent.parent.parent
-    electron_dir = project_root / "electron-app"
+    electron_dir = PROJECT_ROOT / "Edge" / "electron-app"
 
     # Electron 必須的文件
     required_files = [
@@ -58,7 +65,7 @@ def test_electron_app_structure():
 
 def test_tests_directory():
     """驗證測試目錄結構"""
-    project_root = Path(__file__).parent.parent.parent
+    project_root = PROJECT_ROOT
     tests_dir = project_root / "tests"
 
     # 確認舊的 Test 目錄不存在
@@ -85,17 +92,18 @@ def test_tests_directory():
 
 
 def test_config_directory():
-    """驗證配置目錄結構"""
-    project_root = Path(__file__).parent.parent.parent
-    config_dir = project_root / "config"
+    """驗證配置檔與 Edge 配置結構"""
+    project_root = PROJECT_ROOT
+    config_file = project_root / "config.py"
+    edge_config = project_root / "Edge" / "config.py"
 
-    assert config_dir.exists(), "config/ 目錄不存在"
-    assert (config_dir / "README.md").exists(), "config/README.md 不存在"
+    assert config_file.exists(), "config.py 不存在"
+    assert edge_config.exists(), "Edge/config.py 不存在"
 
 
 def test_documentation_structure():
     """驗證文檔結構"""
-    project_root = Path(__file__).parent.parent.parent
+    project_root = PROJECT_ROOT
     docs_dir = project_root / "docs"
 
     # Phase 2 關鍵文檔（已更新路徑）
@@ -113,14 +121,12 @@ def test_documentation_structure():
 
 def test_root_level_files():
     """驗證根層級關鍵文件"""
-    project_root = Path(__file__).parent.parent.parent
+    project_root = PROJECT_ROOT
 
     root_files = [
         "README.md",
         "package.json",  # 新增的根層級 package.json
-        "requirements.txt",
-        "flask_service.py",
-        "run_service_cli.py",
+        "run_tests.py",
         "config.py",  # 保留向後相容
     ]
 
@@ -128,16 +134,19 @@ def test_root_level_files():
         file_path = project_root / file_name
         assert file_path.exists(), f"根層級文件不存在: {file_name}"
 
+    module_requirements = [
+        "Cloud/requirements.txt",
+        "Edge/requirements.txt",
+        "Executor/requirements.txt",
+    ]
+
+    for file_name in module_requirements:
+        file_path = project_root / file_name
+        assert file_path.exists(), f"模組依賴文件不存在: {file_name}"
+
 
 def test_python_imports_work():
     """驗證 Python 導入路徑仍然有效"""
-    project_root = Path(__file__).parent.parent.parent
-
-    # 確保 src 在 Python 路徑中
-    src_path = str(project_root / "src")
-    if src_path not in sys.path:
-        sys.path.insert(0, src_path)
-
     # 測試關鍵模組可以導入
     try:
         from robot_service.service_manager import ServiceManager
@@ -145,30 +154,18 @@ def test_python_imports_work():
     except ImportError as e:
         assert False, f"無法導入 robot_service: {e}"
 
-    # 測試 MCP 模組
-    mcp_path = str(project_root)
-    if mcp_path not in sys.path:
-        sys.path.insert(0, mcp_path)
-
     try:
-        from MCP.auth_manager import AuthManager
-        assert AuthManager is not None
+        from Edge.config import BaseConfig
+        assert BaseConfig is not None
     except ImportError as e:
-        assert False, f"無法導入 MCP: {e}"
+        assert False, f"無法導入 Edge config: {e}"
 
 
 def test_common_module_imports():
     """驗證共用模組可以導入"""
-    project_root = Path(__file__).parent.parent.parent
-
-    # 確保 src 在 Python 路徑中
-    src_path = str(project_root / "src")
-    if src_path not in sys.path:
-        sys.path.insert(0, src_path)
-
     # 測試 common 模組
     try:
-        from common import utc_now, utc_now_iso, get_logger
+        from src.common import utc_now, utc_now_iso, get_logger
         assert utc_now is not None
         assert utc_now_iso is not None
         assert get_logger is not None
@@ -177,7 +174,7 @@ def test_common_module_imports():
 
     # 測試配置類別
     try:
-        from common.config import EdgeConfig, ServerConfig, Environment
+        from src.common.config import EdgeConfig, ServerConfig, Environment
         assert EdgeConfig is not None
         assert ServerConfig is not None
         assert Environment is not None
@@ -187,9 +184,9 @@ def test_common_module_imports():
 
 def test_no_old_references_in_root():
     """確認根目錄沒有舊的 Electron 文件"""
-    project_root = Path(__file__).parent.parent.parent
+    project_root = PROJECT_ROOT
 
-    # 這些文件應該已移到 electron-app/
+    # 這些文件應該已移到 Edge/electron-app/
     old_files = [
         "main.js",
         "preload.js",
@@ -197,11 +194,11 @@ def test_no_old_references_in_root():
 
     for file_name in old_files:
         old_path = project_root / file_name
-        assert not old_path.exists(), f"舊文件仍在根目錄: {file_name}（應該移到 electron-app/）"
+        assert not old_path.exists(), f"舊文件仍在根目錄: {file_name}（應該移到 Edge/electron-app/）"
 
     # renderer 目錄應該已移動
     old_renderer = project_root / "renderer"
-    assert not old_renderer.exists(), "舊的 renderer/ 目錄仍在根目錄（應該移到 electron-app/）"
+    assert not old_renderer.exists(), "舊的 renderer/ 目錄仍在根目錄（應該移到 Edge/electron-app/）"
 
 
 if __name__ == "__main__":

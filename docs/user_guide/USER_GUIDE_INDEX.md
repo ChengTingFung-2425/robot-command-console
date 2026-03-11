@@ -93,6 +93,7 @@ FAQ(快速查找) → TROUBLESHOOTING(系統診斷) → GitHub Issues(社群)
 - [架構說明](../architecture.md) - 系統架構
 - [API 文件](../../openapi.yaml) - OpenAPI 規範
 - [開發指南](../development/) - 開發者文件
+- [安裝測試與環境驗證紀錄](../deployment/INSTALLATION_VALIDATION_LOG.md) - 近期安裝測試結果與缺失依賴追蹤
 
 ### 安全性
 - [API 安全指南](../security/api-security-guide.md) - 認證與授權

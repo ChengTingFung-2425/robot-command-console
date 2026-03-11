@@ -22,12 +22,21 @@ from typing import Any, Dict, List, Optional
 
 import aiohttp
 
-# 添加專案路徑
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+EDGE_DIR = os.path.dirname(CURRENT_DIR)
+PROJECT_ROOT = os.path.dirname(EDGE_DIR)
+
+# 直接以檔案路徑執行時，避免 Edge/robot_service/queue 遮蔽標準庫 queue
+if __package__ in (None, "") and CURRENT_DIR in sys.path:
+    sys.path.remove(CURRENT_DIR)
+
+for path in [PROJECT_ROOT, EDGE_DIR]:
+    if path not in sys.path:
+        sys.path.insert(0, path)
 
 from src.common.service_types import ServiceConfig  # noqa: E402
-from src.robot_service.service_coordinator import ServiceBase, ServiceCoordinator, QueueService  # noqa: E402
-from src.robot_service.token_integration import TokenIntegration  # noqa: E402
+from robot_service.service_coordinator import ServiceBase, ServiceCoordinator, QueueService  # noqa: E402
+from robot_service.token_integration import TokenIntegration  # noqa: E402
 
 
 logger = logging.getLogger(__name__)
@@ -413,7 +422,13 @@ class UnifiedLauncher:
         # 從當前模組位置向上尋找專案根目錄
         current = os.path.dirname(os.path.abspath(__file__))
         while current != os.path.dirname(current):
-            if os.path.exists(os.path.join(current, 'requirements.txt')):
+            has_git_dir = os.path.isdir(os.path.join(current, ".git"))
+            has_core_markers = (
+                os.path.isdir(os.path.join(current, "src", "common")) and
+                os.path.isfile(os.path.join(current, "package.json")) and
+                os.path.isfile(os.path.join(current, "Edge", "requirements.txt"))
+            )
+            if has_git_dir or has_core_markers:
                 return current
             current = os.path.dirname(current)
         return os.getcwd()

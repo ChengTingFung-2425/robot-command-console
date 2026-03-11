@@ -31,8 +31,8 @@ from .command_processor import (
     create_action_executor_dispatcher,
     create_mqtt_dispatcher,
 )
-# 從 common 模組導入共用服務類型
-from common.service_types import ServiceStatus, ServiceConfig, ServiceState
+# 從 src.common 模組導入共用服務類型
+from src.common.service_types import ServiceStatus, ServiceConfig, ServiceState
 
 try:
     from .cli.runner import CLIRunner

@@ -11,29 +11,37 @@ Robot Command Console is a unified platform for managing, routing, and executing
 
 ```
 robot-command-console/
-├── Cloud/                     # Cloud-based operations
+├── Cloud/                     # 雲端服務
 │   ├── MCP/                   # Model Context Protocol services
-│   ├── user_management/       # User management services
-│   ├── notification/          # Notification services
-│   └── firmware_repository/   # Firmware repository
+│   ├── user_management/       # 使用者管理服務
+│   ├── notification/          # 通知服務
+│   ├── firmware_repository/   # 韌體倉庫
+│   └── requirements.txt       # Cloud Python 依賴
 │
-├── Edge/                      # Edge computing and services
+├── Edge/                      # 邊緣運算與本地服務
 │   ├── MCP/                   # Unified MCP and LLM discovery module
-│   ├── qtwebview-app/         # PyQt application (Tiny version)
 │   ├── WebUI/                 # Web-based user interface
+│   ├── electron-app/          # Electron 應用
+│   ├── qtwebview-app/         # PyQt application (Tiny version)
+│   ├── robot_service/         # 邊緣機器人服務
 │   ├── unified-edge-app/      # Unified edge application
+│   ├── requirements.txt       # Edge Python 依賴
+│   ├── config.py              # Edge 設定入口
+│   ├── config.toml            # Edge 設定檔
+│   ├── unified_launcher_cli.py # 統一啟動器 CLI
 │   └── start_all_services.py  # Script to start all edge services
 │
-├── Executor/                  # Robot command execution
+├── Executor/                  # 執行器模組
 │   ├── action_executor.py     # Executes robot actions
 │   ├── advanced_decoder.py    # Decodes advanced commands
 │   ├── pubsub.py              # Publish-subscribe utilities
-│   └── tools.py               # Utility tools for execution
+│   ├── tools.py               # Utility tools for execution
+│   └── requirements.txt       # Executor Python 依賴
 │
-├── config/                    # Configuration files
-├── docs/                      # Documentation
-├── tests/                     # Test cases and examples
-└── requirements.txt           # Python dependencies
+├── config.py                  # 共用設定入口
+├── config.toml                # 根目錄設定檔
+├── docs/                      # 文件
+└── tests/                     # 測試
 ```
 
 ## Design Principles

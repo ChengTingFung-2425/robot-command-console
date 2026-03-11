@@ -115,8 +115,9 @@
 # 1. 安裝依賴
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
-pip install -r MCP/requirements.txt
+pip install -r Cloud/requirements.txt
+pip install -r Edge/requirements.txt
+pip install -r Executor/requirements.txt
 
 # 2. 一鍵啟動所有服務（推薦）
 python3 start_all_services.py

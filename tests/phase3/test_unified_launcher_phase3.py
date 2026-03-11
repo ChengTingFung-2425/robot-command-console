@@ -7,8 +7,13 @@ import sys
 import unittest
 from pathlib import Path
 
-# 添加 src 目錄到路徑
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+EDGE_PATH = str(PROJECT_ROOT / 'Edge')
+SRC_PATH = str(PROJECT_ROOT / 'src')
+
+for path in [EDGE_PATH, SRC_PATH]:
+    if path not in sys.path:
+        sys.path.insert(0, path)
 
 import pytest  # noqa: E402
 
@@ -18,12 +23,12 @@ class TestUnifiedLauncherExists:
 
     def test_unified_launcher_module_exists(self):
         """確認 unified_launcher.py 存在"""
-        launcher_path = Path(__file__).parent.parent.parent / 'src' / 'robot_service' / 'unified_launcher.py'
+        launcher_path = PROJECT_ROOT / 'Edge' / 'robot_service' / 'unified_launcher.py'
         assert launcher_path.exists(), "unified_launcher.py 不存在"
 
     def test_unified_launcher_cli_exists(self):
         """確認 unified_launcher_cli.py 存在"""
-        cli_path = Path(__file__).parent.parent.parent / 'unified_launcher_cli.py'
+        cli_path = PROJECT_ROOT / 'Edge' / 'unified_launcher_cli.py'
         assert cli_path.exists(), "unified_launcher_cli.py 不存在"
 
 
@@ -202,7 +207,7 @@ class TestUnifiedLauncherModuleContent:
     @pytest.fixture
     def launcher_content(self):
         """讀取 unified_launcher.py 內容"""
-        launcher_path = Path(__file__).parent.parent.parent / 'src' / 'robot_service' / 'unified_launcher.py'
+        launcher_path = PROJECT_ROOT / 'Edge' / 'robot_service' / 'unified_launcher.py'
         return launcher_path.read_text(encoding='utf-8')
 
     def test_has_start_all_method(self, launcher_content):
@@ -233,6 +238,23 @@ class TestUnifiedLauncherModuleContent:
         """確認使用 ServiceCoordinator"""
         assert "ServiceCoordinator" in launcher_content, "未使用 ServiceCoordinator"
 
+    def test_uses_absolute_robot_service_imports(self, launcher_content):
+        """確認可直接執行時使用絕對 robot_service 匯入"""
+        assert (
+            "from robot_service.service_coordinator import ServiceBase, ServiceCoordinator, QueueService"
+            in launcher_content
+        )
+        assert "from robot_service.token_integration import TokenIntegration" in launcher_content
+
+    def test_bootstraps_project_and_edge_paths_for_direct_execution(self, launcher_content):
+        """確認直接執行時會引導 PROJECT_ROOT 與 EDGE_DIR 路徑"""
+        assert "CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))" in launcher_content
+        assert "EDGE_DIR = os.path.dirname(CURRENT_DIR)" in launcher_content
+        assert "PROJECT_ROOT = os.path.dirname(EDGE_DIR)" in launcher_content
+        assert 'if __package__ in (None, "") and CURRENT_DIR in sys.path:' in launcher_content
+        assert "sys.path.remove(CURRENT_DIR)" in launcher_content
+        assert "for path in [PROJECT_ROOT, EDGE_DIR]:" in launcher_content
+
     def test_has_health_check_documentation(self, launcher_content):
         """確認有健康檢查相關文檔"""
         assert "健康檢查" in launcher_content, "健康檢查文檔缺失"
@@ -248,7 +270,7 @@ class TestUnifiedLauncherCLI:
     @pytest.fixture
     def cli_content(self):
         """讀取 unified_launcher_cli.py 內容"""
-        cli_path = Path(__file__).parent.parent.parent / 'unified_launcher_cli.py'
+        cli_path = PROJECT_ROOT / 'Edge' / 'unified_launcher_cli.py'
         return cli_path.read_text(encoding='utf-8')
 
     def test_cli_imports_main(self, cli_content):

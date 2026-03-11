@@ -98,6 +98,9 @@ https://github.com/ChengTingFung-2425/robot-command-console/releases
 確認：
 - [ ] Release Notes 完整
 - [ ] 所有平台的打包檔案已上傳
+- [ ] Linux 已包含 `RobotConsole-linux.AppImage` 與 `RobotConsole-linux.tar.gz`
+- [ ] Windows 已包含 `RobotConsole-Setup-*.exe` 與 `RobotConsole-Electron-Setup-*.exe`
+- [ ] macOS 已包含 `RobotConsole-macos.tar.gz`
 - [ ] 下載連結可用
 - [ ] Pre-release 標記正確（如適用）
 
@@ -138,14 +141,13 @@ tar -czf RobotConsole-$(uname -s).tar.gz RobotConsole/
 測試各平台下載連結：
 ```bash
 # Linux
-wget https://github.com/.../RobotConsole-linux.tar.gz
-tar -xzf RobotConsole-linux.tar.gz
-./RobotConsole/RobotConsole
+wget https://github.com/.../RobotConsole-linux.AppImage
+chmod +x RobotConsole-linux.AppImage
+./RobotConsole-linux.AppImage
 
 # Windows (PowerShell)
-Invoke-WebRequest -Uri https://github.com/.../RobotConsole-windows.zip -OutFile RobotConsole.zip
-Expand-Archive RobotConsole.zip
-.\RobotConsole\RobotConsole.exe
+Invoke-WebRequest -Uri https://github.com/.../RobotConsole-Setup-3.2.0.exe -OutFile RobotConsole-Setup.exe
+.\RobotConsole-Setup.exe
 
 # macOS
 curl -L https://github.com/.../RobotConsole-macos.tar.gz -o RobotConsole.tar.gz

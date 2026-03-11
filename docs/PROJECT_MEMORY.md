@@ -228,6 +228,14 @@ import secrets
 token = os.environ.get("APP_TOKEN") or secrets.token_hex(32)
 ```
 
+### 4.5. CI/CD 打包流程要重用本地腳本 ⭐⭐⭐
+
+**使用頻率**：每次調整封裝流程 | **新增**：2026-03-11
+
+- GitHub Actions 的 `build.yml` / `release.yml` 應直接呼叫 `scripts/build-linux.sh`、`scripts/build-windows.ps1`、`scripts/build-macos.sh`
+- 不要在 workflow 內重複寫 `pyinstaller`、`electron-builder`、`makensis` 的細節，避免本地流程與 CI/CD 漂移
+- 釋出資產名稱要與腳本輸出一致：Linux (`RobotConsole-linux.AppImage`, `RobotConsole-linux.tar.gz`)、Windows (`RobotConsole-Setup-*.exe`, `RobotConsole-Electron-Setup-*.exe`)、macOS (`RobotConsole-macos.tar.gz`)
+
 ### 21. 零信任前端原則 ⭐⭐⭐
 
 **使用頻率**：所有前後端互動 | **相關**：[security/threat-model.md](security/threat-model.md)

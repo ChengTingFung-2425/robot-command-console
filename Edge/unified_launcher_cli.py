@@ -11,8 +11,8 @@
 import os
 import sys
 
-# 添加 src 到路徑（必須在導入 robot_service 前執行）
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+# 添加 Edge 目錄到路徑（必須在導入 robot_service 前執行）
+sys.path.insert(0, os.path.dirname(__file__))
 
 from robot_service.unified_launcher import main  # noqa: E402
 

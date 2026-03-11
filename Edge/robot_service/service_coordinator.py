@@ -11,9 +11,9 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Any, Callable, Coroutine, Dict, Optional
 
-# 從 common 模組導入共用服務類型
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from common.service_types import ServiceStatus, ServiceConfig, ServiceState  # noqa: E402
+# 從 src.common 模組導入共用服務類型
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+from src.common.service_types import ServiceStatus, ServiceConfig, ServiceState  # noqa: E402
 
 from .service_manager import ServiceManager  # noqa: E402
 

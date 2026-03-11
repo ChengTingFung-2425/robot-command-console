@@ -243,6 +243,12 @@ class TestUnifiedLauncherModuleContent:
         assert "from robot_service.service_coordinator import" in launcher_content
         assert "from robot_service.token_integration import" in launcher_content
 
+    def test_bootstraps_project_and_edge_paths_for_direct_execution(self, launcher_content):
+        """確認直接執行時會引導 PROJECT_ROOT 與 EDGE_DIR 路徑"""
+        assert "EDGE_DIR = os.path.dirname(CURRENT_DIR)" in launcher_content
+        assert "PROJECT_ROOT = os.path.dirname(EDGE_DIR)" in launcher_content
+        assert "for path in [PROJECT_ROOT, EDGE_DIR]:" in launcher_content
+
     def test_has_health_check_documentation(self, launcher_content):
         """確認有健康檢查相關文檔"""
         assert "健康檢查" in launcher_content, "健康檢查文檔缺失"

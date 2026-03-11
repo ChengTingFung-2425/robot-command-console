@@ -26,6 +26,7 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 EDGE_DIR = os.path.dirname(CURRENT_DIR)
 PROJECT_ROOT = os.path.dirname(EDGE_DIR)
 
+# 直接以檔案路徑執行時，避免 Edge/robot_service/queue 遮蔽標準庫 queue
 if __package__ in (None, "") and CURRENT_DIR in sys.path:
     sys.path.remove(CURRENT_DIR)
 

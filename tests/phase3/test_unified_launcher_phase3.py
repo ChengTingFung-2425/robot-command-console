@@ -240,13 +240,19 @@ class TestUnifiedLauncherModuleContent:
 
     def test_uses_absolute_robot_service_imports(self, launcher_content):
         """確認可直接執行時使用絕對 robot_service 匯入"""
-        assert "from robot_service.service_coordinator import" in launcher_content
-        assert "from robot_service.token_integration import" in launcher_content
+        assert (
+            "from robot_service.service_coordinator import ServiceBase, ServiceCoordinator, QueueService"
+            in launcher_content
+        )
+        assert "from robot_service.token_integration import TokenIntegration" in launcher_content
 
     def test_bootstraps_project_and_edge_paths_for_direct_execution(self, launcher_content):
         """確認直接執行時會引導 PROJECT_ROOT 與 EDGE_DIR 路徑"""
+        assert "CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))" in launcher_content
         assert "EDGE_DIR = os.path.dirname(CURRENT_DIR)" in launcher_content
         assert "PROJECT_ROOT = os.path.dirname(EDGE_DIR)" in launcher_content
+        assert 'if __package__ in (None, "") and CURRENT_DIR in sys.path:' in launcher_content
+        assert "sys.path.remove(CURRENT_DIR)" in launcher_content
         assert "for path in [PROJECT_ROOT, EDGE_DIR]:" in launcher_content
 
     def test_has_health_check_documentation(self, launcher_content):

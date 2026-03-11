@@ -274,9 +274,10 @@ build_binary_tarball() {
     # 安裝 Python 依賴
     log_info "安裝 Python 依賴..."
     python3 -m pip install --upgrade pip setuptools wheel
-    if [[ -f "${PROJECT_ROOT}/requirements.txt" ]]; then
-        python3 -m pip install -r "${PROJECT_ROOT}/requirements.txt" || \
-            log_warning "部分依賴安裝失敗（繼續打包）"
+    local edge_requirements="${PROJECT_ROOT}/Edge/requirements.txt"
+    if [[ -f "${edge_requirements}" ]]; then
+        python3 -m pip install -r "${edge_requirements}" || \
+            log_warning "部分依賴安裝失敗：Edge/requirements.txt（繼續打包）"
     fi
     log_success "Python 依賴安裝完成"
 

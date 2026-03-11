@@ -118,7 +118,6 @@ def test_root_level_files():
     root_files = [
         "README.md",
         "package.json",  # 新增的根層級 package.json
-        "requirements.txt",
         "flask_service.py",
         "run_service_cli.py",
         "config.py",  # 保留向後相容
@@ -127,6 +126,16 @@ def test_root_level_files():
     for file_name in root_files:
         file_path = project_root / file_name
         assert file_path.exists(), f"根層級文件不存在: {file_name}"
+
+    module_requirements = [
+        "Cloud/requirements.txt",
+        "Edge/requirements.txt",
+        "Executor/requirements.txt",
+    ]
+
+    for file_name in module_requirements:
+        file_path = project_root / file_name
+        assert file_path.exists(), f"模組依賴文件不存在: {file_name}"
 
 
 def test_python_imports_work():

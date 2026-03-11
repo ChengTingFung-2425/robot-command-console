@@ -162,7 +162,7 @@ function Build-NsisInstaller {
 
     # 安裝 Python 依賴
     Write-Info "正在安裝 Python 依賴..."
-    $reqFile = Join-Path $ProjectRoot "requirements.txt"
+    $reqFile = Join-Path $ProjectRoot "Edge\requirements.txt"
     if (Test-Path $reqFile) {
         python -m pip install -r $reqFile --quiet
     }

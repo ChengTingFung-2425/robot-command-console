@@ -10,10 +10,14 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # 複製依賴文件
-COPY requirements.txt .
+COPY Cloud/requirements.txt ./cloud-requirements.txt
+COPY Edge/requirements.txt ./edge-requirements.txt
+COPY Executor/requirements.txt ./executor-requirements.txt
 
 # 安裝 Python 依賴
-RUN pip install --no-cache-dir -r requirements.txt && \
+RUN for req in cloud-requirements.txt edge-requirements.txt executor-requirements.txt; do \
+        pip install --no-cache-dir -r "$req"; \
+    done && \
     pip install --no-cache-dir pytest pytest-asyncio pytest-cov flake8
 
 # 複製源代碼

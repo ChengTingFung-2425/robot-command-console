@@ -33,7 +33,9 @@ robot-command-console/
 ├── config/                    # Configuration files
 ├── docs/                      # Documentation
 ├── tests/                     # Test cases and examples
-└── requirements.txt           # Python dependencies
+├── Cloud/requirements.txt     # Cloud Python dependencies
+├── Edge/requirements.txt      # Edge Python dependencies
+└── Executor/requirements.txt  # Executor Python dependencies
 ```
 
 ## Design Principles

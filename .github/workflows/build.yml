@@ -68,7 +68,9 @@ jobs:
       - name: 安裝 Python 依賴
         run: |
           pip install --upgrade pip setuptools wheel
-          pip install -r requirements.txt
+          for req in Cloud/requirements.txt Edge/requirements.txt Executor/requirements.txt; do
+            pip install -r "$req"
+          done
           pip install pyinstaller pillow
       
       - name: 檢查版本資訊
@@ -176,7 +178,9 @@ jobs:
       
       - name: 安裝依賴
         run: |
-          pip install -r requirements.txt
+          for req in Cloud/requirements.txt Edge/requirements.txt Executor/requirements.txt; do
+            pip install -r "$req"
+          done
           pip install pytest pytest-cov pytest-asyncio aiohttp pydantic httpx requests
           pip install Flask Flask-Login Flask-SQLAlchemy Flask-WTF email-validator
       

@@ -101,7 +101,9 @@ jobs:
       
       - name: 安裝依賴
         run: |
-          pip install -r requirements.txt
+          for req in Cloud/requirements.txt Edge/requirements.txt Executor/requirements.txt; do
+            pip install -r "$req"
+          done
           pip install pytest pytest-asyncio aiohttp pydantic httpx requests
           # 安裝 WebUI 測試依賴（用於審計日誌測試）
           pip install Flask Flask-Login Flask-SQLAlchemy Flask-WTF email-validator
@@ -247,7 +249,9 @@ jobs:
       
       - name: 安裝依賴
         run: |
-          pip install -r requirements.txt
+          for req in Cloud/requirements.txt Edge/requirements.txt Executor/requirements.txt; do
+            pip install -r "$req"
+          done
           pip install pytest pytest-asyncio aiohttp pydantic httpx requests
           # 安裝 WebUI 測試依賴（用於審計日誌測試）
           pip install Flask Flask-Login Flask-SQLAlchemy Flask-WTF email-validator

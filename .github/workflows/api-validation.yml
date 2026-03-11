@@ -120,8 +120,7 @@ jobs:
       
       - name: 安裝依賴
         run: |
-          pip install -r requirements.txt
-          pip install -r MCP/requirements.txt
+          pip install -r Edge/requirements.txt
           pip install pytest pytest-asyncio
       
       - name: 執行安全測試

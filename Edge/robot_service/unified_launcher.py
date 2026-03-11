@@ -412,8 +412,16 @@ class UnifiedLauncher:
         """偵測專案根目錄"""
         # 從當前模組位置向上尋找專案根目錄
         current = os.path.dirname(os.path.abspath(__file__))
+        project_markers = [
+            os.path.join("Cloud", "requirements.txt"),
+            os.path.join("Edge", "requirements.txt"),
+            os.path.join("Executor", "requirements.txt"),
+            os.path.join("src", "common"),
+        ]
         while current != os.path.dirname(current):
-            if os.path.exists(os.path.join(current, 'requirements.txt')):
+            if all(
+                    os.path.exists(os.path.join(current, marker))
+                    for marker in project_markers):
                 return current
             current = os.path.dirname(current)
         return os.getcwd()

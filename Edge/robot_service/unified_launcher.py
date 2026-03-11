@@ -22,9 +22,6 @@ from typing import Any, Dict, List, Optional
 
 import aiohttp
 
-# 添加專案路徑
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-
 from src.common.service_types import ServiceConfig  # noqa: E402
 from .service_coordinator import ServiceBase, ServiceCoordinator, QueueService  # noqa: E402
 from .token_integration import TokenIntegration  # noqa: E402

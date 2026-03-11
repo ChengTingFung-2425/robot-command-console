@@ -39,13 +39,9 @@ Edge 可能使用網路佇列服務（Redis/RabbitMQ）連接到 Runner。
 
 import asyncio
 import logging
-import os
-import sys
 from enum import Enum
 from typing import Any, Callable, Coroutine, Dict, Optional
 
-# 確保可以正確導入 src.common 模組
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..')))
 from src.common.network_monitor import NetworkMonitor, NetworkStatus  # noqa: E402
 from src.common.shared_state import SharedStateManager  # noqa: E402
 from src.common.datetime_utils import utc_now  # noqa: E402

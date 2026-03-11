@@ -44,13 +44,13 @@
 
 ---
 
-## Deployment & Validation
+## 部署與驗證
 
-| Document | Description |
-|----------|-------------|
-| [`RABBITMQ_DEPLOYMENT.md`](deployment/RABBITMQ_DEPLOYMENT.md) | RabbitMQ deployment guide |
-| [`TEST_EXECUTION.md`](deployment/TEST_EXECUTION.md) | Test execution guide |
-| [`INSTALLATION_VALIDATION_LOG.md`](deployment/INSTALLATION_VALIDATION_LOG.md) | Installation test & environment verification log (2026-03-09) |
+| 文件 | 說明 |
+|------|------|
+| [`RABBITMQ_DEPLOYMENT.md`](deployment/RABBITMQ_DEPLOYMENT.md) | RabbitMQ 部署指南 |
+| [`TEST_EXECUTION.md`](deployment/TEST_EXECUTION.md) | 測試執行指南 |
+| [`INSTALLATION_VALIDATION_LOG.md`](deployment/INSTALLATION_VALIDATION_LOG.md) | 安裝測試與環境驗證紀錄（2026-03-09） |
 
 ---
 

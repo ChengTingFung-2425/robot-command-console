@@ -456,7 +456,7 @@ pagination = query.order_by(AuditLog.timestamp.desc()).paginate(page=page, per_p
 ### 2026-03-09: 安裝測試與環境驗證紀錄
 
 - 新增 `docs/deployment/INSTALLATION_VALIDATION_LOG.md`，記錄 Ubuntu 24.04 + Python 3.12 環境下的安裝與測試嘗試。
-- 依賴安裝（`pip install -r requirements.txt`）成功，但 `python -m pytest -q` 因 `MCP`/`robot_service`/`common` 模組未解析與缺少 `pydantic`、`paramiko` 等依賴而收集失敗；建議先設定 `PYTHONPATH="src:Edge:."` 並補齊缺失套件後再跑完整測試。
+- 依賴安裝（`pip install -r requirements.txt`）成功，但 `python -m pytest -q` 因 `MCP`/`robot_service`/`common` 模組未解析與 Edge 依賴未安裝而收集失敗；`pydantic`、`paramiko` 等套件其實已列在 `Edge/requirements.txt`（非 root `requirements.txt`），建議先安裝 root + Edge 依賴並設定 `PYTHONPATH="src:Edge:."` 後再跑完整測試。
 - 更新 `docs/README.md` 與 `docs/user_guide/USER_GUIDE_INDEX.md` 以便快速索引本次驗證紀錄。
 
 ### 2026-03-04: 經驗教訓標籤系統與搜尋管理工具

@@ -20,8 +20,8 @@
 # 1) 安裝核心依賴
 pip install -r requirements.txt
 
-# 2) 預期（未安裝）：Edge Tiny 依賴
-#    若需 Tiny 版本，需另外安裝 Edge/qtwebview-app 所需套件
+# 2) 安裝 Edge / MCP 相關依賴
+pip install -r Edge/requirements.txt
 
 # 3) 驗證指令（本次執行）
 python -m pytest -q
@@ -39,18 +39,18 @@ python -m pytest -q
 ### 主要阻塞原因
 
 1. **模組路徑未解析**：`MCP`, `robot_service`, `common` 等模組因未設定 `PYTHONPATH` 或缺少對應封裝而導致 `ModuleNotFoundError`。  
-2. **缺失依賴**：測試載入時需要但未安裝的套件（例如 `pydantic`, `paramiko`）。  
+2. **Edge 依賴未安裝**：測試載入 `MCP` / Edge 模組時需要 `pydantic`、`paramiko` 等套件；這些套件已列在 `Edge/requirements.txt`，不在 root `requirements.txt`。  
 
 ### 建議後續處理
 
+- 若要執行會 import `MCP` / Edge 模組的測試，先安裝 **root + Edge** 兩份依賴：`pip install -r requirements.txt && pip install -r Edge/requirements.txt`。  
 - 在本地或 CI 執行測試前，加入路徑設定：`export PYTHONPATH="src:Edge:."`（或建立對應封裝/安裝腳本）。  
-- 將缺失依賴補入安裝流程（如 `pydantic`, `paramiko`，以及 Tiny 版本需要的額外 Qt 相關套件）。  
 - 若僅需部分測試，可先以 `python -m pytest tests/<target>::<case> -q` 逐步驗證，並確認路徑/依賴完整後再跑全套。  
 
 ---
 
 ## 📌 總結
 
-- **目前安裝步驟可成功完成核心依賴安裝。**  
-- **測試執行仍受模組路徑與缺失依賴阻塞，需補充 `PYTHONPATH` 設定與安裝額外套件後再進行。**  
+- **目前 root 依賴可成功安裝；若需測試 `MCP` / Edge 模組，還需一併安裝 `Edge/requirements.txt`。**  
+- **測試執行仍受模組路徑與 Edge 依賴未安裝阻塞，需補充 `PYTHONPATH` 設定後再進行。**  
 - 後續可在此文件下方持續追加新的驗證批次與結果，以建立可追溯的安裝/測試紀錄。  

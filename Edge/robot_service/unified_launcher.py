@@ -412,16 +412,14 @@ class UnifiedLauncher:
         """偵測專案根目錄"""
         # 從當前模組位置向上尋找專案根目錄
         current = os.path.dirname(os.path.abspath(__file__))
-        project_markers = [
-            os.path.join("Cloud", "requirements.txt"),
-            os.path.join("Edge", "requirements.txt"),
-            os.path.join("Executor", "requirements.txt"),
-            os.path.join("src", "common"),
-        ]
         while current != os.path.dirname(current):
-            if all(
-                    os.path.exists(os.path.join(current, marker))
-                    for marker in project_markers):
+            has_git_dir = os.path.isdir(os.path.join(current, ".git"))
+            has_core_markers = (
+                os.path.isdir(os.path.join(current, "src", "common")) and
+                os.path.isfile(os.path.join(current, "package.json")) and
+                os.path.isfile(os.path.join(current, "Edge", "requirements.txt"))
+            )
+            if has_git_dir or has_core_markers:
                 return current
             current = os.path.dirname(current)
         return os.getcwd()

@@ -7,7 +7,7 @@
   },
   "waitFor": "onCreateCommand",
   "workspaceFolder": "/workspace",
-  "postCreateCommand": "for req in /workspace/Cloud/requirements.txt /workspace/Edge/requirements.txt; do pip install -r \"$req\" -q; done && PYTHONPATH=/workspace/src:/workspace/Edge FLASK_DEBUG=1 FLASK_APP=WebUI.app flask run --host=0.0.0.0 --port=8080 & PYTHONPATH=/workspace/src:/workspace/Edge python /workspace/.devcontainer/run_cloud.py &",
+  "postCreateCommand": "bash /workspace/.devcontainer/post-create.sh",
   "portsAttributes": {
     "8080": {
       "label": "Edge WebUI",

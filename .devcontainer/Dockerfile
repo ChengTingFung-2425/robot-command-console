@@ -19,7 +19,6 @@ RUN python3 -m pip install --no-cache-dir \
 # Install dependencies for Cloud and Edge devcontainer environment
 COPY Cloud/requirements.txt /tmp/pip-tmp/cloud-requirements.txt
 COPY Edge/requirements.txt /tmp/pip-tmp/edge-requirements.txt
-RUN for req in /tmp/pip-tmp/*-requirements.txt; do \
-        python3 -m pip install --no-cache-dir -r "$req"; \
-    done
+RUN python3 -m pip install --no-cache-dir -r /tmp/pip-tmp/cloud-requirements.txt \
+    && python3 -m pip install --no-cache-dir -r /tmp/pip-tmp/edge-requirements.txt
 RUN rm -rf /tmp/pip-tmp

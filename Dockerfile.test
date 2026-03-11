@@ -17,8 +17,7 @@ COPY Executor/requirements.txt ./executor-requirements.txt
 # 安裝 Python 依賴
 RUN for req in cloud-requirements.txt edge-requirements.txt executor-requirements.txt; do \
         pip install --no-cache-dir -r "$req"; \
-    done && \
-    pip install --no-cache-dir pytest pytest-asyncio pytest-cov flake8
+    done
 
 # 複製源代碼
 COPY src/ ./src/

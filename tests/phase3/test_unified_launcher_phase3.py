@@ -238,6 +238,11 @@ class TestUnifiedLauncherModuleContent:
         """確認使用 ServiceCoordinator"""
         assert "ServiceCoordinator" in launcher_content, "未使用 ServiceCoordinator"
 
+    def test_uses_absolute_robot_service_imports(self, launcher_content):
+        """確認可直接執行時使用絕對 robot_service 匯入"""
+        assert "from robot_service.service_coordinator import" in launcher_content
+        assert "from robot_service.token_integration import" in launcher_content
+
     def test_has_health_check_documentation(self, launcher_content):
         """確認有健康檢查相關文檔"""
         assert "健康檢查" in launcher_content, "健康檢查文檔缺失"

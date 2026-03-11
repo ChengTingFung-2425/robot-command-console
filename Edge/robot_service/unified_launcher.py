@@ -22,9 +22,20 @@ from typing import Any, Dict, List, Optional
 
 import aiohttp
 
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+EDGE_DIR = os.path.dirname(CURRENT_DIR)
+PROJECT_ROOT = os.path.dirname(EDGE_DIR)
+
+if __package__ in (None, "") and CURRENT_DIR in sys.path:
+    sys.path.remove(CURRENT_DIR)
+
+for path in [PROJECT_ROOT, EDGE_DIR]:
+    if path not in sys.path:
+        sys.path.insert(0, path)
+
 from src.common.service_types import ServiceConfig  # noqa: E402
-from .service_coordinator import ServiceBase, ServiceCoordinator, QueueService  # noqa: E402
-from .token_integration import TokenIntegration  # noqa: E402
+from robot_service.service_coordinator import ServiceBase, ServiceCoordinator, QueueService  # noqa: E402
+from robot_service.token_integration import TokenIntegration  # noqa: E402
 
 
 logger = logging.getLogger(__name__)

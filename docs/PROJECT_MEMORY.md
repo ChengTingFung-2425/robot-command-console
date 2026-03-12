@@ -203,6 +203,15 @@ find src/ Edge/MCP/ -name "*.py" -exec sed -i 's/[[:space:]]*$//' {} \;
 - Azure `Storage Account` 名稱有長度限制，前綴與 random hex 長度要一起檢查
 - 至少提供 `terraform.tfvars.example` 與 output，讓 Cloud Terraform 可直接被操作與驗證
 
+### 1.6. CI 打包避免 source-built psycopg2 ⭐⭐⭐
+
+**使用頻率**：調整 `.github/workflows/build.yml` / `release.yml` 或模組 requirements 時 | **修復**：2026-03-12
+
+- `Cloud/requirements.txt`、`Edge/requirements.txt`、`Executor/requirements.txt` 在 CI 打包情境改用 `psycopg2-binary==2.9.5`
+- 這是為了避免 macOS/Windows runner 因缺少 `pg_config` 或 PostgreSQL 編譯工具鏈而在安裝依賴階段失敗
+- macOS workflow 若需額外資料庫 CLI，當前 PR 已改為 `mysql-client`，不再依賴 `brew install postgresql`
+- 若未來部署策略需要 source-built `psycopg2`，應另行區分 production 與 CI/packaging requirements，不要直接回退目前的 CI 依賴修復
+
 ### 2. Python 時間處理（必記）⭐⭐⭐
 
 **使用頻率**：高頻 | **相關**：[phase3_lessons.md](memory/phase3_lessons.md)

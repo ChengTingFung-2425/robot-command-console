@@ -182,7 +182,7 @@ jobs:
       - name: 安裝系統依賴 (macOS)
         if: matrix.platform == 'macos'
         run: |
-          brew install postgresql
+          brew install mysql-client
       
       - name: 安裝 Python 依賴
         run: |

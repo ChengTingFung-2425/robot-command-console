@@ -21,11 +21,24 @@ class TestRunner:
         if self.verbose:
             print(f"Running: {' '.join(cmd)}")
 
+        pythonpath_entries = [
+            os.getcwd(),
+            os.path.join(os.getcwd(), "src"),
+            os.path.join(os.getcwd(), "Edge"),
+        ]
+        existing_pythonpath = os.environ.get("PYTHONPATH", "")
+        if existing_pythonpath:
+            pythonpath_entries.append(existing_pythonpath)
+
+        pythonpath_env = {
+            "PYTHONPATH": os.pathsep.join(pythonpath_entries)
+        }
+
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            env={**os.environ, **(env or {})}
+            env={**os.environ, **pythonpath_env, **(env or {})}
         )
 
         for line in iter(process.stdout.readline, b''):
@@ -51,6 +64,7 @@ class TestRunner:
         if with_coverage:
             cmd.extend([
                 "--cov=src",
+                "--cov=Edge",
                 "--cov-report=term-missing",
                 "--cov-report=html:htmlcov"
             ])
@@ -105,6 +119,7 @@ class TestRunner:
         if with_coverage:
             cmd.extend([
                 "--cov=src",
+                "--cov=Edge",
                 "--cov-report=term-missing",
                 "--cov-report=html:htmlcov",
                 "--cov-report=xml:coverage.xml"
@@ -159,7 +174,7 @@ class TestRunner:
 
         cmd = [
             "python3", "-m", "flake8",
-            "src/robot_service/queue/",
+            "Edge/robot_service/queue/",
             "tests/test_rabbitmq_queue.py",
             "tests/test_queue_comparison.py",
             "--select=E,F,W",

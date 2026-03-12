@@ -50,4 +50,9 @@ variable "azure_storage_account_name_prefix" {
   description = "Prefix for the Azure storage account name"
   type        = string
   default     = "robotsa"
+
+  validation {
+    condition     = can(regex("^[a-z0-9]{1,12}$", var.azure_storage_account_name_prefix))
+    error_message = "azure_storage_account_name_prefix must be 1-12 lowercase alphanumeric characters so the prefix plus the 12-char hex suffix stays within Azure's 24-character limit."
+  }
 }

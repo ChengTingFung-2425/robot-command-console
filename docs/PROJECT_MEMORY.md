@@ -194,6 +194,15 @@ python llm-helper/check_lint.py
 find src/ Edge/MCP/ -name "*.py" -exec sed -i 's/[[:space:]]*$//' {} \;
 ```
 
+### 1.5. Cloud Terraform 模組需完整 root/module wiring ⭐⭐⭐
+
+**使用頻率**：調整 `Cloud/terraform/` 時 | **修復**：2026-03-12
+
+- root module 要宣告 `required_providers`，避免環境初始化時 provider 來源與版本不明
+- child module 內使用到的變數必須在 module 內宣告，且 root module 要明確傳入
+- Azure `Storage Account` 名稱有長度限制，前綴與 random hex 長度要一起檢查
+- 至少提供 `terraform.tfvars.example` 與 output，讓 Cloud Terraform 可直接被操作與驗證
+
 ### 2. Python 時間處理（必記）⭐⭐⭐
 
 **使用頻率**：高頻 | **相關**：[phase3_lessons.md](memory/phase3_lessons.md)

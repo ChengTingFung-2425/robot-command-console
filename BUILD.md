@@ -246,8 +246,28 @@ docker-compose up -d
 
 專案使用 GitHub Actions 進行自動化構建：
 
-- **build.yml**: 每次 push 或 PR 時自動構建所有平台
-- **release.yml**: 標籤觸發時自動建立 Release
+- **build.yml**: 每次 push 或 PR 時自動重用 `scripts/build-linux.sh`、`scripts/build-windows.ps1`、`scripts/build-macos.sh` 進行跨平台打包
+- **release.yml**: 標籤觸發時自動重用相同腳本建立 Release 資產
+
+### CI/CD 打包輸出
+
+| 平台 | CI/CD 腳本 | 主要輸出 |
+|------|-----------|----------|
+| Linux | `scripts/build-linux.sh` | `dist/RobotConsole-linux.AppImage`、`dist/RobotConsole-linux.tar.gz` |
+| Windows | `scripts/build-windows.ps1` | `dist/RobotConsole-Setup-*.exe`、`dist/RobotConsole-Electron-Setup-*.exe` |
+| macOS | `scripts/build-macos.sh` | `dist/RobotConsole-macos.tar.gz` |
+
+如需在本地驗證 CI/CD 打包腳本與 workflow 設定，可執行：
+
+```bash
+PYTHONPATH="${PWD}/src" python -m pytest \
+  tests/edge/test_edge_packaging.py \
+  tests/edge/test_windows_installer.py \
+  tests/edge/test_macos_packaging.py \
+  tests/edge/test_packaging_workflows.py -q
+```
+
+> 此指令用於跨平台打包設定驗證；若只需驗證單一平台，可比照 `build.yml` 僅執行對應的測試檔。
 
 ### 觸發構建
 

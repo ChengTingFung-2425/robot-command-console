@@ -170,6 +170,25 @@ python -m cloud_service.main
 docker-compose up -d
 ```
 
+### 使用 Terraform 建立多雲端儲存資源
+
+```bash
+cd Cloud/terraform
+cp terraform.tfvars.example terraform.tfvars
+
+# 依實際環境填入 gcp_project / azure_subscription_id 等值後再執行
+terraform init
+terraform plan
+```
+
+目前 Terraform 組態會：
+
+- 在 AWS 建立一個 S3 bucket
+- 在 GCP 建立一個 Cloud Storage bucket
+- 在 Azure 建立一個 Resource Group 與 Storage Account
+
+如需調整名稱前綴或區域，可修改 `terraform.tfvars` 內對應變數。
+
 ### Edge App 連接到雲端（可選）
 
 ```yaml

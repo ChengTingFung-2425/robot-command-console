@@ -1,7 +1,7 @@
 # AWS resources configuration
 
 resource "aws_s3_bucket" "example" {
-  bucket = "example-bucket-${random_id.bucket_id.hex}"
+  bucket = "${var.bucket_name_prefix}-${random_id.bucket_id.hex}"
   acl    = "private"
 }
 

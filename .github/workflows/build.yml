@@ -45,6 +45,15 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
+
+      - name: 設定 Node.js
+        # macOS 僅使用 scripts/build-macos.sh 的 PyInstaller 流程，不需 electron-builder。
+        if: matrix.platform != 'macos'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: Edge/electron-app/package-lock.json
       
       - name: 安裝系統依賴 (Ubuntu)
         if: matrix.platform == 'linux'
@@ -54,7 +63,7 @@ jobs:
             libxcb-xinerama0 \
             libxcb-cursor0 \
             libxkbcommon-x11-0 \
-            libgl1-mesa-glx \
+            libgl1 \
             libdbus-1-3 \
             libegl1 \
             libxcb-icccm4 \
@@ -64,99 +73,113 @@ jobs:
             libxcb-render-util0 \
             libxcb-shape0 \
             libxcb-sync1
+
+      - name: 安裝系統依賴 (macOS)
+        if: matrix.platform == 'macos'
+        run: |
+          brew install mysql-client
       
       - name: 安裝 Python 依賴
+        shell: bash
         run: |
           pip install --upgrade pip setuptools wheel
           for req in Cloud/requirements.txt Edge/requirements.txt Executor/requirements.txt; do
             pip install -r "$req"
           done
-          pip install pyinstaller pillow
+          pip install pyinstaller pillow pytest
       
       - name: 檢查版本資訊
         run: |
           python src/common/version.py
       
-      - name: 執行測試
+      - name: 驗證打包腳本與設定
+        # 這裡只執行聚焦的打包驗證；完整測試仍由 ci.yml / coverage job 負責。
+        shell: bash
         run: |
-          pip install pytest pytest-asyncio aiohttp pydantic httpx requests
-          pip install Flask Flask-Login Flask-SQLAlchemy Flask-WTF email-validator
+          case "${{ matrix.platform }}" in
+            linux)
+              python -m pytest \
+                tests/edge/test_edge_packaging.py \
+                tests/edge/test_packaging_workflows.py \
+                -q
+              ;;
+            windows)
+              python -m pytest \
+                tests/edge/test_windows_installer.py \
+                tests/edge/test_packaging_workflows.py \
+                -q
+              ;;
+            macos)
+              python -m pytest \
+                tests/edge/test_macos_packaging.py \
+                tests/edge/test_packaging_workflows.py \
+                -q
+              ;;
+          esac
         env:
-          PYTHONPATH: ${{ github.workspace }}/src
-      
-      - name: 運行 pytest
+          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/src:${{ github.workspace }}/Edge
+
+      - name: 執行跨平台打包腳本
+        shell: bash
         run: |
-          python -m pytest tests/ -v --tb=short
-        env:
-          PYTHONPATH: ${{ github.workspace }}/src
-        continue-on-error: true
-      
-      - name: 建立啟動畫面圖片
-        run: |
-          python Edge/qtwebview-app/resources/images/create_splash_image.py
-      
-      - name: 打包應用程式
-        run: |
-          pyinstaller Edge/qtwebview-app/build.spec
-        env:
-          PYTHONPATH: ${{ github.workspace }}/src
-      
+          case "${{ matrix.platform }}" in
+            linux)
+              bash scripts/build-linux.sh
+              ;;
+            windows)
+              pwsh -NoLogo -NoProfile -File scripts/build-windows.ps1
+              ;;
+            macos)
+              bash scripts/build-macos.sh
+              ;;
+          esac
+
       - name: 驗證打包結果
         shell: bash
         run: |
-          if [ -d "dist/RobotConsole" ]; then
-            echo "✓ 打包成功"
-            ls -lh dist/RobotConsole/
-          else
-            echo "✗ 打包失敗"
-            exit 1
-          fi
-      
-      - name: 建立壓縮檔 (Linux/macOS)
-        if: matrix.platform != 'windows'
-        shell: bash
-        run: |
-          cd dist
-          tar -czf ${{ matrix.artifact_name }}.tar.gz RobotConsole/
-      
-      - name: 建立壓縮檔 (Windows)
-        if: matrix.platform == 'windows'
-        shell: pwsh
-        run: |
-          cd dist
-          Compress-Archive -Path 'RobotConsole' -DestinationPath '${{ matrix.artifact_name }}.zip' -Force
+          case "${{ matrix.platform }}" in
+            linux)
+              test -f dist/RobotConsole-linux.AppImage
+              test -f dist/RobotConsole-linux.tar.gz
+              ls -lh dist/RobotConsole-linux.AppImage dist/RobotConsole-linux.tar.gz
+              ;;
+            windows)
+              ls -lh dist/RobotConsole-Setup-*.exe dist/RobotConsole-Electron-Setup-*.exe
+              ;;
+            macos)
+              test -f dist/RobotConsole-macos.tar.gz
+              ls -lh dist/RobotConsole-macos.tar.gz
+              ;;
+          esac
 
-      - name: 建立 NSIS 安裝程式 (Windows)
-        if: matrix.platform == 'windows'
-        shell: pwsh
-        run: |
-          # 安裝 NSIS
-          choco install nsis -y --no-progress
-          $env:PATH = "C:\Program Files (x86)\NSIS;$env:PATH"
-          makensis /VERSION
-
-          # 建立 NSIS 安裝程式
-          Push-Location Edge\qtwebview-app
-          makensis /V2 installer.nsi
-          Pop-Location
-
-          # 驗證輸出
-          $installer = Get-ChildItem dist -Filter "RobotConsole-Setup-*.exe"
-          if ($installer) {
-            Write-Host "✓ NSIS 安裝程式建立成功：$($installer.Name)"
-          } else {
-            Write-Error "✗ NSIS 安裝程式建立失敗"
-            exit 1
-          }
-
-      - name: 上傳構建產物
+      - name: 上傳 Linux 構建產物
+        if: matrix.platform == 'linux'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
           path: |
-            dist/${{ matrix.artifact_name }}.zip
-            dist/${{ matrix.artifact_name }}.tar.gz
+            dist/RobotConsole-linux.AppImage
+            dist/RobotConsole-linux.tar.gz
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: 上傳 Windows 構建產物
+        if: matrix.platform == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
             dist/RobotConsole-Setup-*.exe
+            dist/RobotConsole-Electron-Setup-*.exe
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: 上傳 macOS 構建產物
+        if: matrix.platform == 'macos'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: dist/RobotConsole-macos.tar.gz
           if-no-files-found: ignore
           retention-days: 7
   

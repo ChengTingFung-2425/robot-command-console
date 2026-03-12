@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PyInstaller 打包配置（build.spec）
 - 統一版本管理機制（version.py）
 - 跨平台自動化構建
+- macOS 打包腳本（scripts/build-macos.sh）
+
+### Changed
+- build.yml 與 release.yml 改為重用 Linux / Windows / macOS 打包腳本
 
 ## [3.2.0-beta] - 2026-02-04
 

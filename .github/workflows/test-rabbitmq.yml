@@ -41,10 +41,12 @@ jobs:
 
     - name: Lint with flake8
       run: |
-        python3 -m flake8 src/robot_service/queue/ tests/test_rabbitmq_queue.py tests/test_queue_comparison.py \
+        python3 -m flake8 Edge/robot_service/queue/ tests/test_rabbitmq_queue.py tests/test_queue_comparison.py \
           --select=E,F,W --max-line-length=120 --exclude=.venv,node_modules,__pycache__
 
     - name: Run unit tests
+      env:
+        PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/src:${{ github.workspace }}/Edge
       run: |
         python3 run_tests.py unit --coverage
 
@@ -110,6 +112,8 @@ jobs:
         done
 
     - name: Check RabbitMQ availability
+      env:
+        PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/src:${{ github.workspace }}/Edge
       run: |
         python3 run_tests.py integration --check-rabbitmq || true
 
@@ -117,6 +121,7 @@ jobs:
       env:
         TEST_WITH_RABBITMQ: "1"
         RABBITMQ_URL: amqp://guest:guest@localhost:5672/
+        PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/src:${{ github.workspace }}/Edge
       run: |
         python3 run_tests.py integration --with-rabbitmq
 
@@ -165,12 +170,15 @@ jobs:
       env:
         TEST_WITH_RABBITMQ: "1"
         RABBITMQ_URL: amqp://guest:guest@localhost:5672/
+        PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/src:${{ github.workspace }}/Edge
       run: |
         python3 run_tests.py all --with-rabbitmq --coverage
 
     - name: Generate coverage report
+      env:
+        PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/src:${{ github.workspace }}/Edge
       run: |
-        python3 -m pytest tests/ --cov=src --cov-report=html --cov-report=xml
+        python3 -m pytest tests/ --cov=src --cov=Edge --cov-report=html --cov-report=xml
 
     - name: Upload coverage reports
       uses: codecov/codecov-action@v3
